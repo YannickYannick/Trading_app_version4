@@ -5,9 +5,13 @@ import Login from '@pages/Login'
 import NotFound from '@pages/NotFound'
 import Dashboard from '@pages/Dashboard'
 import Positions from '@pages/Positions'
+import PositionDetail from '@pages/PositionDetail'
 import Trades from '@pages/Trades'
+import TradeDetail from '@pages/TradeDetail'
 import Assets from '@pages/Assets'
+import AssetDetail from '@pages/AssetDetail'
 import Brokers from '@pages/Brokers'
+import Settings from '@pages/Settings'
 
 function App() {
   return (
@@ -32,21 +36,21 @@ function App() {
 
         {/* Positions */}
         <Route path="positions" element={<Positions />} />
-        {/* TODO: Ajouter PositionDetailPage */}
-        {/* <Route path="positions/:id" element={<PositionDetailPage />} /> */}
+        <Route path="positions/:id" element={<PositionDetail />} />
 
         {/* Trades */}
         <Route path="trades" element={<Trades />} />
-        {/* TODO: Ajouter TradeDetailPage */}
-        {/* <Route path="trades/:id" element={<TradeDetailPage />} /> */}
+        <Route path="trades/:id" element={<TradeDetail />} />
 
         {/* Assets */}
         <Route path="assets" element={<Assets />} />
-        {/* TODO: Ajouter AssetDetailPage */}
-        {/* <Route path="assets/:id" element={<AssetDetailPage />} /> */}
+        <Route path="assets/:id" element={<AssetDetail />} />
 
         {/* Brokers */}
         <Route path="brokers" element={<Brokers />} />
+
+        {/* Settings */}
+        <Route path="settings" element={<Settings />} />
 
         {/* Route 404 */}
         <Route path="*" element={<NotFound />} />

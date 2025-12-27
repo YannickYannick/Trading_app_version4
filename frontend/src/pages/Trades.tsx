@@ -2,6 +2,7 @@
  * Page Trades - Historique des trades
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Input } from '@components/common'
 import { useTrades } from '@hooks/useTrades'
 import { formatCurrency, formatDate } from '@utils/format'
@@ -29,7 +30,9 @@ export default function Trades() {
       key: 'symbol',
       label: 'Symbole',
       render: (trade: Trade) => (
-        <span className="trade-symbol">{trade.asset.symbol}</span>
+        <Link to={`/trades/${trade.id}`} className="trade-symbol link-symbol">
+          {trade.asset.symbol}
+        </Link>
       ),
     },
     {

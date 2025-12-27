@@ -14,6 +14,7 @@ function Sidebar() {
     { path: '/trades', label: 'Trades', icon: '📈' },
     { path: '/assets', label: 'Assets', icon: '💰' },
     { path: '/brokers', label: 'Brokers', icon: '🏦' },
+    { path: '/settings', label: 'Paramètres', icon: '⚙️' },
   ]
 
   const handleLogout = async () => {

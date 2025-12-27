@@ -2,6 +2,7 @@
  * Page Assets - Liste et recherche des assets
  */
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Input } from '@components/common'
 import { useAssets } from '@hooks/useAssets'
 import { formatCurrency } from '@utils/format'
@@ -24,7 +25,9 @@ export default function Assets() {
       key: 'symbol',
       label: 'Symbole',
       render: (asset: Asset) => (
-        <span className="asset-symbol">{asset.symbol}</span>
+        <Link to={`/assets/${asset.id}`} className="asset-symbol link-symbol">
+          {asset.symbol}
+        </Link>
       ),
     },
     {

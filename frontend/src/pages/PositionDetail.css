@@ -1,0 +1,74 @@
+.position-detail {
+  padding: var(--spacing-lg);
+}
+
+.position-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+}
+
+.position-detail-subtitle {
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.position-detail-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.position-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.position-detail-card {
+  height: 100%;
+}
+
+.position-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.info-value {
+  color: var(--color-text);
+}
+
+.pnl-badge {
+  font-size: 1.1em;
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+  .position-detail-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .position-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
