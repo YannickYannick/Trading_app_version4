@@ -5,15 +5,45 @@ import apiClient from './api/client'
 import type { ApiResponse, Broker, BrokerAccount, BrokerSyncLog, ApiError } from '@types'
 
 export interface BrokerAccountCreateData {
-  broker: number
-  account_name: string
-  account_id: string
+  // Identifiants
+  name: string
+  broker?: number | null
+  broker_type: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
+  account_id?: string
+  environment?: 'live' | 'simulation'
+  
+  // Credentials Saxo
+  saxo_client_id?: string
+  saxo_client_secret?: string
+  saxo_redirect_uri?: string
+  saxo_environment?: 'live' | 'simulation'
+  saxo_access_token?: string
+  saxo_refresh_token?: string
+  saxo_token_expires_at?: string | null
+  
+  // Credentials Binance
+  binance_api_key?: string
+  binance_api_secret?: string
+  binance_testnet?: boolean
+  
+  // Credentials génériques (pour compatibilité)
   api_key?: string
   api_secret?: string
   client_id?: string
   client_secret?: string
-  is_sandbox?: boolean
+  access_token?: string
+  refresh_token?: string
+  token_expires_at?: string | null
   extra_credentials?: Record<string, any>
+  
+  // Auto-refresh
+  auto_refresh_enabled?: boolean
+  auto_refresh_frequency?: number
+  
+  // Statut
+  is_active?: boolean
+  is_demo?: boolean
+  is_sandbox?: boolean
 }
 
 export interface TestConnectionResponse {
@@ -90,6 +120,74 @@ export const brokerService = {
     const response = await apiClient.post<TestConnectionResponse>(
       `/broker-accounts/${accountId}/test-connection/`
     )
+    return response.data
+  },
+
+  /**
+   * Récupérer le solde EUR d'un compte broker
+   */
+  async getBalanceEur(accountId: number): Promise<{
+    success: boolean
+    balance_eur: number
+    currency: string
+    all_balances: Record<string, number>
+    timestamp?: string
+    error?: string
+  }> {
+    const response = await apiClient.get<{
+      success: boolean
+      balance_eur: number
+      currency: string
+      all_balances: Record<string, number>
+      timestamp?: string
+      error?: string
+    }>(`/broker-accounts/${accountId}/balance-eur/`)
+    return response.data
+  },
+
+  /**
+   * Rafraîchir le solde d'un compte broker
+   */
+  async refreshBalance(accountId: number): Promise<{
+    success: boolean
+    balance_eur: number
+    currency: string
+    all_balances: Record<string, number>
+    account: BrokerAccount
+    error?: string
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      balance_eur: number
+      currency: string
+      all_balances: Record<string, number>
+      account: BrokerAccount
+      error?: string
+    }>(`/broker-accounts/${accountId}/refresh-balance/`)
+    return response.data
+  },
+
+  /**
+   * Récupérer les credentials (masqués) d'un compte broker
+   */
+  async getCredentials(accountId: number): Promise<{
+    broker_type: string
+    credentials_dict: Record<string, any>
+    raw_fields: Record<string, any>
+    has_api_key: boolean
+    has_api_secret: boolean
+    testnet: boolean
+    environment: string
+  }> {
+    const response = await apiClient.get<{
+      broker_type: string
+      credentials_dict: Record<string, any>
+      raw_fields: Record<string, any>
+      has_api_key: boolean
+      has_api_secret: boolean
+      testnet: boolean
+      environment: string
+    }>(`/broker-accounts/${accountId}/credentials/`)
     return response.data
   },
 

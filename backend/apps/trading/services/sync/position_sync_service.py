@@ -61,7 +61,7 @@ class PositionSyncService(BaseSyncService):
         try:
             # Get broker instance
             credentials = self._get_credentials(broker_account)
-            broker_type = broker_account.broker.broker_type
+            broker_type = broker_account.get_broker_type()
             broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
             
             # Authenticate
@@ -198,14 +198,14 @@ class PositionSyncService(BaseSyncService):
         # Find or create asset
         asset = self._get_or_create_asset(
             symbol=broker_position.symbol,
-            broker_type=broker_account.broker.broker_type,
+            broker_type=broker_account.get_broker_type(),
         )
         
         if not asset:
             raise ValueError(f"Could not find or create asset: {broker_position.symbol}")
         
         # Determine broker position ID
-        broker_position_id = broker_position.broker_position_id or f"{broker_account.broker.broker_type}_{broker_position.symbol}"
+        broker_position_id = broker_position.broker_position_id or f"{broker_account.get_broker_type()}_{broker_position.symbol}"
         
         # Convert side
         side = 'BUY' if broker_position.side == 'LONG' else 'SELL'
@@ -323,31 +323,17 @@ class PositionSyncService(BaseSyncService):
         return asset
     
     def _get_credentials(self, broker_account: BrokerAccount) -> Dict[str, Any]:
-        """Get credentials from broker account."""
-        credentials = {}
+        """
+        Get credentials from broker account.
+        Utilise la méthode get_credentials_dict() du modèle.
+        """
+        # Utiliser la méthode du modèle qui gère déjà tout
+        credentials = broker_account.get_credentials_dict()
         
-        if broker_account.api_key:
-            credentials['api_key'] = broker_account.api_key
-        if broker_account.api_secret:
-            credentials['api_secret'] = broker_account.api_secret
-        if broker_account.client_id:
-            credentials['client_id'] = broker_account.client_id
-        if broker_account.client_secret:
-            credentials['client_secret'] = broker_account.client_secret
-        if broker_account.access_token:
-            credentials['access_token'] = broker_account.access_token
-        if broker_account.refresh_token:
-            credentials['refresh_token'] = broker_account.refresh_token
-        if broker_account.token_expires_at:
-            credentials['token_expires_at'] = broker_account.token_expires_at.isoformat()
-        if broker_account.extra_credentials:
-            credentials.update(broker_account.extra_credentials)
-        
-        broker_type = broker_account.broker.broker_type.upper()
-        if broker_type == 'SAXO':
-            credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
-        elif broker_type == 'BINANCE':
-            credentials['testnet'] = broker_account.is_sandbox
+        # Ajouter des informations supplémentaires si nécessaire
+        credentials['user_id'] = broker_account.user.id
+        if broker_account.account_id:
+            credentials['account_id'] = broker_account.account_id
         
         return credentials
     

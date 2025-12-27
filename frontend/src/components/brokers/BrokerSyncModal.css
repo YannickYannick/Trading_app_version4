@@ -1,0 +1,119 @@
+.broker-sync-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.broker-sync-info {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius);
+}
+
+.broker-sync-info p {
+  margin: 0.5rem 0;
+  color: var(--color-text);
+}
+
+.broker-sync-type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.broker-sync-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.broker-sync-select {
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.broker-sync-description {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.broker-sync-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.broker-sync-error {
+  padding: var(--spacing-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.broker-sync-error p {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.broker-sync-result {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.broker-sync-result-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.broker-sync-message {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.broker-sync-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.broker-sync-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius);
+}
+
+.broker-sync-stat-label {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.broker-sync-stat-value {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.broker-sync-error-message {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}
+

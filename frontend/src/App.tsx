@@ -7,6 +7,7 @@ import Dashboard from '@pages/Dashboard'
 import Positions from '@pages/Positions'
 import Trades from '@pages/Trades'
 import Assets from '@pages/Assets'
+import Brokers from '@pages/Brokers'
 
 function App() {
   return (
@@ -43,6 +44,9 @@ function App() {
         <Route path="assets" element={<Assets />} />
         {/* TODO: Ajouter AssetDetailPage */}
         {/* <Route path="assets/:id" element={<AssetDetailPage />} /> */}
+
+        {/* Brokers */}
+        <Route path="brokers" element={<Brokers />} />
 
         {/* Route 404 */}
         <Route path="*" element={<NotFound />} />

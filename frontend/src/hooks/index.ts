@@ -8,5 +8,8 @@ export { useAuth } from './useAuth'
 export { useDebounce } from './useDebounce'
 export { useLocalStorage } from './useLocalStorage'
 export { useApi } from './useApi'
+export { useBrokers, useBrokerAccount, useBrokerSyncLogs } from './useBrokers'
+export { useBrokerBalance } from './useBrokerBalance'
 export type { UseApiOptions } from './useApi'
+export type { UseBrokersOptions } from './useBrokers'
 

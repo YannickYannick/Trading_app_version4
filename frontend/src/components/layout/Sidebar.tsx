@@ -13,6 +13,7 @@ function Sidebar() {
     { path: '/positions', label: 'Positions', icon: '💼' },
     { path: '/trades', label: 'Trades', icon: '📈' },
     { path: '/assets', label: 'Assets', icon: '💰' },
+    { path: '/brokers', label: 'Brokers', icon: '🏦' },
   ]
 
   const handleLogout = async () => {

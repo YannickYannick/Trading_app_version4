@@ -112,23 +112,55 @@ class BrokerSerializer(serializers.ModelSerializer):
 class BrokerAccountSerializer(serializers.ModelSerializer):
     """
     Serializer pour les comptes broker.
+    Architecture compatible avec BrokerCredentials de la v3.
     
-    ⚠️ Les tokens ne sont JAMAIS exposés dans l'API !
+    ⚠️ Les tokens et secrets ne sont JAMAIS exposés dans l'API en lecture !
     """
-    broker_name = serializers.CharField(source='broker.name', read_only=True)
-    broker_type = serializers.CharField(source='broker.broker_type', read_only=True)
+    broker_name = serializers.CharField(source='broker.name', read_only=True, allow_null=True)
+    broker_type_display = serializers.CharField(source='get_broker_type_display', read_only=True)
+    environment_display = serializers.CharField(source='get_environment_display', read_only=True)
     
     class Meta:
         model = BrokerAccount
         fields = [
-            'id', 'broker', 'broker_name', 'broker_type',
-            'account_id', 'account_name',
-            'balance', 'currency', 'balance_updated_at',
-            'is_active', 'is_demo', 'created_at'
+            # Identifiants
+            'id', 'name', 'broker', 'broker_name', 'broker_type', 'broker_type_display',
+            'account_id', 'environment', 'environment_display',
+            
+            # Credentials Saxo (write_only pour sécurité)
+            'saxo_client_id', 'saxo_client_secret', 'saxo_redirect_uri', 'saxo_environment',
+            'saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at',
+            
+            # Credentials Binance (write_only pour sécurité)
+            'binance_api_key', 'binance_api_secret', 'binance_testnet',
+            
+            # Credentials génériques
+            'api_key', 'api_secret', 'client_id', 'client_secret',
+            'access_token', 'refresh_token', 'token_expires_at',
+            'extra_credentials',
+            
+            # Configuration auto-refresh
+            'auto_refresh_enabled', 'auto_refresh_frequency',
+            
+            # Balance et statut
+            'balance', 'currency', 'balance_updated_at', 'last_sync',
+            'is_active', 'is_demo', 'is_sandbox',
+            
+            # Timestamps
+            'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'balance_updated_at']
-        # Ne JAMAIS exposer les tokens
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'balance_updated_at',
+            'last_sync', 'broker_name', 'broker_type_display', 'environment_display'
+        ]
+        # Ne JAMAIS exposer les secrets en lecture
         extra_kwargs = {
+            'saxo_client_secret': {'write_only': True},
+            'saxo_access_token': {'write_only': True},
+            'saxo_refresh_token': {'write_only': True},
+            'binance_api_secret': {'write_only': True},
+            'api_secret': {'write_only': True},
+            'client_secret': {'write_only': True},
             'access_token': {'write_only': True},
             'refresh_token': {'write_only': True},
         }

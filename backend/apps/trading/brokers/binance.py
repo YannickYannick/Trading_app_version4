@@ -99,6 +99,19 @@ class BinanceBroker(BrokerBase):
         try:
             self._clear_error()
             
+            # Log des informations de connexion (sans les secrets)
+            logger.debug(f"Authenticating Binance: api_key present={bool(self.api_key)}, testnet={self.is_testnet}, base_url={self.base_url}")
+            
+            if not self.api_key:
+                self._set_error("API key is missing")
+                logger.error("Binance API key is missing")
+                return False
+            
+            if not self.api_secret:
+                self._set_error("API secret is missing")
+                logger.error("Binance API secret is missing")
+                return False
+            
             # Test connection with ping
             response = self._make_request('GET', '/api/v3/ping', signed=False)
             if response is not None:

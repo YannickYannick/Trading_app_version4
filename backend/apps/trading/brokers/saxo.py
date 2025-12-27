@@ -69,11 +69,12 @@ class SaxoBroker(BrokerBase):
         'crypto': 'CfdOnCrypto',
     }
     
-    def __init__(self, credentials: Dict[str, Any], user=None):
+    def __init__(self, user, credentials: Dict[str, Any]):
         """
         Initialiser le client Saxo Bank
         
         Args:
+            user: Django User instance
             credentials: Dictionnaire contenant:
                 - client_id: ID client OAuth2
                 - client_secret: Secret client OAuth2
@@ -82,9 +83,8 @@ class SaxoBroker(BrokerBase):
                 - access_token: Token d'accès (optionnel)
                 - refresh_token: Token de rafraîchissement (optionnel)
                 - token_expires_at: Date d'expiration ISO (optionnel)
-            user: Utilisateur Django (optionnel)
         """
-        super().__init__(credentials, user)
+        super().__init__(user, credentials)
         
         self.client_id = credentials.get('client_id')
         self.client_secret = credentials.get('client_secret')

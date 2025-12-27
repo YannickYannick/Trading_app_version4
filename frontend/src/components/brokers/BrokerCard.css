@@ -1,0 +1,90 @@
+.broker-card {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.broker-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+}
+
+.broker-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.broker-card-badges {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.broker-card-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.broker-card-info {
+  flex-grow: 1;
+}
+
+.broker-card-info p {
+  margin: var(--spacing-xs) 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.broker-card-info strong {
+  color: var(--color-text);
+}
+
+.broker-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: auto;
+}
+
+.broker-card-actions-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.broker-card-sync-group {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.broker-card-sync-select {
+  padding: 0.4rem 0.6rem;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.broker-card-sync-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.broker-card-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+

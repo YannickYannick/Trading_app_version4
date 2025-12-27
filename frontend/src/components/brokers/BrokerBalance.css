@@ -1,0 +1,89 @@
+/**
+ * Styles pour le composant BrokerBalance
+ */
+.broker-balance {
+  margin: 0.5rem 0;
+}
+
+.broker-balance-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.broker-balance-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.broker-balance-amount {
+  font-size: 1.1rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.broker-balance-error {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.broker-balance-error-icon {
+  font-size: 1rem;
+}
+
+.broker-balance-refresh {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  min-width: auto;
+}
+
+.broker-balance-details {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.broker-balance-details-summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  list-style: none;
+  user-select: none;
+}
+
+.broker-balance-details-summary:hover {
+  color: var(--text-primary);
+}
+
+.broker-balance-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.broker-balance-details-list {
+  list-style: none;
+  padding: 0.5rem 0 0 0;
+  margin: 0;
+}
+
+.broker-balance-details-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.broker-balance-details-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.broker-balance-container {
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+

@@ -657,15 +657,18 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
     Actions personnalisées :
     - GET /api/broker-accounts/1/sync_status/ → Statut de synchronisation
     - POST /api/broker-accounts/1/refresh_balance/ → Rafraîchir la balance
+    - POST /api/broker-accounts/1/test-connection/ → Tester la connexion
+    - POST /api/broker-accounts/1/sync/ → Synchroniser les données
     """
     serializer_class = BrokerAccountSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
-    filterset_fields = ['broker', 'is_active', 'is_demo']
-    ordering = ['broker__name']
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['broker', 'broker_type', 'is_active', 'environment']
+    ordering = ['broker_type', 'name']
+    pagination_class = StandardPagination
     
     def get_queryset(self):
-        return BrokerAccount.objects.filter(user=self.request.user)
+        return BrokerAccount.objects.filter(user=self.request.user).select_related('broker')
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -685,7 +688,7 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 {
                     'sync_type': log.sync_type,
                     'status': log.status,
-                    'items_synced': log.items_synced,
+                    'records_synced': log.records_synced,
                     'started_at': log.started_at.isoformat(),
                     'error': log.error_message if log.status == 'FAILED' else None,
                 }
@@ -693,22 +696,267 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             ]
         })
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='refresh-balance')
     def refresh_balance(self, request, pk=None):
         """
-        POST /api/broker-accounts/1/refresh_balance/
-        Rafraîchit la balance du compte.
-        (À implémenter avec le service broker)
+        POST /api/broker-accounts/1/refresh-balance/
+        Rafraîchit la balance du compte et retourne le solde EUR.
+        """
+        from django.utils import timezone
+        from decimal import Decimal
+        from ..services.broker_service import BrokerService
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
+        
+        account = self.get_object()
+        service = BrokerService(request.user)
+        
+        try:
+            # Récupérer toutes les balances
+            balances = service.get_account_balance(account)
+            
+            # Extraire le solde EUR
+            eur_balance = balances.get('EUR', Decimal('0'))
+            
+            # Mettre à jour le modèle
+            account.balance = eur_balance
+            account.currency = 'EUR'
+            account.balance_updated_at = timezone.now()
+            account.save(update_fields=['balance', 'currency', 'balance_updated_at'])
+            
+            # Formater les balances (exclure les clés _free et _locked)
+            all_balances = {
+                k: float(v) 
+                for k, v in balances.items() 
+                if not k.endswith('_free') and not k.endswith('_locked')
+            }
+            
+            return Response({
+                'success': True,
+                'balance_eur': float(eur_balance),
+                'currency': 'EUR',
+                'all_balances': all_balances,
+                'account': BrokerAccountSerializer(account).data
+            })
+        except Exception as e:
+            logger.error(f"Error refreshing balance for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e),
+                'balance_eur': 0.0
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='credentials')
+    def credentials(self, request, pk=None):
+        """
+        GET /api/broker-accounts/1/credentials/
+        Affiche les credentials (masqués) pour débogage.
         """
         account = self.get_object()
+        credentials_dict = account.get_credentials_dict()
         
-        # TODO: Appeler le service broker pour rafraîchir la balance
-        # balance = broker_service.get_balance(account)
-        # account.balance = balance
-        # account.balance_updated_at = timezone.now()
-        # account.save()
+        # Masquer les secrets
+        masked_credentials = {}
+        for key, value in credentials_dict.items():
+            if value:
+                if 'secret' in key.lower() or 'token' in key.lower() or 'key' in key.lower():
+                    # Masquer les secrets (afficher les 4 premiers et 4 derniers caractères)
+                    str_value = str(value)
+                    if len(str_value) > 8:
+                        masked_credentials[key] = f"{str_value[:4]}...{str_value[-4:]}"
+                    else:
+                        masked_credentials[key] = "***"
+                else:
+                    masked_credentials[key] = value
+            else:
+                masked_credentials[key] = None
+        
+        # Afficher aussi les valeurs brutes (masquées) pour vérifier
+        raw_credentials = {}
+        if account.broker_type == 'BINANCE':
+            raw_credentials = {
+                'binance_api_key': account.binance_api_key[:8] + '...' if account.binance_api_key else None,
+                'binance_api_secret': account.binance_api_secret[:8] + '...' if account.binance_api_secret else None,
+                'binance_testnet': account.binance_testnet if hasattr(account, 'binance_testnet') else None,
+                'api_key': account.api_key[:8] + '...' if account.api_key else None,
+                'api_secret': account.api_secret[:8] + '...' if account.api_secret else None,
+            }
+        elif account.broker_type == 'SAXO':
+            raw_credentials = {
+                'saxo_client_id': account.saxo_client_id[:8] + '...' if account.saxo_client_id else None,
+                'saxo_client_secret': account.saxo_client_secret[:8] + '...' if account.saxo_client_secret else None,
+            }
         
         return Response({
-            'status': 'Balance refresh requested',
-            'account': BrokerAccountSerializer(account).data
+            'broker_type': account.broker_type,
+            'credentials_dict': masked_credentials,
+            'raw_fields': raw_credentials,
+            'has_api_key': bool(credentials_dict.get('api_key')),
+            'has_api_secret': bool(credentials_dict.get('api_secret')),
+            'testnet': credentials_dict.get('testnet', False),
+            'environment': credentials_dict.get('environment', 'unknown'),
         })
+    
+    @action(detail=True, methods=['get'], url_path='balance-eur')
+    def balance_eur(self, request, pk=None):
+        """
+        GET /api/broker-accounts/1/balance-eur/
+        Récupère le solde EUR actuel du compte sans mettre à jour la base de données.
+        """
+        from decimal import Decimal
+        from ..services.broker_service import BrokerService
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
+        
+        account = self.get_object()
+        service = BrokerService(request.user)
+        
+        try:
+            # Récupérer toutes les balances
+            balances = service.get_account_balance(account)
+            
+            # Extraire le solde EUR
+            eur_balance = balances.get('EUR', Decimal('0'))
+            
+            # Formater les balances (exclure les clés _free et _locked)
+            all_balances = {
+                k: float(v) 
+                for k, v in balances.items() 
+                if not k.endswith('_free') and not k.endswith('_locked')
+            }
+            
+            return Response({
+                'success': True,
+                'balance_eur': float(eur_balance),
+                'currency': 'EUR',
+                'all_balances': all_balances,
+                'timestamp': timezone.now().isoformat()
+            })
+        except Exception as e:
+            logger.error(f"Error getting EUR balance for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e),
+                'balance_eur': 0.0
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'], url_path='test-connection')
+    def test_connection(self, request, pk=None):
+        """
+        POST /api/broker-accounts/1/test-connection/
+        Teste la connexion au broker.
+        """
+        from apps.trading.services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        try:
+            broker_service = BrokerService(request.user)
+            result = broker_service.test_connection(account)
+            
+            return Response({
+                'success': result.get('success', False),
+                'message': result.get('message', 'Test de connexion effectué'),
+                'details': result.get('details', {}),
+            })
+        except Exception as e:
+            return Response(
+                {
+                    'success': False,
+                    'message': f'Erreur lors du test de connexion: {str(e)}',
+                    'error': str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def sync(self, request, pk=None):
+        """
+        POST /api/broker-accounts/1/sync/
+        Synchronise les données depuis le broker.
+        Body: { "sync_type": "ASSETS" | "PRICES" | "POSITIONS" | "TRADES", "force": false }
+        """
+        from apps.trading.services.sync.asset_sync_service import AssetSyncService
+        from apps.trading.services.sync.price_sync_service import PriceSyncService
+        from apps.trading.models import BrokerSyncLog
+        from django.utils import timezone
+        
+        account = self.get_object()
+        sync_type = request.data.get('sync_type', 'ASSETS').upper()
+        force = request.data.get('force', False)
+        
+        if sync_type not in ['ASSETS', 'PRICES', 'POSITIONS', 'TRADES']:
+            return Response(
+                {'error': f'Sync type invalide: {sync_type}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Créer un log de synchronisation
+        sync_log = BrokerSyncLog.objects.create(
+            broker_account=account,
+            sync_type=sync_type,
+            status='IN_PROGRESS',
+            started_at=timezone.now(),
+        )
+        
+        try:
+            if sync_type == 'ASSETS':
+                sync_service = AssetSyncService(request.user)
+                result = sync_service.sync_assets(account)
+            elif sync_type == 'PRICES':
+                sync_service = PriceSyncService(request.user)
+                result = sync_service.sync_prices(account)
+            elif sync_type == 'POSITIONS':
+                # TODO: Implémenter PositionSyncService
+                result = {'success': False, 'message': 'Non implémenté'}
+            elif sync_type == 'TRADES':
+                # TODO: Implémenter TradeSyncService
+                result = {'success': False, 'message': 'Non implémenté'}
+            else:
+                result = {'success': False, 'message': 'Type de synchronisation inconnu'}
+            
+            # Mettre à jour le log
+            sync_log.status = 'SUCCESS' if result.get('success') else 'FAILED'
+            sync_log.records_synced = result.get('records_synced', 0)
+            sync_log.completed_at = timezone.now()
+            sync_log.error_message = result.get('error') if not result.get('success') else None
+            sync_log.details = result.get('details', {})
+            sync_log.save()
+            
+            # Mettre à jour last_sync du compte
+            account.last_sync = timezone.now()
+            account.save()
+            
+            return Response({
+                'success': result.get('success', False),
+                'message': result.get('message', 'Synchronisation terminée'),
+                'sync_log': {
+                    'id': sync_log.id,
+                    'status': sync_log.status,
+                    'records_synced': sync_log.records_synced,
+                    'started_at': sync_log.started_at.isoformat(),
+                    'completed_at': sync_log.completed_at.isoformat() if sync_log.completed_at else None,
+                },
+                'details': result.get('details', {}),
+            })
+        except Exception as e:
+            sync_log.status = 'FAILED'
+            sync_log.completed_at = timezone.now()
+            sync_log.error_message = str(e)
+            sync_log.save()
+            
+            return Response(
+                {
+                    'success': False,
+                    'message': f'Erreur lors de la synchronisation: {str(e)}',
+                    'error': str(e),
+                    'sync_log': {
+                        'id': sync_log.id,
+                        'status': sync_log.status,
+                        'error_message': sync_log.error_message,
+                    },
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -98,11 +98,14 @@ class BrokerService:
         # Get credentials from broker account
         credentials = self._get_credentials_from_account(broker_account)
         
-        # Get broker type
-        broker_type = broker_account.broker.broker_type
+        # Get broker type - utiliser la méthode du modèle
+        broker_type = broker_account.get_broker_type()
+        
+        # Normaliser en minuscules pour le factory (saxo, binance, etc.)
+        broker_type_lower = broker_type.lower() if broker_type else None
         
         # Create broker instance
-        broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
+        broker = BrokerFactory.create_broker(broker_type_lower, self.user, credentials)
         
         # Cache the instance
         if use_cache:
@@ -114,39 +117,26 @@ class BrokerService:
         """
         Extract credentials from a broker account.
         
+        Utilise la méthode get_credentials_dict() du modèle qui gère déjà
+        tous les cas (Saxo, Binance, etc.) de manière cohérente.
+        
         Args:
             broker_account: BrokerAccount model instance
             
         Returns:
             Dictionary of credentials
         """
-        credentials = {}
+        # Utiliser la méthode du modèle qui gère déjà tout
+        credentials = broker_account.get_credentials_dict()
         
-        # Get API credentials from broker account
-        if hasattr(broker_account, 'api_key') and broker_account.api_key:
-            credentials['api_key'] = broker_account.api_key
+        # Ajouter des informations supplémentaires si nécessaire
+        credentials['user_id'] = broker_account.user.id
+        if broker_account.account_id:
+            credentials['account_id'] = broker_account.account_id
         
-        if hasattr(broker_account, 'api_secret') and broker_account.api_secret:
-            credentials['api_secret'] = broker_account.api_secret
-        
-        if hasattr(broker_account, 'access_token') and broker_account.access_token:
-            credentials['access_token'] = broker_account.access_token
-        
-        if hasattr(broker_account, 'refresh_token') and broker_account.refresh_token:
-            credentials['refresh_token'] = broker_account.refresh_token
-        
-        # Add any extra credentials stored in a JSON field
-        if hasattr(broker_account, 'extra_credentials') and broker_account.extra_credentials:
-            credentials.update(broker_account.extra_credentials)
-        
-        # Determine environment
-        broker_type = broker_account.broker.broker_type.upper()
-        if broker_type == 'SAXO':
-            credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
-            credentials['client_id'] = getattr(broker_account, 'client_id', '')
-            credentials['client_secret'] = getattr(broker_account, 'client_secret', '')
-        elif broker_type == 'BINANCE':
-            credentials['testnet'] = broker_account.is_sandbox
+        # S'assurer que l'environnement est défini
+        if 'environment' not in credentials:
+            credentials['environment'] = broker_account.environment or 'simulation'
         
         return credentials
     
@@ -177,7 +167,7 @@ class BrokerService:
                 broker_account=broker_account,
                 sync_type='connection_test',
                 status='success' if success else 'error',
-                error_message=broker.last_error if not success else None,
+                error_message=broker.last_error if not success else '',
             )
             
             return {
@@ -483,7 +473,7 @@ class BrokerService:
                     'order_type': order_type,
                     'order_id': result.order_id,
                 },
-                error_message=result.error if not result.success else None,
+                error_message=result.error if not result.success else '',
             )
             
             return result
@@ -538,7 +528,7 @@ class BrokerService:
                 sync_type='order_cancelled',
                 status='success' if result.success else 'error',
                 details={'order_id': order_id},
-                error_message=result.error if not result.success else None,
+                error_message=result.error if not result.success else '',
             )
             
             return result
@@ -565,15 +555,21 @@ class BrokerService:
             Dictionary mapping currency to balance
         """
         try:
+            # Récupérer les credentials pour logging
+            credentials = self._get_credentials_from_account(broker_account)
+            logger.info(f"Getting balance for account {broker_account.id} (type: {broker_account.get_broker_type()})")
+            logger.debug(f"Credentials keys present: api_key={bool(credentials.get('api_key'))}, api_secret={bool(credentials.get('api_secret'))}, testnet={credentials.get('testnet', False)}")
+            
             broker = self.get_broker_instance(broker_account)
             
             if not broker.authenticate():
+                logger.error(f"Authentication failed for account {broker_account.id}")
                 return {}
             
             return broker.get_account_balance()
             
         except Exception as e:
-            logger.error(f"Error getting account balance: {e}")
+            logger.error(f"Error getting account balance: {e}", exc_info=True)
             return {}
     
     def get_account_info(self, broker_account: BrokerAccount) -> Dict[str, Any]:
@@ -630,7 +626,7 @@ class BrokerService:
             sync_type=sync_type,
             status=status,
             records_synced=records_synced,
-            error_message=error_message,
+            error_message=error_message or '',  # Utiliser chaîne vide au lieu de None
             details=details or {},
         )
     
@@ -702,7 +698,7 @@ class BrokerService:
             
             created = 0
             updated = 0
-            platform = broker_account.broker.broker_type.upper()
+            platform = broker_account.get_broker_type().upper()
             
             for broker_asset in broker_assets:
                 all_asset, was_created = AllAssets.objects.update_or_create(
@@ -790,7 +786,7 @@ class BrokerService:
                     # Try to find in AllAssets
                     all_asset = AllAssets.objects.filter(
                         symbol=broker_pos.symbol,
-                        platform=broker_account.broker.broker_type.upper()
+                        platform=broker_account.get_broker_type().upper()
                     ).first()
                     
                     if all_asset:

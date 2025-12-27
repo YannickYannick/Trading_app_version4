@@ -65,7 +65,7 @@ class AssetSyncService:
         try:
             # Get broker instance
             credentials = self._get_credentials(broker_account)
-            broker_type = broker_account.broker.broker_type
+            broker_type = broker_account.get_broker_type()
             broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
             
             # Authenticate
@@ -104,7 +104,7 @@ class AssetSyncService:
             created = 0
             updated = 0
             errors = []
-            platform = broker_account.broker.broker_type.upper()
+            platform = broker_account.get_broker_type().upper()
             
             for broker_asset in broker_assets:
                 try:
@@ -219,7 +219,7 @@ class AssetSyncService:
         Returns:
             Dict with aggregated sync results
         """
-        broker_type = broker_account.broker.broker_type.upper()
+        broker_type = broker_account.get_broker_type().upper()
         
         # Define asset types based on broker
         if broker_type == 'SAXO':
@@ -282,7 +282,7 @@ class AssetSyncService:
         )
         
         # Get the synced assets from database
-        platform = broker_account.broker.broker_type.upper()
+        platform = broker_account.get_broker_type().upper()
         synced_assets = AllAssets.objects.filter(
             platform=platform,
             symbol__icontains=keywords
@@ -316,7 +316,7 @@ class AssetSyncService:
             credentials.update(broker_account.extra_credentials)
         
         # Environment settings
-        broker_type = broker_account.broker.broker_type.upper()
+        broker_type = broker_account.get_broker_type().upper()
         if broker_type == 'SAXO':
             credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
         elif broker_type == 'BINANCE':

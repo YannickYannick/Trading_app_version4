@@ -59,7 +59,7 @@ class PriceSyncService:
         try:
             # Get broker instance
             credentials = self._get_credentials(broker_account)
-            broker_type = broker_account.broker.broker_type
+            broker_type = broker_account.get_broker_type()
             broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
             
             if not broker.authenticate():
@@ -68,7 +68,7 @@ class PriceSyncService:
             
             # Get symbols to update
             if symbols is None:
-                platform = broker_account.broker.broker_type.upper()
+                platform = broker_account.get_broker_type().upper()
                 assets = Asset.objects.filter(
                     all_asset__platform=platform
                 ).values_list('symbol', flat=True)
@@ -127,7 +127,7 @@ class PriceSyncService:
         """
         try:
             credentials = self._get_credentials(broker_account)
-            broker_type = broker_account.broker.broker_type
+            broker_type = broker_account.get_broker_type()
             broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
             
             if not broker.authenticate():
@@ -170,7 +170,7 @@ class PriceSyncService:
         """
         try:
             credentials = self._get_credentials(broker_account)
-            broker_type = broker_account.broker.broker_type
+            broker_type = broker_account.get_broker_type()
             broker = BrokerFactory.create_broker(broker_type, self.user, credentials)
             
             if not broker.authenticate():
@@ -236,7 +236,7 @@ class PriceSyncService:
         Returns:
             Dict with sync results
         """
-        platform = broker_account.broker.broker_type.upper()
+        platform = broker_account.get_broker_type().upper()
         
         # Get all assets for this platform
         assets = Asset.objects.filter(
@@ -315,7 +315,7 @@ class PriceSyncService:
         if broker_account.extra_credentials:
             credentials.update(broker_account.extra_credentials)
         
-        broker_type = broker_account.broker.broker_type.upper()
+        broker_type = broker_account.get_broker_type().upper()
         if broker_type == 'SAXO':
             credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
         elif broker_type == 'BINANCE':

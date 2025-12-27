@@ -136,12 +136,56 @@ export interface Broker {
 
 export interface BrokerAccount {
   id: number
-  broker: Broker
-  account_name: string
+  name: string
+  broker: Broker | null
+  broker_name?: string | null
+  broker_type: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
+  broker_type_display?: string
   account_id: string
-  is_active: boolean
-  is_sandbox: boolean
+  environment: 'live' | 'simulation'
+  environment_display?: string
+  
+  // Credentials Saxo
+  saxo_client_id?: string | null
+  saxo_client_secret?: string | null
+  saxo_redirect_uri?: string | null
+  saxo_environment?: 'live' | 'simulation'
+  saxo_access_token?: string | null
+  saxo_refresh_token?: string | null
+  saxo_token_expires_at?: string | null
+  
+  // Credentials Binance
+  binance_api_key?: string | null
+  binance_api_secret?: string | null
+  binance_testnet?: boolean
+  
+  // Credentials génériques
+  api_key?: string
+  api_secret?: string
+  client_id?: string
+  client_secret?: string
+  access_token?: string
+  refresh_token?: string
+  token_expires_at?: string | null
+  extra_credentials?: Record<string, any>
+  
+  // Auto-refresh
+  auto_refresh_enabled?: boolean
+  auto_refresh_frequency?: number
+  
+  // Balance et statut
+  balance?: number | null
+  currency?: string
+  balance_updated_at?: string | null
   last_sync: string | null
+  is_active: boolean
+  is_demo?: boolean
+  is_sandbox: boolean
+  
+  // Timestamps
+  created_at?: string
+  updated_at?: string
+  
   user: number
 }
 
