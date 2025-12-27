@@ -1,3 +1,7 @@
+/* Import variables and components */
+@import './variables.css';
+@import './components.css';
+
 /* Variables */
 :root {
   --color-bg: #0a0a0f;

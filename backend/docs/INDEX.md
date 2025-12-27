@@ -52,11 +52,16 @@ Trading_app_version4/
 - Logging configuré
 - Tests des services
 
-### Phase 4 : Frontend React (à venir)
-- Setup Vite + React + TypeScript
-- Composants UI
-- État global (Zustand/Redux)
-- Intégration API
+### [Phase 4 : Frontend React](phase_4/README.md) 🚧
+- ✅ Projet React/TypeScript initialisé
+- ✅ Design trading-page-builder intégré
+- ✅ Composants de base créés
+- ✅ Services API créés
+- ✅ Pages principales créées
+- ✅ Hooks personnalisés créés
+- ⏳ Pages de détail
+- ⏳ Page Login/Auth
+- ⏳ État global (Zustand/Redux)
 
 ## 🔧 Stack technique
 
@@ -123,5 +128,14 @@ docs/
     ├── 04_LOGGING.md
     ├── 05_TESTS_SERVICES.md
     └── 06_YAHOO_VALIDATOR.md
+└── phase_4/                    # Phase 4 - Frontend React
+    ├── README.md
+    ├── 01_REACT_TYPESCRIPT_SETUP.md
+    ├── 02_DESIGN_INTEGRATION.md
+    ├── 03_COMPOSANTS_BASE.md
+    ├── 04_SERVICES_API.md
+    ├── 05_PAGES_PRINCIPALES.md
+    ├── 06_ROUTING.md
+    └── 07_HOOKS_PERSONNALISES.md
 ```
 

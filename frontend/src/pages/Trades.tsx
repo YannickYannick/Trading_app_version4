@@ -1,67 +1,196 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { api, Trade } from '../services/api'
+/**
+ * Page Trades - Historique des trades
+ */
+import { useState } from 'react'
+import { Card, Button, Table, Badge, Loading, Input } from '@components/common'
+import { useTrades } from '@hooks/useTrades'
+import { formatCurrency, formatDate } from '@utils/format'
+import type { Trade } from '@types'
+import './Trades.css'
 
 export default function Trades() {
-  const [trades, setTrades] = useState<Trade[]>([])
-  const [loading, setLoading] = useState(true)
+  const [sideFilter, setSideFilter] = useState<'BUY' | 'SELL' | undefined>(undefined)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  
+  const { trades, loading, error, statistics, total } = useTrades({
+    side: sideFilter,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+  })
 
-  useEffect(() => {
-    const fetchTrades = async () => {
-      try {
-        const data = await api.getRecentTrades()
-        setTrades(data)
-      } catch (error) {
-        console.error('Error fetching trades:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchTrades()
-  }, [])
+  const columns = [
+    {
+      key: 'timestamp',
+      label: 'Date',
+      render: (trade: Trade) => formatDate(trade.timestamp, 'dd/MM/yyyy HH:mm'),
+    },
+    {
+      key: 'symbol',
+      label: 'Symbole',
+      render: (trade: Trade) => (
+        <span className="trade-symbol">{trade.asset.symbol}</span>
+      ),
+    },
+    {
+      key: 'side',
+      label: 'Side',
+      render: (trade: Trade) => (
+        <Badge variant={trade.side === 'BUY' ? 'success' : 'danger'}>
+          {trade.side}
+        </Badge>
+      ),
+    },
+    {
+      key: 'size',
+      label: 'Taille',
+      align: 'right' as const,
+      render: (trade: Trade) => trade.size.toFixed(4),
+    },
+    {
+      key: 'price',
+      label: 'Prix',
+      align: 'right' as const,
+      render: (trade: Trade) => formatCurrency(trade.price),
+    },
+    {
+      key: 'total',
+      label: 'Total',
+      align: 'right' as const,
+      render: (trade: Trade) => formatCurrency(trade.size * trade.price),
+    },
+    {
+      key: 'fees',
+      label: 'Frais',
+      align: 'right' as const,
+      render: (trade: Trade) => formatCurrency(trade.fees || 0),
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="trades-page">
+        <Loading text="Chargement des trades..." />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="trades-page">
+        <Card>
+          <div className="error-state">
+            <p>Erreur: {error}</p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div className="page">
-      <header>
-        <Link to="/">← Retour</Link>
-        <h1>Trades récents</h1>
-      </header>
+    <div className="trades-page">
+      <div className="trades-header">
+        <div>
+          <h1 className="page-title">Trades</h1>
+          <p className="page-subtitle">
+            {total} trade(s) au total
+            {statistics && (
+              <>
+                {' • '}
+                <span className={statistics.win_rate >= 50 ? 'positive' : 'negative'}>
+                  {statistics.win_rate.toFixed(1)}% de réussite
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+        <div className="filter-buttons">
+          <Button
+            variant={sideFilter === undefined ? 'primary' : 'secondary'}
+            onClick={() => setSideFilter(undefined)}
+          >
+            Tous
+          </Button>
+          <Button
+            variant={sideFilter === 'BUY' ? 'primary' : 'secondary'}
+            onClick={() => setSideFilter('BUY')}
+          >
+            Achat
+          </Button>
+          <Button
+            variant={sideFilter === 'SELL' ? 'primary' : 'secondary'}
+            onClick={() => setSideFilter('SELL')}
+          >
+            Vente
+          </Button>
+        </div>
+      </div>
 
-      <main>
-        {loading ? (
-          <p>Chargement...</p>
-        ) : trades.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Asset</th>
-                <th>Type</th>
-                <th>Quantité</th>
-                <th>Prix</th>
-                <th>Total</th>
-                <th>Frais</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((trade) => (
-                <tr key={trade.id}>
-                  <td>{new Date(trade.executed_at).toLocaleString()}</td>
-                  <td>{trade.asset_symbol}</td>
-                  <td className={trade.trade_type.toLowerCase()}>{trade.trade_type}</td>
-                  <td>{trade.quantity}</td>
-                  <td>{trade.price}</td>
-                  <td>{trade.total_value?.toFixed(2)}</td>
-                  <td>{trade.fees}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {statistics && (
+        <div className="trades-statistics">
+          <Card className="stat-card">
+            <h3>Volume Total</h3>
+            <p className="stat-value">{formatCurrency(statistics.total_volume)}</p>
+          </Card>
+          <Card className="stat-card">
+            <h3>Frais Totaux</h3>
+            <p className="stat-value">{formatCurrency(statistics.total_fees)}</p>
+          </Card>
+          <Card className="stat-card">
+            <h3>Achats</h3>
+            <p className="stat-value">{statistics.buy_trades}</p>
+          </Card>
+          <Card className="stat-card">
+            <h3>Ventes</h3>
+            <p className="stat-value">{statistics.sell_trades}</p>
+          </Card>
+        </div>
+      )}
+
+      <Card
+        title="Filtres de date"
+        className="filters-card"
+      >
+        <div className="date-filters">
+          <Input
+            label="Date de début"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+          <Input
+            label="Date de fin"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+          {(dateFrom || dateTo) && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDateFrom('')
+                setDateTo('')
+              }}
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card title={`${trades.length} trade(s)`}>
+        {trades.length > 0 ? (
+          <Table
+            columns={columns}
+            data={trades}
+            keyExtractor={(trade) => trade.id}
+          />
         ) : (
-          <p>Aucun trade récent</p>
+          <div className="empty-state">
+            <p>Aucun trade {sideFilter ? sideFilter === 'BUY' ? 'd\'achat' : 'de vente' : ''}</p>
+          </div>
         )}
-      </main>
+      </Card>
     </div>
   )
 }
-

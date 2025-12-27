@@ -1,0 +1,15 @@
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--border-radius-lg);
+}
+
+.table-row-clickable {
+  cursor: pointer;
+}
+
+.table-empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--color-text-muted);
+}
+
