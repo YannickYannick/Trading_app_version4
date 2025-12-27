@@ -1,14 +1,14 @@
 """
 URLs pour l'application Trading.
 """
-from django.urls import path
+from django.urls import path, include
 
 app_name = 'trading'
 
 urlpatterns = [
-    # Les URLs seront ajoutées ici
-    # Exemple:
+    # API REST
+    path('api/', include('apps.trading.api.urls')),
+    
+    # Vues web (à ajouter plus tard)
     # path('', views.home, name='home'),
-    # path('assets/', views.asset_list, name='asset_list'),
 ]
-

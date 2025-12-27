@@ -8,14 +8,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
-# Database
-# SQLite pour le développement
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# Database - Utilise la config de base.py (PostgreSQL ou SQLite selon USE_SUPABASE)
+# Ne pas override ici !
 
 # Debug toolbar (optionnel)
 # INSTALLED_APPS += ['debug_toolbar']
@@ -27,4 +21,3 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # CORS pour le développement frontend
 CORS_ALLOW_ALL_ORIGINS = True
-
