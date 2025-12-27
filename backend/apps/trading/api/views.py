@@ -858,11 +858,30 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 'all_balances': all_balances,
                 'timestamp': timezone.now().isoformat()
             })
+        except BrokerAuthenticationError as e:
+            # Erreur d'authentification spécifique
+            error_msg = str(e)
+            logger.warning(f"Authentication error for account {account.id}: {error_msg}")
+            
+            # Message plus explicite selon le type d'erreur
+            if 'expired' in error_msg.lower() or 'invalid' in error_msg.lower():
+                message = 'Token expiré ou invalide. Veuillez rafraîchir le token ou vous ré-authentifier via OAuth2.'
+            else:
+                message = 'Erreur d\'authentification. Vérifiez vos credentials ou ré-authentifiez-vous.'
+            
+            return Response({
+                'success': False,
+                'error': error_msg,
+                'error_type': 'AUTHENTICATION_ERROR',
+                'balance_eur': 0.0,
+                'message': message
+            }, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
-            logger.error(f"Error getting EUR balance for account {account.id}: {e}")
+            logger.error(f"Error getting EUR balance for account {account.id}: {e}", exc_info=True)
             return Response({
                 'success': False,
                 'error': str(e),
+                'error_type': 'UNKNOWN_ERROR',
                 'balance_eur': 0.0
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -1115,7 +1134,7 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
         from apps.trading.services.sync.position_sync_service import PositionSyncService
         from apps.trading.services.sync.trade_sync_service import TradeSyncService
         from apps.trading.models import BrokerSyncLog
-        from apps.trading.exceptions.sync_exceptions import SyncException
+        from apps.trading.exceptions import SyncException
         from django.utils import timezone
         import logging
         

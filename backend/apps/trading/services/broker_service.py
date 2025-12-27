@@ -20,6 +20,7 @@ from ..brokers.base import (
     BrokerOrder,
     OrderResult,
     BrokerError,
+    BrokerAuthenticationError,
 )
 from ..models import (
     BrokerAccount,
@@ -563,13 +564,19 @@ class BrokerService:
             broker = self.get_broker_instance(broker_account)
             
             if not broker.authenticate():
-                logger.error(f"Authentication failed for account {broker_account.id}")
-                return {}
+                error_msg = broker.last_error or "Authentication failed"
+                logger.error(f"Authentication failed for account {broker_account.id}: {error_msg}")
+                # Lever une exception pour que l'endpoint puisse la gérer
+                raise BrokerAuthenticationError(error_msg)
             
             return broker.get_account_balance()
             
+        except BrokerAuthenticationError:
+            # Re-lever les erreurs d'authentification
+            raise
         except Exception as e:
             logger.error(f"Error getting account balance: {e}", exc_info=True)
+            # Pour les autres erreurs, retourner un dict vide mais logger l'erreur
             return {}
     
     def get_account_info(self, broker_account: BrokerAccount) -> Dict[str, Any]:
