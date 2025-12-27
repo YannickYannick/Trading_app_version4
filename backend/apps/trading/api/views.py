@@ -818,6 +818,8 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
         """
         from decimal import Decimal
         from ..services.broker_service import BrokerService
+        from ..brokers.base import BrokerAuthenticationError
+        from django.utils import timezone
         import logging
         
         logger = logging.getLogger('trading.api.brokers')
