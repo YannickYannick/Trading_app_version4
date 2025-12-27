@@ -3,19 +3,37 @@ Serializers pour l'API REST Trading.
 """
 from rest_framework import serializers
 from apps.trading.models import (
-    Asset, AssetPrice, Position, Trade, Order,
+    AllAssets, Asset, AssetPrice, Position, Trade, Order,
     Strategy, Broker, BrokerAccount
 )
 
 
+class AllAssetsSerializer(serializers.ModelSerializer):
+    """Serializer pour le catalogue universel des assets."""
+    
+    class Meta:
+        model = AllAssets
+        fields = [
+            'id', 'symbol', 'name', 'platform', 'asset_type', 'market',
+            'currency', 'exchange', 'is_tradable', 'last_updated', 'created_at',
+            'saxo_uic', 'saxo_exchange_id', 'saxo_country_code',
+            'binance_base_asset', 'binance_quote_asset', 'binance_status'
+        ]
+        read_only_fields = ['id', 'last_updated', 'created_at']
+
+
 class AssetSerializer(serializers.ModelSerializer):
-    """Serializer pour les assets."""
+    """Serializer pour les assets enrichis."""
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_platform = serializers.CharField(source='all_asset.platform', read_only=True)
     
     class Meta:
         model = Asset
         fields = [
-            'id', 'symbol', 'name', 'asset_type', 'currency', 'exchange',
+            'id', 'all_asset', 'all_asset_symbol', 'all_asset_platform',
+            'symbol', 'name', 'asset_type', 'currency', 'exchange',
             'current_price', 'price_updated_at', 'is_active', 'description',
+            'sector', 'industry', 'market_cap', 'pe_ratio', 'dividend_yield',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
