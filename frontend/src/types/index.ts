@@ -72,11 +72,19 @@ export interface Position {
 export interface Trade {
   id: number
   asset: Asset
-  size: number
+  size: number // Alias pour quantity dans le serializer
+  quantity?: number // Nom réel du champ backend
   price: number
   side: 'BUY' | 'SELL'
-  timestamp: string
+  timestamp: string // Alias pour executed_at dans le serializer
+  executed_at?: string // Nom réel du champ backend
   fees: number
+  pnl?: number | null
+  position?: number | null // ID de la position
+  position_id?: number | null // Alias
+  broker_name?: string
+  broker_id?: number
+  broker?: { id: number; name: string } | null
   user: number
 }
 

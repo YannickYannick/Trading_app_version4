@@ -70,12 +70,14 @@ export default function TradeDetail() {
             </div>
             <div className="info-row">
               <span className="info-label">Date:</span>
-              <span className="info-value">{formatDate(trade.timestamp, 'dd/MM/yyyy HH:mm:ss')}</span>
+              <span className="info-value">
+                {formatDate(trade.timestamp || trade.executed_at || '', 'dd/MM/yyyy HH:mm:ss')}
+              </span>
             </div>
-            {trade.broker && (
+            {(trade.broker_name || trade.broker) && (
               <div className="info-row">
                 <span className="info-label">Broker:</span>
-                <span className="info-value">{trade.broker.name}</span>
+                <span className="info-value">{trade.broker_name || trade.broker?.name}</span>
               </div>
             )}
           </div>
@@ -85,7 +87,9 @@ export default function TradeDetail() {
           <div className="trade-detail-info">
             <div className="info-row">
               <span className="info-label">Taille:</span>
-              <span className="info-value">{trade.size.toFixed(4)}</span>
+              <span className="info-value">
+                {(trade.size || trade.quantity || 0).toFixed(4)}
+              </span>
             </div>
             <div className="info-row">
               <span className="info-label">Prix:</span>
@@ -94,7 +98,7 @@ export default function TradeDetail() {
             <div className="info-row">
               <span className="info-label">Valeur:</span>
               <span className="info-value">
-                {formatCurrency(trade.size * trade.price, trade.asset.currency)}
+                {formatCurrency((trade.size || trade.quantity || 0) * trade.price, trade.asset.currency)}
               </span>
             </div>
             {trade.fees && (
@@ -114,7 +118,7 @@ export default function TradeDetail() {
           </div>
         </Card>
 
-        {trade.position && (
+        {(trade.position || trade.position_id) && (
           <Card title="Position Associée" className="trade-detail-card">
             <div className="trade-detail-info">
               <div className="info-row">
@@ -122,16 +126,10 @@ export default function TradeDetail() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => navigate(`/positions/${trade.position?.id}`)}
+                  onClick={() => navigate(`/positions/${trade.position || trade.position_id}`)}
                 >
-                  Voir Position #{trade.position.id}
+                  Voir Position #{trade.position || trade.position_id}
                 </Button>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Statut:</span>
-                <Badge variant={trade.position.status === 'OPEN' ? 'success' : 'secondary'}>
-                  {trade.position.status}
-                </Badge>
               </div>
             </div>
           </Card>

@@ -48,7 +48,7 @@ export default function Trades() {
       key: 'size',
       label: 'Taille',
       align: 'right' as const,
-      render: (trade: Trade) => trade.size.toFixed(4),
+      render: (trade: Trade) => (trade.size || trade.quantity || 0).toFixed(4),
     },
     {
       key: 'price',
