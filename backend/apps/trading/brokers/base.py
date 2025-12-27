@@ -113,6 +113,17 @@ class InsufficientFundsError(BrokerError):
     pass
 
 
+class APIError(BrokerError):
+    """API request error."""
+    pass
+
+
+# Aliases for compatibility
+BrokerAuthenticationError = AuthenticationError
+BrokerRateLimitError = RateLimitError
+BrokerAPIError = APIError
+
+
 class BrokerBase(ABC):
     """
     Abstract base class for all broker implementations.

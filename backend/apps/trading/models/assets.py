@@ -17,6 +17,12 @@ BROKER_CHOICES = [
 class AllAssets(models.Model):
     """Catalogue universel d'actifs récupérés depuis les APIs des brokers."""
     
+    # Valeurs possibles pour symbole_yahoo
+    class YahooStatus(models.TextChoices):
+        NOT_SEARCHED = 'Not_searched', 'Non recherché'
+        NOT_FOUND = 'not_found', 'Non trouvé'
+        MANUAL = 'manual', 'Validation manuelle requise'
+    
     symbol = models.CharField(max_length=50)
     name = models.CharField(max_length=200)
     platform = models.CharField(max_length=20, choices=BROKER_CHOICES)
@@ -27,6 +33,24 @@ class AllAssets(models.Model):
     is_tradable = models.BooleanField(default=True)
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Champ Yahoo Finance - symbole validé
+    symbole_yahoo = models.CharField(
+        max_length=50,
+        default='Not_searched',
+        db_index=True,
+        help_text="Symbole Yahoo validé, 'not_found', 'manual', ou 'Not_searched'"
+    )
+    yahoo_validated_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Date de dernière validation Yahoo"
+    )
+    yahoo_validation_method = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Méthode de validation: Y4 (MIC), Y3 (nom), Y0 (brut)"
+    )
     
     # Champs spécifiques Saxo
     saxo_uic = models.IntegerField(null=True, blank=True)
@@ -58,6 +82,29 @@ class AllAssets(models.Model):
     @property
     def is_binance(self):
         return self.platform == 'BINANCE'
+    
+    @property
+    def needs_yahoo_validation(self) -> bool:
+        """Vérifie si l'asset nécessite une validation Yahoo."""
+        return self.symbole_yahoo == 'Not_searched'
+    
+    @property
+    def is_yahoo_validated(self) -> bool:
+        """Vérifie si l'asset a un symbole Yahoo validé."""
+        return self.symbole_yahoo not in ['Not_searched', 'not_found', 'manual']
+    
+    @property
+    def is_yahoo_manual(self) -> bool:
+        """Vérifie si l'asset nécessite une validation manuelle."""
+        return self.symbole_yahoo == 'manual'
+    
+    def set_yahoo_symbol(self, symbol: str, method: str = '') -> None:
+        """Met à jour le symbole Yahoo avec la méthode de validation."""
+        from django.utils import timezone
+        self.symbole_yahoo = symbol
+        self.yahoo_validation_method = method
+        self.yahoo_validated_at = timezone.now()
+        self.save(update_fields=['symbole_yahoo', 'yahoo_validation_method', 'yahoo_validated_at'])
 
 
 class Asset(TimeStampedModel):

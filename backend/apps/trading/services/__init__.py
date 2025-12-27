@@ -13,14 +13,34 @@ from .sync import (
     TradeSyncService,
 )
 from .data_providers import YahooFinanceService
+from .yahoo_validator import (
+    validate_assets,
+    validate_single_asset,
+    validate_single_symbol,
+    ValidationResult,
+    ValidationStats,
+    clear_yahoo_cache,
+    get_cache_info,
+)
 
 __all__ = [
+    # Broker Service
     'BrokerService',
+    # Sync Services
     'BaseSyncService',
     'AssetSyncService',
     'PriceSyncService',
     'PositionSyncService',
     'TradeSyncService',
+    # Data Providers
     'YahooFinanceService',
+    # Yahoo Validator
+    'validate_assets',
+    'validate_single_asset',
+    'validate_single_symbol',
+    'ValidationResult',
+    'ValidationStats',
+    'clear_yahoo_cache',
+    'get_cache_info',
 ]
 

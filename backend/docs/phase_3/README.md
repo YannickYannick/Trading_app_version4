@@ -44,6 +44,14 @@ La Phase 3 implémente les services métier de l'application, permettant l'inter
    - Tests des services de synchronisation
    - Utilisation des mocks
 
+### Yahoo Finance Validator
+
+6. **[06_YAHOO_VALIDATOR.md](./06_YAHOO_VALIDATOR.md)**
+   - Système de validation Yahoo Finance
+   - Algorithme en cascade (Y4 → Y3 → Y0)
+   - MIC Mapping (107 marchés)
+   - Django Management Command
+
 ## Fichiers créés
 
 ```
@@ -73,9 +81,12 @@ apps/trading/
 ├── utils/
 │   ├── __init__.py
 │   ├── error_utils.py
+│   ├── yahoo_config.py      # MIC mapping et config
 │   └── logging/
 │       ├── __init__.py
 │       └── formatters.py
+├── management/commands/
+│   └── validate_yahoo_assets.py  # Django command
 └── tests/
     ├── test_brokers/
     │   ├── __init__.py

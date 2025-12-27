@@ -121,6 +121,7 @@ docs/
     ├── 02_SERVICES_SYNC.md
     ├── 03_GESTION_ERREURS.md
     ├── 04_LOGGING.md
-    └── 05_TESTS_SERVICES.md
+    ├── 05_TESTS_SERVICES.md
+    └── 06_YAHOO_VALIDATOR.md
 ```
 
