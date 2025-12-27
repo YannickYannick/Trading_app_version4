@@ -75,7 +75,11 @@ class PriceSyncService:
                 symbols = list(assets[:100])  # Limit to 100 at a time
             
             if not symbols:
-                return {'success': True, 'message': 'No symbols to update', 'updated': 0}
+                self._log_sync(
+                    broker_account, 'prices', 'success',
+                    details={'message': 'No symbols to update'}
+                )
+                return {'success': True, 'message': 'No symbols to update', 'updated': 0, 'records_synced': 0}
             
             # Get prices
             prices = broker.get_multiple_prices(symbols)
@@ -101,12 +105,17 @@ class PriceSyncService:
                 'success': True,
                 'message': f'Updated {updated} prices',
                 'updated': updated,
+                'records_synced': updated,  # Ajouter pour cohérence avec les autres services
                 'prices': {k: str(v) for k, v in prices.items() if v is not None},
             }
             
         except Exception as e:
             logger.exception(f"Error syncing prices: {e}")
-            return {'success': False, 'message': str(e), 'updated': 0}
+            self._log_sync(
+                broker_account, 'prices', 'error',
+                error_message=str(e)
+            )
+            return {'success': False, 'message': str(e), 'updated': 0, 'records_synced': 0}
     
     def sync_single_price(
         self,
@@ -296,30 +305,14 @@ class PriceSyncService:
     
     def _get_credentials(self, broker_account: BrokerAccount) -> Dict[str, Any]:
         """Get credentials from broker account."""
-        credentials = {}
+        credentials = broker_account.get_credentials_dict()
+        credentials['user_id'] = broker_account.user.id
+        if broker_account.account_id:
+            credentials['account_id'] = broker_account.account_id
         
-        if broker_account.api_key:
-            credentials['api_key'] = broker_account.api_key
-        if broker_account.api_secret:
-            credentials['api_secret'] = broker_account.api_secret
-        if broker_account.client_id:
-            credentials['client_id'] = broker_account.client_id
-        if broker_account.client_secret:
-            credentials['client_secret'] = broker_account.client_secret
-        if broker_account.access_token:
-            credentials['access_token'] = broker_account.access_token
-        if broker_account.refresh_token:
-            credentials['refresh_token'] = broker_account.refresh_token
-        if broker_account.token_expires_at:
-            credentials['token_expires_at'] = broker_account.token_expires_at.isoformat()
-        if broker_account.extra_credentials:
-            credentials.update(broker_account.extra_credentials)
-        
-        broker_type = broker_account.get_broker_type().upper()
-        if broker_type == 'SAXO':
-            credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
-        elif broker_type == 'BINANCE':
-            credentials['testnet'] = broker_account.is_sandbox
+        # S'assurer que l'environnement est défini
+        if 'environment' not in credentials:
+            credentials['environment'] = broker_account.environment or 'simulation'
         
         return credentials
     

@@ -1112,8 +1112,14 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
         """
         from apps.trading.services.sync.asset_sync_service import AssetSyncService
         from apps.trading.services.sync.price_sync_service import PriceSyncService
+        from apps.trading.services.sync.position_sync_service import PositionSyncService
+        from apps.trading.services.sync.trade_sync_service import TradeSyncService
         from apps.trading.models import BrokerSyncLog
+        from apps.trading.exceptions.sync_exceptions import SyncException
         from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
         
         account = self.get_object()
         sync_type = request.data.get('sync_type', 'ASSETS').upper()
@@ -1131,6 +1137,7 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             sync_type=sync_type,
             status='IN_PROGRESS',
             started_at=timezone.now(),
+            error_message='',  # Toujours initialiser avec une chaîne vide
         )
         
         try:
@@ -1139,21 +1146,47 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 result = sync_service.sync_assets(account)
             elif sync_type == 'PRICES':
                 sync_service = PriceSyncService(request.user)
-                result = sync_service.sync_prices(account)
+                # sync_current_prices est la méthode principale
+                result = sync_service.sync_current_prices(account)
             elif sync_type == 'POSITIONS':
-                # TODO: Implémenter PositionSyncService
-                result = {'success': False, 'message': 'Non implémenté'}
+                sync_service = PositionSyncService(request.user)
+                try:
+                    result = sync_service.sync(account)
+                except SyncException as e:
+                    # Convertir SyncException en format de résultat
+                    result = {
+                        'success': False,
+                        'message': str(e),
+                        'error': str(e),
+                        'records_synced': 0,
+                    }
             elif sync_type == 'TRADES':
-                # TODO: Implémenter TradeSyncService
-                result = {'success': False, 'message': 'Non implémenté'}
+                sync_service = TradeSyncService(request.user)
+                try:
+                    result = sync_service.sync(account)
+                except SyncException as e:
+                    # Convertir SyncException en format de résultat
+                    result = {
+                        'success': False,
+                        'message': str(e),
+                        'error': str(e),
+                        'records_synced': 0,
+                    }
             else:
                 result = {'success': False, 'message': 'Type de synchronisation inconnu'}
             
             # Mettre à jour le log
             sync_log.status = 'SUCCESS' if result.get('success') else 'FAILED'
-            sync_log.records_synced = result.get('records_synced', 0)
+            # records_synced peut être dans différents champs selon le service
+            sync_log.records_synced = (
+                result.get('records_synced', 0) or 
+                result.get('created', 0) + result.get('updated', 0) or
+                result.get('records', 0) or
+                0
+            )
             sync_log.completed_at = timezone.now()
-            sync_log.error_message = result.get('error') if not result.get('success') else None
+            # Toujours utiliser une chaîne vide au lieu de None
+            sync_log.error_message = result.get('error', '') if not result.get('success') else ''
             sync_log.details = result.get('details', {})
             sync_log.save()
             

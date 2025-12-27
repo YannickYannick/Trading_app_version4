@@ -7,7 +7,6 @@ from .models import (
     ScheduledTask, TaskExecutionLog
 )
 
-
 # ============== ASSETS ==============
 
 @admin.register(AllAssets)
