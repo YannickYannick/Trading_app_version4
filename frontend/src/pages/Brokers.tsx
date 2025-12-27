@@ -16,6 +16,7 @@ import BrokerForm from '@components/brokers/BrokerForm'
 import BrokerTestModal from '@components/brokers/BrokerTestModal'
 import BrokerSyncModal from '@components/brokers/BrokerSyncModal'
 import BrokerBalance from '@components/brokers/BrokerBalance'
+import SaxoOAuthModal from '@components/brokers/SaxoOAuthModal'
 import './Brokers.css'
 
 export default function Brokers() {
@@ -25,6 +26,7 @@ export default function Brokers() {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false)
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isSaxoOAuthModalOpen, setIsSaxoOAuthModalOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState<BrokerAccount | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'>('ALL')
@@ -190,7 +192,7 @@ export default function Brokers() {
 
               <div className="broker-card-info">
                 {/* Solde EUR */}
-                {account.broker_type === 'BINANCE' && (
+                {(account.broker_type === 'BINANCE' || account.broker_type === 'SAXO') && (
                   <div className="broker-info-item broker-balance-container">
                     <BrokerBalance accountId={account.id} />
                   </div>
@@ -229,6 +231,19 @@ export default function Brokers() {
                 >
                   🔑 Creds
                 </Button>
+                {account.broker_type === 'SAXO' && (
+                  <Button
+                    size="sm"
+                    variant="info"
+                    onClick={() => {
+                      setSelectedAccount(account)
+                      setIsSaxoOAuthModalOpen(true)
+                    }}
+                    title="Gérer l'authentification OAuth2 Saxo"
+                  >
+                    🔐 OAuth2
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -341,6 +356,32 @@ export default function Brokers() {
           />
         )}
       </Modal>
+
+      {/* Modal OAuth2 Saxo */}
+      {selectedAccount && selectedAccount.broker_type === 'SAXO' && (
+        <Modal
+          isOpen={isSaxoOAuthModalOpen}
+          onClose={() => {
+            setIsSaxoOAuthModalOpen(false)
+            setSelectedAccount(null)
+          }}
+          title={`OAuth2 Saxo: ${selectedAccount.name}`}
+          size="md"
+        >
+          <SaxoOAuthModal
+            account={selectedAccount}
+            onSuccess={() => {
+              refetch()
+              setIsSaxoOAuthModalOpen(false)
+              setSelectedAccount(null)
+            }}
+            onClose={() => {
+              setIsSaxoOAuthModalOpen(false)
+              setSelectedAccount(null)
+            }}
+          />
+        </Modal>
+      )}
 
       {/* Modal de confirmation de suppression */}
       <Modal

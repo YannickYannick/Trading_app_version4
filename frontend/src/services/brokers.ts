@@ -192,6 +192,43 @@ export const brokerService = {
   },
 
   /**
+   * Obtenir l'URL d'authentification Saxo (OAuth2)
+   */
+  async getSaxoAuthUrl(accountId: number): Promise<{ auth_url: string; state: string }> {
+    const response = await apiClient.get<{ success: boolean; auth_url: string; state: string }>(
+      `/broker-accounts/${accountId}/saxo-auth-url/`
+    )
+    return response.data
+  },
+
+  /**
+   * Échanger le code d'autorisation Saxo contre des tokens
+   */
+  async exchangeSaxoAuthCode(accountId: number, code: string, state?: string): Promise<BrokerAccount> {
+    const response = await apiClient.post<BrokerAccount>(`/broker-accounts/${accountId}/saxo-exchange-code/`, {
+      code,
+      state,
+    })
+    return response.data
+  },
+
+  /**
+   * Rafraîchir le token Saxo
+   */
+  async refreshSaxoToken(accountId: number): Promise<BrokerAccount> {
+    const response = await apiClient.post<BrokerAccount>(`/broker-accounts/${accountId}/saxo-refresh-token/`)
+    return response.data
+  },
+
+  /**
+   * Supprimer les tokens Saxo
+   */
+  async deleteSaxoTokens(accountId: number): Promise<BrokerAccount> {
+    const response = await apiClient.post<BrokerAccount>(`/broker-accounts/${accountId}/saxo-delete-tokens/`)
+    return response.data
+  },
+
+  /**
    * Synchroniser les données depuis un broker
    */
   async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import Button from '@components/common/Button'
 import Input from '@components/common/Input'
 import Loading from '@components/common/Loading'
+import Badge from '@components/common/Badge'
 import { brokerService } from '@services'
 import type { Broker, BrokerAccount, BrokerAccountCreateData } from '@types'
 import './BrokerForm.css'
@@ -31,6 +32,8 @@ export default function BrokerForm({ account, brokers, onSuccess, onCancel }: Br
     saxo_client_secret: account?.saxo_client_secret || '',
     saxo_redirect_uri: account?.saxo_redirect_uri || '',
     saxo_environment: account?.saxo_environment || 'simulation',
+    saxo_access_token: account?.saxo_access_token || '',
+    saxo_refresh_token: account?.saxo_refresh_token || '',
     
     // Credentials Binance
     binance_api_key: account?.binance_api_key || '',
@@ -236,6 +239,52 @@ export default function BrokerForm({ account, brokers, onSuccess, onCancel }: Br
               <option value="simulation">Simulation</option>
               <option value="live">Live</option>
             </select>
+          </div>
+          
+          {/* Tokens OAuth2 */}
+          <div className="broker-form-section broker-form-tokens-section">
+            <div className="broker-form-section-header">
+              <label className="broker-form-label broker-form-label-large">
+                🔐 Tokens OAuth2
+              </label>
+              <p className="broker-form-hint">
+                Les tokens sont obtenus automatiquement via OAuth2. Vous pouvez aussi les saisir manuellement si vous les avez déjà.
+              </p>
+            </div>
+            
+            <div className="broker-form-tokens-status">
+              {(account?.saxo_access_token || formData.saxo_access_token) && (
+                <Badge variant="success" className="broker-form-token-badge">
+                  ✅ Access Token présent
+                </Badge>
+              )}
+              {(account?.saxo_refresh_token || formData.saxo_refresh_token) && (
+                <Badge variant="success" className="broker-form-token-badge">
+                  ✅ Refresh Token présent
+                </Badge>
+              )}
+            </div>
+            
+            <Input
+              label="Access Token"
+              type={showSecrets ? 'text' : 'password'}
+              value={formData.saxo_access_token || ''}
+              onChange={(e) => handleChange('saxo_access_token', e.target.value)}
+              fullWidth
+              placeholder="Token d'accès OAuth2 (obtenu via OAuth2 ou saisi manuellement)"
+            />
+            <Input
+              label="Refresh Token"
+              type={showSecrets ? 'text' : 'password'}
+              value={formData.saxo_refresh_token || ''}
+              onChange={(e) => handleChange('saxo_refresh_token', e.target.value)}
+              fullWidth
+              placeholder="Token de rafraîchissement OAuth2 (obtenu via OAuth2 ou saisi manuellement)"
+            />
+            
+            <p className="broker-form-hint broker-form-hint-small">
+              💡 Astuce : Utilisez le bouton "🔐 OAuth2" sur la page des brokers pour obtenir les tokens automatiquement.
+            </p>
           </div>
         </>
       )}

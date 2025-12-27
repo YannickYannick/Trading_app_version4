@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse
 
 from .base import (
     BrokerBase, 
@@ -88,7 +88,23 @@ class SaxoBroker(BrokerBase):
         
         self.client_id = credentials.get('client_id')
         self.client_secret = credentials.get('client_secret')
-        self.redirect_uri = credentials.get('redirect_uri', 'http://localhost:8080/callback')
+        redirect_uri_raw = credentials.get('redirect_uri', 'http://localhost:8080/callback')
+        # Normaliser l'URL : en minuscules pour le domaine (Saxo est sensible à la casse)
+        if redirect_uri_raw:
+            parsed = urlparse(redirect_uri_raw)
+            # Reconstruire l'URL avec le domaine en minuscules
+            normalized = urlunparse((
+                parsed.scheme.lower(),
+                parsed.netloc.lower(),
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            self.redirect_uri = normalized
+            logger.debug(f"Saxo redirect_uri normalized: {self.redirect_uri} (from: {redirect_uri_raw})")
+        else:
+            self.redirect_uri = 'http://localhost:8080/callback'
         
         # Environnement (live ou simulation)
         environment = credentials.get('environment', 'simulation')
@@ -167,6 +183,15 @@ class SaxoBroker(BrokerBase):
                 return False
         
         return True
+    
+    def refresh_authentication(self) -> bool:
+        """
+        Rafraîchir l'authentification (implémentation de l'interface abstraite).
+        
+        Returns:
+            True si le rafraîchissement a réussi
+        """
+        return self._refresh_token()
     
     def _refresh_token(self) -> bool:
         """
@@ -988,34 +1013,102 @@ class SaxoBroker(BrokerBase):
             Dictionnaire avec les informations du compte
         """
         try:
-            params = {}
+            # D'abord récupérer les comptes pour obtenir l'AccountKey
+            account_params = {}
             if self.client_key:
-                params['ClientKey'] = self.client_key
+                account_params['ClientKey'] = self.client_key
             
-            # Récupérer les balances
-            balance_data = self._make_request('GET', '/port/v1/balances', params=params)
-            
-            # Récupérer les infos du compte
-            account_data = self._make_request('GET', '/port/v1/accounts', params=params)
+            account_data = self._make_request('GET', '/port/v1/accounts', params=account_params)
             
             accounts = account_data.get('Data', [])
-            primary_account = accounts[0] if accounts else {}
+            if not accounts:
+                logger.warning("No accounts found in Saxo response")
+                return {}
+            
+            primary_account = accounts[0]
+            account_key = primary_account.get('AccountKey')
+            # Le ClientKey est aussi dans la réponse du compte
+            client_key_from_account = primary_account.get('ClientKey')
+            
+            # Utiliser le ClientKey de la réponse si disponible, sinon celui des credentials
+            client_key_to_use = client_key_from_account or self.client_key
+            
+            # Maintenant récupérer les balances avec l'AccountKey ET ClientKey (les deux sont requis)
+            balance_params = {}
+            if account_key:
+                balance_params['AccountKey'] = account_key
+            if client_key_to_use:
+                balance_params['ClientKey'] = client_key_to_use
+            
+            # Les deux sont requis par l'API Saxo
+            if not balance_params.get('AccountKey') or not balance_params.get('ClientKey'):
+                logger.warning(f"Missing required parameters for balances: AccountKey={bool(account_key)}, ClientKey={bool(self.client_key)}")
+                # Essayer quand même, mais cela échouera probablement
+            
+            balance_data = self._make_request('GET', '/port/v1/balances', params=balance_params)
+            
+            # Si balance_data est une liste, prendre le premier élément
+            if isinstance(balance_data, list) and balance_data:
+                balance_data = balance_data[0]
+            elif isinstance(balance_data, dict) and 'Data' in balance_data:
+                balance_data = balance_data['Data'][0] if balance_data['Data'] else {}
             
             return {
                 'account_id': primary_account.get('AccountId'),
-                'account_key': primary_account.get('AccountKey'),
-                'currency': primary_account.get('Currency', 'USD'),
-                'balance': balance_data.get('TotalValue', 0),
-                'cash_balance': balance_data.get('CashBalance', 0),
-                'margin_available': balance_data.get('MarginAvailableForTrading', 0),
-                'margin_used': balance_data.get('MarginUsedByCurrentPositions', 0),
-                'unrealized_pnl': balance_data.get('UnrealizedProfitLoss', 0),
+                'account_key': account_key,
+                'currency': primary_account.get('Currency', 'EUR'),
+                'balance': balance_data.get('TotalValue', 0) if isinstance(balance_data, dict) else 0,
+                'cash_balance': balance_data.get('CashBalance', 0) if isinstance(balance_data, dict) else 0,
+                'margin_available': balance_data.get('MarginAvailableForTrading', 0) if isinstance(balance_data, dict) else 0,
+                'margin_used': balance_data.get('MarginUsedByCurrentPositions', 0) if isinstance(balance_data, dict) else 0,
+                'unrealized_pnl': balance_data.get('UnrealizedProfitLoss', 0) if isinstance(balance_data, dict) else 0,
                 'account_type': primary_account.get('AccountType'),
                 'is_active': primary_account.get('Active', False),
             }
             
         except Exception as e:
-            logger.error(f"Saxo get_account_info error: {e}")
+            logger.error(f"Saxo get_account_info error: {e}", exc_info=True)
+            return {}
+    
+    def get_account_balance(self) -> Dict[str, Decimal]:
+        """
+        Get account balances.
+        
+        Returns:
+            Dictionary mapping currency to balance
+        """
+        try:
+            # Récupérer les informations du compte
+            account_info = self.get_account_info()
+            
+            if not account_info:
+                return {}
+            
+            # Extraire la devise et le solde
+            currency = account_info.get('currency', 'EUR')
+            cash_balance = account_info.get('cash_balance', 0)
+            total_balance = account_info.get('balance', 0)
+            
+            # Formater les balances
+            balances = {}
+            
+            # Solde en cash (devise principale)
+            if cash_balance:
+                balances[currency] = Decimal(str(cash_balance))
+            
+            # Solde total (si différent)
+            if total_balance and total_balance != cash_balance:
+                balances[f'{currency}_total'] = Decimal(str(total_balance))
+            
+            # Autres informations
+            if account_info.get('margin_available'):
+                balances[f'{currency}_margin_available'] = Decimal(str(account_info['margin_available']))
+            
+            return balances
+            
+        except Exception as e:
+            logger.error(f"Saxo get_account_balance error: {e}")
+            self._set_error(f"Get account balance error: {str(e)}")
             return {}
     
     # ==================== Helper Methods ====================

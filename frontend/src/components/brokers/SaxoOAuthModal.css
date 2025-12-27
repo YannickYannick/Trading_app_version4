@@ -1,0 +1,119 @@
+/**
+ * Styles pour le modal OAuth2 Saxo
+ */
+.saxo-oauth-modal {
+  padding: 1rem;
+}
+
+.saxo-oauth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.saxo-oauth-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.saxo-oauth-content {
+  margin-bottom: 1.5rem;
+}
+
+.saxo-oauth-info {
+  margin-bottom: 1.5rem;
+}
+
+.saxo-oauth-info p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.saxo-oauth-hint {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.saxo-oauth-hint code {
+  background: var(--bg-secondary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+}
+
+.saxo-oauth-url {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.saxo-oauth-url a {
+  color: var(--primary-color);
+  word-break: break-all;
+  text-decoration: none;
+}
+
+.saxo-oauth-url a:hover {
+  text-decoration: underline;
+}
+
+.saxo-oauth-error {
+  padding: 0.75rem;
+  background: var(--danger-bg);
+  color: var(--danger-color);
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+
+.saxo-oauth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.saxo-oauth-tokens-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.saxo-oauth-tokens-info ul {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1.5rem;
+}
+
+.saxo-oauth-tokens-info li {
+  margin: 0.25rem 0;
+  color: var(--text-secondary);
+}
+
+.saxo-oauth-success {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.saxo-oauth-success-badge {
+  font-size: 1.25rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.saxo-oauth-success p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.saxo-oauth-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}

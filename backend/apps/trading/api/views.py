@@ -716,26 +716,38 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             # Récupérer toutes les balances
             balances = service.get_account_balance(account)
             
-            # Extraire le solde EUR
-            eur_balance = balances.get('EUR', Decimal('0'))
+            # Pour Saxo, extraire le solde de la devise principale
+            if account.broker_type == 'SAXO':
+                currency = account.currency or 'EUR'
+                eur_balance = balances.get(currency, balances.get('EUR', Decimal('0')))
+                
+                # Si pas de EUR, prendre la première balance disponible
+                if eur_balance == 0 and balances:
+                    currency = list(balances.keys())[0]
+                    eur_balance = balances[currency]
+            else:
+                # Pour Binance, utiliser directement EUR
+                eur_balance = balances.get('EUR', Decimal('0'))
+                currency = 'EUR'
             
             # Mettre à jour le modèle
             account.balance = eur_balance
-            account.currency = 'EUR'
+            account.currency = currency
             account.balance_updated_at = timezone.now()
             account.save(update_fields=['balance', 'currency', 'balance_updated_at'])
             
-            # Formater les balances (exclure les clés _free et _locked)
+            # Formater les balances (exclure les clés _free, _locked, _margin_available, _total)
             all_balances = {
                 k: float(v) 
                 for k, v in balances.items() 
                 if not k.endswith('_free') and not k.endswith('_locked')
+                and not k.endswith('_margin_available') and not k.endswith('_total')
             }
             
             return Response({
                 'success': True,
                 'balance_eur': float(eur_balance),
-                'currency': 'EUR',
+                'currency': currency,
                 'all_balances': all_balances,
                 'account': BrokerAccountSerializer(account).data
             })
@@ -817,20 +829,32 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             # Récupérer toutes les balances
             balances = service.get_account_balance(account)
             
-            # Extraire le solde EUR
-            eur_balance = balances.get('EUR', Decimal('0'))
+            # Pour Saxo, extraire le solde de la devise principale
+            if account.broker_type == 'SAXO':
+                currency = account.currency or 'EUR'
+                eur_balance = balances.get(currency, balances.get('EUR', Decimal('0')))
+                
+                # Si pas de EUR, prendre la première balance disponible
+                if eur_balance == 0 and balances:
+                    currency = list(balances.keys())[0]
+                    eur_balance = balances[currency]
+            else:
+                # Pour Binance, utiliser directement EUR
+                eur_balance = balances.get('EUR', Decimal('0'))
+                currency = 'EUR'
             
-            # Formater les balances (exclure les clés _free et _locked)
+            # Formater les balances (exclure les clés _free, _locked, _margin_available, _total)
             all_balances = {
                 k: float(v) 
                 for k, v in balances.items() 
-                if not k.endswith('_free') and not k.endswith('_locked')
+                if not k.endswith('_free') and not k.endswith('_locked') 
+                and not k.endswith('_margin_available') and not k.endswith('_total')
             }
             
             return Response({
                 'success': True,
                 'balance_eur': float(eur_balance),
-                'currency': 'EUR',
+                'currency': currency,
                 'all_balances': all_balances,
                 'timestamp': timezone.now().isoformat()
             })
@@ -841,6 +865,214 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 'error': str(e),
                 'balance_eur': 0.0
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='saxo-auth-url')
+    def saxo_auth_url(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/saxo-auth-url/
+        Obtient l'URL d'authentification OAuth2 pour Saxo Bank.
+        """
+        from ..services.broker_service import BrokerService
+        import secrets
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            broker = service.get_broker_instance(account, use_cache=False)
+            
+            # Générer un state pour CSRF protection
+            state = secrets.token_urlsafe(32)
+            request.session[f'saxo_oauth_state_{account.id}'] = state
+            
+            auth_url = broker.get_authorization_url(state=state)
+            
+            return Response({
+                'success': True,
+                'auth_url': auth_url,
+                'state': state,
+            })
+        except Exception as e:
+            logger.error(f"Error getting Saxo auth URL for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'], url_path='saxo-exchange-code')
+    def saxo_exchange_code(self, request, pk=None):
+        """
+        POST /api/broker-accounts/{id}/saxo-exchange-code/
+        Échange le code d'autorisation OAuth2 contre des tokens.
+        
+        Body: { "code": "AUTHORIZATION_CODE", "state": "STATE_VALUE" }
+        """
+        from ..services.broker_service import BrokerService
+        from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        code = request.data.get('code')
+        state = request.data.get('state')
+        
+        if not code:
+            return Response({
+                'success': False,
+                'error': 'Le code d\'autorisation est requis'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Vérifier le state (CSRF protection)
+        stored_state = request.session.get(f'saxo_oauth_state_{account.id}')
+        if state and stored_state and stored_state != state:
+            return Response({
+                'success': False,
+                'error': 'State invalide - possible attaque CSRF'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            broker = service.get_broker_instance(account, use_cache=False)
+            
+            # Échanger le code contre des tokens
+            token_data = broker.exchange_code_for_token(code)
+            
+            # Sauvegarder les tokens dans la base de données
+            account.saxo_access_token = token_data['access_token']
+            account.saxo_refresh_token = token_data.get('refresh_token')
+            if token_data.get('token_expires_at'):
+                from datetime import datetime
+                try:
+                    account.saxo_token_expires_at = datetime.fromisoformat(
+                        token_data['token_expires_at'].replace('Z', '+00:00')
+                    )
+                except ValueError:
+                    # Si le format est différent, essayer sans timezone
+                    account.saxo_token_expires_at = datetime.fromisoformat(
+                        token_data['token_expires_at'].replace('Z', '')
+                    )
+            account.save(update_fields=['saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at'])
+            
+            # Nettoyer le state de la session
+            if f'saxo_oauth_state_{account.id}' in request.session:
+                del request.session[f'saxo_oauth_state_{account.id}']
+            
+            return Response({
+                'success': True,
+                'message': 'Tokens obtenus avec succès',
+                'token_expires_at': token_data.get('token_expires_at'),
+                'account': BrokerAccountSerializer(account).data
+            })
+        except Exception as e:
+            logger.error(f"Error exchanging Saxo code for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'], url_path='saxo-refresh-token')
+    def saxo_refresh_token(self, request, pk=None):
+        """
+        POST /api/broker-accounts/{id}/saxo-refresh-token/
+        Rafraîchit le token d'accès Saxo.
+        """
+        from ..services.broker_service import BrokerService
+        from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger('trading.api.brokers')
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            broker = service.get_broker_instance(account, use_cache=False)
+            
+            # Rafraîchir le token
+            success = broker._refresh_token()
+            
+            if success:
+                # Sauvegarder les nouveaux tokens
+                account.saxo_access_token = broker.access_token
+                if broker.refresh_token:
+                    account.saxo_refresh_token = broker.refresh_token
+                if broker.token_expires_at:
+                    from datetime import datetime
+                    try:
+                        account.saxo_token_expires_at = datetime.fromisoformat(
+                            broker.token_expires_at.replace('Z', '+00:00')
+                        )
+                    except ValueError:
+                        account.saxo_token_expires_at = datetime.fromisoformat(
+                            broker.token_expires_at.replace('Z', '')
+                        )
+                account.save(update_fields=['saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at'])
+                
+                return Response({
+                    'success': True,
+                    'message': 'Token rafraîchi avec succès',
+                    'token_expires_at': broker.token_expires_at,
+                    'account': BrokerAccountSerializer(account).data
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Échec du rafraîchissement du token'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"Error refreshing Saxo token for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'], url_path='saxo-delete-tokens')
+    def saxo_delete_tokens(self, request, pk=None):
+        """
+        POST /api/broker-accounts/{id}/saxo-delete-tokens/
+        Supprime les tokens OAuth2 Saxo.
+        """
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        account.saxo_access_token = None
+        account.saxo_refresh_token = None
+        account.saxo_token_expires_at = None
+        account.save(update_fields=['saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at'])
+        
+        return Response({
+            'success': True,
+            'message': 'Tokens supprimés avec succès',
+            'account': BrokerAccountSerializer(account).data
+        })
     
     @action(detail=True, methods=['post'], url_path='test-connection')
     def test_connection(self, request, pk=None):
