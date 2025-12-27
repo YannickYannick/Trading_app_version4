@@ -23,8 +23,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Third party
-    'rest_framework',   # Django REST Framework
-    'corsheaders',      # Pour CORS avec React
+    'rest_framework',           # Django REST Framework
+    'rest_framework_simplejwt', # JWT Authentication
+    'django_filters',           # Filtres avancés pour DRF
+    'drf_spectacular',          # Documentation API OpenAPI/Swagger
+    'corsheaders',              # Pour CORS avec React
     
     # Apps métier
     'apps.trading',
@@ -41,6 +44,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.trading.middleware.ErrorHandlerMiddleware',  # Gestion d'erreurs unifiée
 ]
 
 ROOT_URLCONF = 'config_django.urls'
@@ -120,30 +124,116 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS pour React
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Alternative
+# ============================================
+# CORS Configuration (Cross-Origin Resource Sharing)
+# ============================================
+# Permet au frontend React (port 5173) d'appeler l'API Django (port 8000)
+# Sans CORS, le navigateur bloque les requêtes cross-origin
+
+# Headers autorisés dans les requêtes
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
+
+# Méthodes HTTP autorisées
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Autoriser l'envoi de cookies et headers d'authentification
 CORS_ALLOW_CREDENTIALS = True
+
+# Durée de cache pour les requêtes preflight (24h)
+CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Les origines autorisées sont définies dans development.py et production.py
 
 # Django REST Framework
 REST_FRAMEWORK = {
+    # Permissions - Authentification requise par défaut
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Authentification - Session (navigateur) + JWT (apps/API)
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT pour apps
+        'rest_framework.authentication.SessionAuthentication',         # Session pour navigateur
     ],
+    # Pagination
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+    # Filtres
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    # Documentation API (Swagger/OpenAPI)
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Handler d'exceptions personnalisé
+    'EXCEPTION_HANDLER': 'apps.trading.utils.error_utils.custom_exception_handler',
 }
 
-# Logging configuration
+# ============================================
+# JWT Configuration (Simple JWT)
+# ============================================
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Durée de vie des tokens
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),      # Token d'accès expire en 1h
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),      # Token de refresh expire en 7 jours
+    
+    # Rotation des tokens
+    'ROTATE_REFRESH_TOKENS': True,                    # Nouveau refresh token à chaque refresh
+    'BLACKLIST_AFTER_ROTATION': True,                 # Blacklister l'ancien refresh token
+    
+    # Algorithme de signature
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    
+    # Headers
+    'AUTH_HEADER_TYPES': ('Bearer',),                 # Format: "Bearer <token>"
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    
+    # Token claims
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# Configuration drf-spectacular (documentation API)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Trading App API',
+    'DESCRIPTION': 'API REST pour application de trading multi-brokers',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# ============================================
+# Logging Configuration
+# ============================================
+# Créer le dossier logs s'il n'existe pas
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    
+    # Formatters - Comment formater les messages
     'formatters': {
         'verbose': {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
@@ -153,25 +243,177 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'detailed': {
+            'format': '[{levelname:8}] {asctime} | {name:30} | {funcName}:{lineno} | {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
+    
+    # Filters
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    
+    # Handlers - Où écrire les logs
     'handlers': {
+        # Console
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'detailed',
+        },
+        
+        # Console debug (seulement en DEBUG)
+        'console_debug': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'detailed',
+        },
+        
+        # Fichier principal avec rotation
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'formatter': 'verbose',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'django.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+            'encoding': 'utf-8',
         },
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        
+        # Fichier d'erreurs
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'errors.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'detailed',
+            'encoding': 'utf-8',
+        },
+        
+        # Fichier pour les brokers
+        'broker_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'brokers.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+            'encoding': 'utf-8',
+        },
+        
+        # Fichier pour la synchronisation
+        'sync_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'sync.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+            'encoding': 'utf-8',
         },
     },
+    
+    # Root logger
     'root': {
-        'handlers': ['console', 'file'],
-        'level': 'INFO',
+        'handlers': ['console'],
+        'level': 'WARNING',
     },
+    
+    # Loggers spécifiques
     'loggers': {
+        # Django
         'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['error_file', 'console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        
+        # Trading App - Logger principal
+        'trading': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # Brokers - Logs séparés
+        'trading.brokers': {
+            'handlers': ['console', 'broker_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'trading.brokers.saxo': {
+            'handlers': ['console', 'broker_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'trading.brokers.binance': {
+            'handlers': ['console', 'broker_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # Services
+        'trading.services': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'trading.services.broker': {
+            'handlers': ['console', 'broker_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # Synchronisation - Logs séparés
+        'trading.sync': {
+            'handlers': ['console', 'sync_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'trading.services.sync': {
+            'handlers': ['console', 'sync_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        
+        # Exceptions et erreurs
+        'trading.exceptions': {
+            'handlers': ['console', 'error_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'trading.middleware': {
+            'handlers': ['console', 'error_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'trading.middleware.errors': {
+            'handlers': ['console', 'error_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        
+        # Utilitaires
+        'trading.utils': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': False,

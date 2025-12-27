@@ -51,10 +51,21 @@ class BrokerAccount(TimeStampedModel):
     account_id = models.CharField(max_length=100)
     account_name = models.CharField(max_length=100, blank=True)
     
+    # API Keys (pour Binance et autres brokers avec clé API)
+    api_key = models.CharField(max_length=255, blank=True)
+    api_secret = models.CharField(max_length=255, blank=True)
+    
+    # OAuth credentials (pour Saxo)
+    client_id = models.CharField(max_length=255, blank=True)
+    client_secret = models.CharField(max_length=255, blank=True)
+    
     # Tokens API (chiffrés en production)
     access_token = models.TextField(blank=True)
     refresh_token = models.TextField(blank=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # Extra credentials (JSON pour données supplémentaires)
+    extra_credentials = models.JSONField(default=dict, blank=True)
     
     # Balance
     balance = models.DecimalField(
@@ -65,6 +76,7 @@ class BrokerAccount(TimeStampedModel):
     
     is_active = models.BooleanField(default=True)
     is_demo = models.BooleanField(default=False)
+    is_sandbox = models.BooleanField(default=True, help_text="Use sandbox/simulation environment")
     
     class Meta:
         unique_together = ['user', 'broker', 'account_id']
@@ -86,26 +98,33 @@ class BrokerSyncLog(TimeStampedModel):
         BALANCE = 'BALANCE', 'Balance'
         ASSETS = 'ASSETS', 'Assets'
         PRICES = 'PRICES', 'Prix'
+        CONNECTION_TEST = 'CONNECTION_TEST', 'Test connexion'
+        ORDER_PLACED = 'ORDER_PLACED', 'Ordre placé'
+        ORDER_CANCELLED = 'ORDER_CANCELLED', 'Ordre annulé'
     
     class SyncStatus(models.TextChoices):
         SUCCESS = 'SUCCESS', 'Succès'
         PARTIAL = 'PARTIAL', 'Partiel'
         FAILED = 'FAILED', 'Échec'
+        ERROR = 'ERROR', 'Erreur'
+        WARNING = 'WARNING', 'Avertissement'
     
     broker_account = models.ForeignKey(
         BrokerAccount, on_delete=models.CASCADE, related_name='sync_logs'
     )
-    sync_type = models.CharField(max_length=20, choices=SyncType.choices)
+    sync_type = models.CharField(max_length=50)  # Allow custom sync types
     status = models.CharField(max_length=20, choices=SyncStatus.choices)
     
-    items_synced = models.IntegerField(default=0)
+    records_synced = models.IntegerField(default=0)
+    items_synced = models.IntegerField(default=0)  # Legacy field
     error_message = models.TextField(blank=True)
+    details = models.JSONField(default=dict, blank=True)
     
-    started_at = models.DateTimeField()
+    started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        ordering = ['-started_at']
+        ordering = ['-created_at']
         verbose_name = 'Broker Sync Log'
         verbose_name_plural = 'Broker Sync Logs'
     

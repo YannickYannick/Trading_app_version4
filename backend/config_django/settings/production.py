@@ -31,8 +31,27 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# CORS
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+# ============================================
+# CORS pour la production
+# ============================================
+# Définir via variable d'environnement :
+# CORS_ALLOWED_ORIGINS=https://ton-site.com,https://www.ton-site.com
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() 
+    for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
+# Si aucune origine définie, utiliser une valeur par défaut sécurisée
+if not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS = []
+    # En production, NE PAS utiliser CORS_ALLOW_ALL_ORIGINS = True
+
+# URLs exposées dans les réponses CORS
+CORS_EXPOSE_HEADERS = [
+    'Content-Type',
+    'X-CSRFToken',
+]
 
 # Email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -41,4 +60,3 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-
