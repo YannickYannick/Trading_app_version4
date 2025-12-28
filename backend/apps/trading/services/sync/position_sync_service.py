@@ -213,7 +213,6 @@ class PositionSyncService(BaseSyncService):
         # Create or update position
         position, created = Position.objects.update_or_create(
             user=self.user,
-            broker_account=broker_account,
             broker=broker_account.broker,
             asset=asset,
             is_open=True,
@@ -254,7 +253,7 @@ class PositionSyncService(BaseSyncService):
         # Get open positions for this broker account
         open_positions = Position.objects.filter(
             user=self.user,
-            broker_account=broker_account,
+            broker=broker_account.broker,
             is_open=True,
         ).exclude(id__in=seen_position_ids)
         
