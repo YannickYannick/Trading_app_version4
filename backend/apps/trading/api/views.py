@@ -1459,18 +1459,25 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             account.last_sync = timezone.now()
             account.save()
             
+            # Déterminer le code de statut HTTP approprié
+            status_code = status.HTTP_200_OK
+            if not result.get('success', False):
+                status_code = status.HTTP_400_BAD_REQUEST
+            
             return Response({
                 'success': result.get('success', False),
                 'message': result.get('message', 'Synchronisation terminée'),
+                'error': result.get('error') if not result.get('success') else None,
                 'sync_log': {
                     'id': sync_log.id,
                     'status': sync_log.status,
                     'records_synced': sync_log.records_synced,
                     'started_at': sync_log.started_at.isoformat(),
                     'completed_at': sync_log.completed_at.isoformat() if sync_log.completed_at else None,
+                    'error_message': sync_log.error_message if sync_log.error_message else None,
                 },
                 'details': result.get('details', {}),
-            })
+            }, status=status_code)
         except Exception as e:
             sync_log.status = 'FAILED'
             sync_log.completed_at = timezone.now()

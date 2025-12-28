@@ -234,6 +234,8 @@ class AssetSyncService:
         total_updated = 0
         all_errors = []
         results_by_type = {}
+        has_failures = False
+        success_count = 0
         
         for asset_type in asset_types:
             result = self.sync_assets(
@@ -242,14 +244,41 @@ class AssetSyncService:
                 limit=limit_per_type
             )
             
-            total_created += result.get('created', 0)
-            total_updated += result.get('updated', 0)
+            if result.get('success'):
+                success_count += 1
+                total_created += result.get('created', 0)
+                total_updated += result.get('updated', 0)
+            else:
+                has_failures = True
+                # Ajouter l'erreur d'authentification/échec à la liste des erreurs
+                error_msg = result.get('message', f'Sync failed for {asset_type}')
+                all_errors.append({
+                    'asset_type': asset_type,
+                    'error': error_msg,
+                })
+            
             all_errors.extend(result.get('errors', []))
             results_by_type[asset_type] = result
         
+        # Si toutes les synchronisations ont échoué, retourner un échec
+        if success_count == 0:
+            return {
+                'success': False,
+                'message': f'Échec de la synchronisation pour tous les types d\'assets. Dernière erreur: {all_errors[-1].get("error", "Unknown error") if all_errors else "Unknown error"}',
+                'total_created': 0,
+                'total_updated': 0,
+                'errors': all_errors,
+                'by_type': results_by_type,
+            }
+        
+        # Au moins une synchronisation a réussi
+        message = f'Synchronisé {total_created + total_updated} assets sur {success_count}/{len(asset_types)} types'
+        if has_failures:
+            message += f' ({len(asset_types) - success_count} type(s) en échec)'
+        
         return {
             'success': True,
-            'message': f'Synced {total_created + total_updated} assets across {len(asset_types)} types',
+            'message': message,
             'total_created': total_created,
             'total_updated': total_updated,
             'errors': all_errors,
