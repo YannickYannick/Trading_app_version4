@@ -61,11 +61,23 @@ export default function SyncAssetsModal({ isOpen, onClose, onSuccess }: SyncAsse
         force: false,
       })
       setResult(response)
-      if (onSuccess) {
-        onSuccess()
+      
+      // Vérifier si la synchronisation a réussi
+      if (!response.success) {
+        // Si la synchronisation a échoué, afficher l'erreur
+        const errorMessage = response.error || response.message || 'Erreur lors de la synchronisation'
+        setError(errorMessage)
+        setResult(null) // Ne pas afficher le résultat si échec
+      } else {
+        // Succès, appeler le callback
+        if (onSuccess) {
+          onSuccess()
+        }
       }
     } catch (err: any) {
-      setError(err.error || err.message || 'Erreur lors de la synchronisation')
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.error || err.message || 'Erreur lors de la synchronisation'
+      setError(errorMessage)
+      setResult(null)
     } finally {
       setLoading(false)
     }
