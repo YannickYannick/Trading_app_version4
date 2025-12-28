@@ -20,6 +20,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from . import views
 from . import auth_views
+from .health import health_check, ping
 
 # ============================================
 # ROUTER PRINCIPAL
@@ -118,6 +119,12 @@ router.register(r'broker-accounts', views.BrokerAccountViewSet, basename='broker
 # ============================================
 
 urlpatterns = [
+    # ============================================
+    # HEALTH CHECK (public, no auth required)
+    # ============================================
+    path('health/', health_check, name='health-check'),
+    path('ping/', ping, name='ping'),
+    
     # Toutes les URLs du router (ViewSets)
     path('', include(router.urls)),
     

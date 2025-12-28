@@ -7,6 +7,8 @@ export type { ApiResponse, ApiError } from './api/client'
 export * from './api/auth'
 export { default as authService } from './api/auth'
 
+export * from './api/connection'
+
 export { default as assetService } from './assets'
 export * from './assets'
 
