@@ -2,6 +2,9 @@
  * Types TypeScript pour l'application Trading
  */
 
+// Export des types d'erreurs
+export type { ApiError, ErrorState, ErrorType } from './errors'
+
 // ============================================================================
 // Assets
 // ============================================================================

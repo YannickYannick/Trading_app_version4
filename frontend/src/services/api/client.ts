@@ -4,7 +4,8 @@
  */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { config } from '@utils/config'
-import type { ApiResponse, ApiError } from '@types'
+import type { ApiResponse } from '@types'
+import type { ApiError } from '@types/errors'
 
 // Créer l'instance axios
 const apiClient: AxiosInstance = axios.create({
@@ -162,5 +163,6 @@ function handleLogout() {
 }
 
 export default apiClient
-export type { ApiResponse, ApiError }
+export type { ApiResponse }
+export type { ApiError } from '@types/errors'
 
