@@ -1382,7 +1382,14 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                     # Le format de sync_all_asset_types retourne total_created, total_updated
                     result['created'] = result.get('total_created', 0)
                     result['updated'] = result.get('total_updated', 0)
-                    result['details'] = result
+                    # Créer une copie des détails sans référence circulaire
+                    import copy
+                    result['details'] = {
+                        'total_created': result.get('total_created', 0),
+                        'total_updated': result.get('total_updated', 0),
+                        'by_type': result.get('by_type', {}),
+                        'errors_count': len(result.get('errors', [])),
+                    }
             elif sync_type == 'PRICES':
                 sync_service = PriceSyncService(request.user)
                 # sync_current_prices est la méthode principale
