@@ -1095,6 +1095,111 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             'account': BrokerAccountSerializer(account).data
         })
     
+    @action(detail=True, methods=['get'], url_path='saxo-assets')
+    def saxo_assets(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/saxo-assets/
+        Récupère les assets disponibles depuis Saxo.
+        
+        Query params:
+            - asset_type: Type d'asset (Stock, Etf, etc.) - default: Stock
+            - keywords: Mots-clés de recherche
+            - limit: Nombre maximum de résultats - default: 100
+        """
+        from ..services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            asset_type = request.query_params.get('asset_type', 'Stock')
+            keywords = request.query_params.get('keywords', '')
+            limit = int(request.query_params.get('limit', 100))
+            
+            broker_assets = service.get_assets(
+                broker_account=account,
+                asset_type=asset_type,
+                keywords=keywords,
+                limit=limit
+            )
+            
+            # Convertir en format sérialisable
+            assets_data = []
+            for asset in broker_assets:
+                assets_data.append({
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'asset_type': asset.asset_type,
+                    'exchange': asset.exchange,
+                    'currency': asset.currency,
+                    'is_tradable': asset.is_tradable,
+                    'broker_id': asset.broker_id,
+                })
+            
+            return Response({
+                'success': True,
+                'count': len(assets_data),
+                'assets': assets_data,
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Saxo assets for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='saxo-positions')
+    def saxo_positions(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/saxo-positions/
+        Récupère les positions depuis Saxo.
+        """
+        from ..services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            positions = service.get_positions(account)
+            
+            # Convertir en format sérialisable
+            positions_data = []
+            for pos in positions:
+                positions_data.append({
+                    'symbol': pos.symbol,
+                    'quantity': float(pos.quantity),
+                    'entry_price': float(pos.entry_price),
+                    'current_price': float(pos.current_price) if pos.current_price else None,
+                    'unrealized_pnl': float(pos.unrealized_pnl) if pos.unrealized_pnl else None,
+                    'currency': pos.currency,
+                    'side': pos.side,
+                    'broker_id': pos.broker_id,
+                })
+            
+            return Response({
+                'success': True,
+                'count': len(positions_data),
+                'positions': positions_data,
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Saxo positions for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=True, methods=['post'], url_path='test-connection')
     def test_connection(self, request, pk=None):
         """
