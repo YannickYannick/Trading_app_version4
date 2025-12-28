@@ -1433,7 +1433,26 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             sync_log.completed_at = timezone.now()
             # Toujours utiliser une chaîne vide au lieu de None
             sync_log.error_message = result.get('error', '') if not result.get('success') else ''
-            sync_log.details = result.get('details', {})
+            # Convertir details en format JSON-sérialisable (éviter les références circulaires)
+            details = result.get('details', {})
+            if details:
+                # Créer une copie propre sans références circulaires
+                import json
+                import copy
+                try:
+                    # Tester si c'est sérialisable en JSON
+                    json_str = json.dumps(details)
+                    # Parser pour avoir une copie propre
+                    sync_log.details = json.loads(json_str)
+                except (TypeError, ValueError):
+                    # Si non sérialisable, créer une version simplifiée
+                    sync_log.details = {
+                        'created': result.get('created', result.get('total_created', 0)),
+                        'updated': result.get('updated', result.get('total_updated', 0)),
+                        'records_synced': result.get('records_synced', 0),
+                    }
+            else:
+                sync_log.details = {}
             sync_log.save()
             
             # Mettre à jour last_sync du compte
