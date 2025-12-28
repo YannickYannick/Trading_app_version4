@@ -1200,6 +1200,111 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+    @action(detail=True, methods=['get'], url_path='binance-assets')
+    def binance_assets(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/binance-assets/
+        Récupère les assets disponibles depuis Binance.
+        
+        Query params:
+            - asset_type: Type d'asset (Crypto, Spot) - default: Crypto
+            - keywords: Mots-clés de recherche (ex: BTC, ETH)
+            - limit: Nombre maximum de résultats - default: 100
+        """
+        from ..services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'BINANCE':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Binance'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            asset_type = request.query_params.get('asset_type', 'Crypto')
+            keywords = request.query_params.get('keywords', '')
+            limit = int(request.query_params.get('limit', 100))
+            
+            broker_assets = service.get_assets(
+                broker_account=account,
+                asset_type=asset_type,
+                keywords=keywords,
+                limit=limit
+            )
+            
+            # Convertir en format sérialisable
+            assets_data = []
+            for asset in broker_assets:
+                assets_data.append({
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'asset_type': asset.asset_type,
+                    'exchange': asset.exchange,
+                    'currency': asset.currency,
+                    'is_tradable': asset.is_tradable,
+                    'broker_id': asset.broker_id,
+                })
+            
+            return Response({
+                'success': True,
+                'count': len(assets_data),
+                'assets': assets_data,
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Binance assets for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='binance-positions')
+    def binance_positions(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/binance-positions/
+        Récupère les positions (balances) depuis Binance.
+        """
+        from ..services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'BINANCE':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Binance'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            positions = service.get_positions(account)
+            
+            # Convertir en format sérialisable
+            positions_data = []
+            for pos in positions:
+                positions_data.append({
+                    'symbol': pos.symbol,
+                    'quantity': float(pos.quantity),
+                    'entry_price': float(pos.entry_price) if pos.entry_price else None,
+                    'current_price': float(pos.current_price) if pos.current_price else None,
+                    'unrealized_pnl': float(pos.unrealized_pnl) if pos.unrealized_pnl else None,
+                    'currency': pos.currency,
+                    'side': pos.side,
+                    'broker_id': pos.broker_id,
+                })
+            
+            return Response({
+                'success': True,
+                'count': len(positions_data),
+                'positions': positions_data,
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Binance positions for account {account.id}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=True, methods=['post'], url_path='test-connection')
     def test_connection(self, request, pk=None):
         """

@@ -327,6 +327,104 @@ export const brokerService = {
   },
 
   /**
+   * Récupérer les assets depuis Binance
+   */
+  async getBinanceAssets(
+    accountId: number,
+    options?: {
+      asset_type?: string
+      keywords?: string
+      limit?: number
+    }
+  ): Promise<{
+    success: boolean
+    count: number
+    assets: Array<{
+      symbol: string
+      name: string
+      asset_type: string
+      exchange: string
+      currency: string
+      is_tradable: boolean
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    const params = new URLSearchParams()
+    if (options?.asset_type) params.append('asset_type', options.asset_type)
+    if (options?.keywords) params.append('keywords', options.keywords)
+    if (options?.limit) params.append('limit', options.limit.toString())
+
+    try {
+      const response = await apiClient.get<{
+        success: boolean
+        count: number
+        assets: Array<{
+          symbol: string
+          name: string
+          asset_type: string
+          exchange: string
+          currency: string
+          is_tradable: boolean
+          broker_id: string | null
+        }>
+      }>(`/broker-accounts/${accountId}/binance-assets/?${params.toString()}`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        assets: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Binance assets',
+      }
+    }
+  },
+
+  /**
+   * Récupérer les positions depuis Binance
+   */
+  async getBinancePositions(accountId: number): Promise<{
+    success: boolean
+    count: number
+    positions: Array<{
+      symbol: string
+      quantity: number
+      entry_price: number | null
+      current_price: number | null
+      unrealized_pnl: number | null
+      currency: string
+      side: string
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean
+        count: number
+        positions: Array<{
+          symbol: string
+          quantity: number
+          entry_price: number | null
+          current_price: number | null
+          unrealized_pnl: number | null
+          currency: string
+          side: string
+          broker_id: string | null
+        }>
+      }>(`/broker-accounts/${accountId}/binance-positions/`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        positions: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Binance positions',
+      }
+    }
+  },
+
+  /**
    * Synchroniser les données depuis un broker
    */
   async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {
