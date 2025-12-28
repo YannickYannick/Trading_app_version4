@@ -325,32 +325,26 @@ class AssetSyncService:
         return result
     
     def _get_credentials(self, broker_account: BrokerAccount) -> Dict[str, Any]:
-        """Get credentials from broker account."""
-        credentials = {}
+        """
+        Get credentials from broker account.
+        Utilise la méthode get_credentials_dict() du modèle pour garantir
+        le bon mapping des champs selon le type de broker.
+        """
+        # Utiliser la méthode du modèle qui gère déjà le mapping correct
+        credentials = broker_account.get_credentials_dict()
         
-        if broker_account.api_key:
-            credentials['api_key'] = broker_account.api_key
-        if broker_account.api_secret:
-            credentials['api_secret'] = broker_account.api_secret
-        if broker_account.client_id:
-            credentials['client_id'] = broker_account.client_id
-        if broker_account.client_secret:
-            credentials['client_secret'] = broker_account.client_secret
-        if broker_account.access_token:
-            credentials['access_token'] = broker_account.access_token
-        if broker_account.refresh_token:
-            credentials['refresh_token'] = broker_account.refresh_token
-        if broker_account.token_expires_at:
-            credentials['token_expires_at'] = broker_account.token_expires_at.isoformat()
+        # Ajouter des informations supplémentaires si nécessaire
         if broker_account.extra_credentials:
             credentials.update(broker_account.extra_credentials)
         
-        # Environment settings
+        # S'assurer que les paramètres d'environnement sont corrects
         broker_type = broker_account.get_broker_type().upper()
         if broker_type == 'SAXO':
-            credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
+            if 'environment' not in credentials:
+                credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
         elif broker_type == 'BINANCE':
-            credentials['testnet'] = broker_account.is_sandbox
+            if 'testnet' not in credentials:
+                credentials['testnet'] = broker_account.is_sandbox or broker_account.binance_testnet
         
         return credentials
     
