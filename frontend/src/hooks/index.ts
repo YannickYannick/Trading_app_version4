@@ -10,6 +10,8 @@ export { useLocalStorage } from './useLocalStorage'
 export { useApi } from './useApi'
 export { useBrokers, useBrokerAccount, useBrokerSyncLogs } from './useBrokers'
 export { useBrokerBalance } from './useBrokerBalance'
+export { useErrorHandler } from './useErrorHandler'
+export { useAsyncOperation } from './useAsyncOperation'
 export type { UseApiOptions } from './useApi'
 export type { UseBrokersOptions } from './useBrokers'
 

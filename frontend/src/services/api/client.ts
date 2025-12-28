@@ -76,10 +76,32 @@ apiClient.interceptors.response.use(
     // Gérer les autres erreurs
     if (error.response) {
       // Erreur avec réponse du serveur
-      const apiError: ApiError = error.response.data || {
-        error: 'Une erreur est survenue',
-        code: 'UNKNOWN_ERROR',
-        message: error.response.statusText,
+      const status = error.response.status
+      const data = error.response.data || {}
+      
+      // Déterminer le type d'erreur
+      let errorType = 'UNKNOWN_ERROR'
+      if (status >= 400 && status < 500) {
+        errorType = 'CLIENT_ERROR'
+        if (status === 401) errorType = 'AUTHENTICATION_ERROR'
+        if (status === 403) errorType = 'FORBIDDEN_ERROR'
+        if (status === 404) errorType = 'NOT_FOUND_ERROR'
+        if (status === 422) errorType = 'VALIDATION_ERROR'
+      } else if (status >= 500) {
+        errorType = 'SERVER_ERROR'
+      }
+      
+      // Obtenir un message d'erreur lisible
+      const errorMessage =
+        data.error || data.detail || data.message || getDefaultErrorMessage(status)
+      
+      const apiError: ApiError = {
+        error: errorMessage,
+        code: errorType,
+        message: errorMessage,
+        details: data,
+        status: status,
+        originalError: error,
       }
       
       return Promise.reject(apiError)
@@ -89,6 +111,7 @@ apiClient.interceptors.response.use(
         error: 'Impossible de contacter le serveur',
         code: 'NETWORK_ERROR',
         message: 'Vérifiez votre connexion internet',
+        originalError: error,
       } as ApiError)
     } else {
       // Erreur lors de la configuration de la requête
@@ -96,6 +119,7 @@ apiClient.interceptors.response.use(
         error: error.message,
         code: 'REQUEST_ERROR',
         message: error.message,
+        originalError: error,
       } as ApiError)
     }
   }
@@ -109,6 +133,22 @@ function getCookie(name: string): string | null {
     return parts.pop()?.split(';').shift() || null
   }
   return null
+}
+
+// Fonction pour obtenir un message d'erreur par défaut selon le code HTTP
+function getDefaultErrorMessage(status: number): string {
+  const defaultMessages: Record<number, string> = {
+    400: 'Requête invalide. Vérifiez les données saisies.',
+    401: 'Non autorisé. Veuillez vous connecter.',
+    403: 'Accès refusé. Vous n\'avez pas les permissions nécessaires.',
+    404: 'Ressource non trouvée.',
+    422: 'Données invalides. Veuillez vérifier les champs du formulaire.',
+    500: 'Erreur serveur. Veuillez réessayer plus tard.',
+    502: 'Service temporairement indisponible.',
+    503: 'Service en maintenance.',
+  }
+  
+  return defaultMessages[status] || 'Une erreur est survenue.'
 }
 
 // Fonction pour gérer la déconnexion
