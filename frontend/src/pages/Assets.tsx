@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Input } from '@components/common'
 import { useAssets } from '@hooks/useAssets'
+import SyncAssetsModal from '@components/assets/SyncAssetsModal'
 import { formatCurrency } from '@utils/format'
 import type { Asset } from '@types'
 import './Assets.css'
@@ -13,6 +14,7 @@ export default function Assets() {
   const [search, setSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState<'SAXO' | 'BINANCE' | 'IB' | 'OTHER' | undefined>(undefined)
   const [assetTypeFilter, setAssetTypeFilter] = useState<string>('')
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false)
 
   const { assets, loading, error, total } = useAssets({
     platform: platformFilter,
@@ -120,6 +122,10 @@ export default function Assets() {
           <h1 className="page-title">Assets</h1>
           <p className="page-subtitle">{total} asset(s) disponible(s)</p>
         </div>
+        <Button onClick={() => setIsSyncModalOpen(true)} variant="primary">
+          <i className="fas fa-sync me-1"></i>
+          Synchroniser AllAssets
+        </Button>
       </div>
 
       <Card title="Filtres" className="filters-card">
@@ -209,6 +215,16 @@ export default function Assets() {
           </div>
         )}
       </Card>
+
+      <SyncAssetsModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        onSuccess={() => {
+          setIsSyncModalOpen(false)
+          // Rafraîchir la page pour voir les nouveaux assets
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }

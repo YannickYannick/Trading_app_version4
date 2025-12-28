@@ -1374,7 +1374,15 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
         try:
             if sync_type == 'ASSETS':
                 sync_service = AssetSyncService(request.user)
-                result = sync_service.sync_assets(account)
+                # Utiliser sync_all_asset_types pour synchroniser tous les types d'assets
+                # au lieu de seulement 'Stock' par défaut
+                result = sync_service.sync_all_asset_types(account, limit_per_type=500)
+                # Adapter le format de réponse pour correspondre au format attendu
+                if result.get('success'):
+                    # Le format de sync_all_asset_types retourne total_created, total_updated
+                    result['created'] = result.get('total_created', 0)
+                    result['updated'] = result.get('total_updated', 0)
+                    result['details'] = result
             elif sync_type == 'PRICES':
                 sync_service = PriceSyncService(request.user)
                 # sync_current_prices est la méthode principale

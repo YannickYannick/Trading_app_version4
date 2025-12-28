@@ -204,6 +204,7 @@ class AssetSyncService:
             )
             return 'created'
     
+    @transaction.atomic
     def sync_all_asset_types(
         self,
         broker_account: BrokerAccount,

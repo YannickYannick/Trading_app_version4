@@ -62,13 +62,13 @@ export default function BrokerSyncModal({ account, onSuccess, onClose }: BrokerS
           className="broker-sync-select"
           disabled={loading}
         >
-          <option value="ASSETS">Assets (Catalogue)</option>
+          <option value="ASSETS">Assets (Tous les types - AllAssets)</option>
           <option value="PRICES">Prix</option>
           <option value="POSITIONS">Positions</option>
           <option value="TRADES">Trades</option>
         </select>
         <p className="broker-sync-description">
-          {syncType === 'ASSETS' && 'Récupère la liste complète des actifs tradables'}
+          {syncType === 'ASSETS' && 'Récupère la liste complète de tous les actifs tradables (Stocks, ETF, FX, CFD, Crypto) et les synchronise dans AllAssets'}
           {syncType === 'PRICES' && 'Met à jour les prix actuels des actifs'}
           {syncType === 'POSITIONS' && 'Récupère toutes les positions ouvertes'}
           {syncType === 'TRADES' && "Récupère l'historique des transactions"}
