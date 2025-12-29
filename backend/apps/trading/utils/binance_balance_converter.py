@@ -63,10 +63,16 @@ def convert_binance_balances_to_eur(
         'EUR': Decimal('1'),
         'EURT': Decimal('1'),  # Tether EUR ≈ 1 EUR
         'USDTEUR': Decimal('0.92'),  # Approximation USDT ≈ 0.92 EUR
+        'USDC': Decimal('0.92'),  # USDC ≈ 1 USD ≈ 0.92 EUR (approximation)
+        'BUSD': Decimal('0.92'),  # BUSD ≈ 1 USD ≈ 0.92 EUR (approximation)
+        'DAI': Decimal('0.92'),  # DAI ≈ 1 USD ≈ 0.92 EUR (approximation)
         'BTCEUR': Decimal('95000'),  # Approximation BTC
         'ETHEUR': Decimal('3500'),  # Approximation ETH
         'BNBEUR': Decimal('600'),  # Approximation BNB
     }
+    
+    # Liste des stablecoins qui valent environ 1 USD/EUR
+    stablecoins = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'EURT'}
     
     logger.info(f"Starting conversion of {len(clean_balances)} assets: {list(clean_balances.keys())}")
     
@@ -137,19 +143,23 @@ def convert_binance_balances_to_eur(
                             logger.warning(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
                             break
             
-            # Dernier recours: Essayer via USDT avec taux par défaut
+            # Dernier recours: Essayer via USDT avec taux par défaut ou utiliser taux stablecoin
             if converted_value == 0:
-                # Si l'asset n'est pas USDT, essayer de le convertir via USDT avec taux par défaut
-                if asset_upper != 'USDT':
-                    # Pour les stablecoins et autres cryptos, utiliser une estimation via USDT
-                    # On utilise un taux USDTEUR par défaut si disponible
-                    usdt_eur_default = default_rates.get('USDTEUR', Decimal('0.92'))
-                    # On suppose que la plupart des cryptos peuvent être approximées via USDT
-                    # Pour une meilleure précision, on pourrait chercher le prix USDT de l'asset
-                    # mais sans API, on ne peut que logger un warning
+                # Vérifier si c'est un stablecoin connu
+                if asset_upper in stablecoins:
+                    # Les stablecoins valent environ 1 USD ≈ 0.92 EUR
+                    stablecoin_rate = default_rates.get(asset_upper, default_rates.get('USDTEUR', Decimal('0.92')))
+                    converted_value = balance * stablecoin_rate
+                    converted_balances[asset] = balance
+                    conversion_method = f'Stablecoin default rate ({asset_upper} ≈ 1 USD)'
+                    logger.warning(
+                        f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {stablecoin_rate})"
+                    )
+                # Si ce n'est pas un stablecoin, logger un warning
+                else:
                     logger.warning(
                         f"[{asset_upper}] {balance} → 0 EUR (could not convert: no API price available and no default rate). "
-                        f"Asset value not included in total."
+                        f"Asset value not included in total. Consider adding a default rate for this asset."
                     )
         
         else:
@@ -174,6 +184,13 @@ def convert_binance_balances_to_eur(
                     converted_balances[asset] = balance
                     conversion_method = f'Default rate {eur_pair_key} (no broker instance)'
                     logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
+                # Vérifier si c'est un stablecoin
+                elif asset_upper in stablecoins:
+                    stablecoin_rate = default_rates.get(asset_upper, default_rates.get('USDTEUR', Decimal('0.92')))
+                    converted_value = balance * stablecoin_rate
+                    converted_balances[asset] = balance
+                    conversion_method = f'Stablecoin default rate (no broker instance, {asset_upper} ≈ 1 USD)'
+                    logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {stablecoin_rate})")
                 else:
                     logger.warning(
                         f"[{asset_upper}] {balance} → 0 EUR (could not convert: no broker instance and no default rate). "
