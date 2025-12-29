@@ -18,6 +18,7 @@ import BrokerSyncModal from '@components/brokers/BrokerSyncModal'
 import BrokerBalance from '@components/brokers/BrokerBalance'
 import SaxoOAuthModal from '@components/brokers/SaxoOAuthModal'
 import SaxoTransactionsModal from '@components/brokers/SaxoTransactionsModal'
+import YahooValidationModal from '@components/brokers/YahooValidationModal'
 import './Brokers.css'
 
 export default function Brokers() {
@@ -31,7 +32,7 @@ export default function Brokers() {
   const [isSaxoTransactionsModalOpen, setIsSaxoTransactionsModalOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState<BrokerAccount | null>(null)
   const [refreshingTokens, setRefreshingTokens] = useState<Set<number>>(new Set())
-  const [validatingYahoo, setValidatingYahoo] = useState(false)
+  const [isYahooValidationModalOpen, setIsYahooValidationModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'>('ALL')
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
@@ -143,49 +144,13 @@ export default function Brokers() {
     }
   }
 
-  const handleValidateYahooSymbols = async () => {
-    if (validatingYahoo) return
+  const handleValidateYahooSymbols = () => {
+    setIsYahooValidationModalOpen(true)
+  }
 
-    const confirmed = window.confirm(
-      'Voulez-vous valider les symboles Yahoo Finance pour tous les assets?\n\n' +
-      'Cette opération peut prendre plusieurs minutes et mettra à jour le champ symbole_yahoo.'
-    )
-
-    if (!confirmed) return
-
-    setValidatingYahoo(true)
-
-    try {
-      const result = await brokerService.validateYahooSymbols({
-        limit: 100, // Limiter à 100 par défaut
-        reset: false
-      })
-
-      if (result.success) {
-        alert(
-          `✅ Validation terminée!\n\n` +
-          `Assets traités: ${result.processed}\n` +
-          `✅ Validés: ${result.validated}\n` +
-          `❌ Non trouvés: ${result.not_found}\n` +
-          `⚠️ Erreurs: ${result.failed}\n\n` +
-          `Détails:\n` +
-          `- Y4 (MIC): ${result.details.y4_matches}\n` +
-          `- Y3 (Nom): ${result.details.y3_matches}\n` +
-          `- Y0 (Symbole): ${result.details.y0_matches}`
-        )
-      } else {
-        alert(`❌ Erreur: ${result.error || 'Échec de la validation'}`)
-      }
-    } catch (err: any) {
-      const errorMsg =
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        err.message ||
-        'Erreur lors de la validation'
-      alert(`❌ Erreur: ${errorMsg}`)
-    } finally {
-      setValidatingYahoo(false)
-    }
+  const handleYahooValidationComplete = (result: any) => {
+    // Optionnel: Rafraîchir les données après validation
+    // refetch()
   }
 
   if (loading) {
@@ -209,10 +174,10 @@ export default function Brokers() {
           <Button
             onClick={handleValidateYahooSymbols}
             variant="info"
-            disabled={validatingYahoo}
+            disabled={isYahooValidationModalOpen}
             title="Valider les symboles Yahoo Finance pour tous les assets"
           >
-            {validatingYahoo ? '🔄 Validation...' : '📊 Valider Yahoo Symbols'}
+            📊 Valider Yahoo Symbols
           </Button>
           <Button onClick={handleCreate} variant="primary">
             + Nouveau Broker
@@ -518,6 +483,15 @@ export default function Brokers() {
           </Modal>
         </>
       )}
+
+      {/* Modal de validation Yahoo */}
+      <YahooValidationModal
+        isOpen={isYahooValidationModalOpen}
+        onClose={() => setIsYahooValidationModalOpen(false)}
+        onComplete={handleYahooValidationComplete}
+        limit={100}
+        reset={false}
+      />
 
       {/* Modal de confirmation de suppression */}
       <Modal

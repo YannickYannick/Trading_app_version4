@@ -1,0 +1,124 @@
+.yahoo-validation-modal {
+  padding: var(--spacing-md);
+}
+
+.yahoo-validation-start {
+  text-align: center;
+}
+
+.yahoo-validation-start p {
+  margin-bottom: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.yahoo-validation-start ul {
+  text-align: left;
+  margin: var(--spacing-md) 0;
+  padding-left: var(--spacing-lg);
+}
+
+.yahoo-validation-progress {
+  width: 100%;
+}
+
+.yahoo-validation-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.yahoo-validation-progress-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.yahoo-validation-time {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.yahoo-validation-progress-bar-container {
+  margin-bottom: var(--spacing-lg);
+}
+
+.yahoo-validation-progress-bar {
+  width: 100%;
+  height: 24px;
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: var(--spacing-sm);
+}
+
+.yahoo-validation-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-color-light));
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.yahoo-validation-progress-text {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.yahoo-validation-results {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.yahoo-validation-result-item {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.yahoo-validation-result-item:last-child {
+  border-bottom: none;
+}
+
+.yahoo-validation-result-label {
+  color: var(--text-secondary);
+}
+
+.yahoo-validation-result-value {
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.yahoo-validation-result-details {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.yahoo-validation-result-details ul {
+  margin: var(--spacing-sm) 0 0 var(--spacing-lg);
+  padding: 0;
+}
+
+.yahoo-validation-error {
+  text-align: center;
+}
+
+.yahoo-validation-error-message {
+  color: var(--error-color);
+  font-weight: bold;
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--error-bg);
+  border-radius: var(--border-radius);
+}
+
+.yahoo-validation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+

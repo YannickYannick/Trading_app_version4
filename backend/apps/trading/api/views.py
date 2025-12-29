@@ -213,8 +213,11 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             stats = ValidationStats()
             stats.total = assets_count
             
-            # Valider chaque asset
+            # Valider chaque asset avec suivi du progrès
+            processed_count = 0
             for asset in assets_list:
+                processed_count += 1
+                logger.debug(f"Traitement asset {processed_count}/{assets_count}: {asset.symbol}")
                 try:
                     # Récupérer le broker config si disponible (pour Saxo)
                     broker_config = {}
@@ -264,7 +267,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             return Response({
                 'success': True,
                 'message': f'Validation terminée pour {assets_count} assets',
-                'processed': stats.processed_total,
+                'processed': stats.total,  # Utiliser stats.total au lieu de processed_total
                 'validated': stats.validated_total,
                 'failed': stats.errors,
                 'not_found': stats.not_found,
