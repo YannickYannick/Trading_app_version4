@@ -42,7 +42,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--limit',
             type=int,
-            default=1000,
+            default=20000,
             help='Maximum number of assets to sync'
         )
         parser.add_argument(

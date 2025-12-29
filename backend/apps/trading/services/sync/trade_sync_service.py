@@ -40,7 +40,7 @@ class TradeSyncService(BaseSyncService):
     def sync(
         self,
         broker_account: BrokerAccount,
-        limit: int = 50,
+        limit: int = 100000,
         symbol: Optional[str] = None,
         since_days: Optional[int] = None,
         **kwargs
@@ -199,7 +199,8 @@ class TradeSyncService(BaseSyncService):
         if broker_trade.broker_trade_id:
             existing = Trade.objects.filter(
                 broker_trade_id=broker_trade.broker_trade_id,
-                broker_account=broker_account,
+                broker=broker_account.broker,
+                user=self.user,
             ).first()
             
             if existing:
@@ -239,7 +240,6 @@ class TradeSyncService(BaseSyncService):
         # Create trade
         trade = Trade.objects.create(
             user=self.user,
-            broker_account=broker_account,
             broker=broker_account.broker,
             asset=asset,
             position=position,
@@ -276,7 +276,7 @@ class TradeSyncService(BaseSyncService):
         # Find open position for this asset
         position = Position.objects.filter(
             user=self.user,
-            broker_account=broker_account,
+            broker=broker_account.broker,  # Position model uses broker, not broker_account
             asset=asset,
             is_open=True,
         ).first()

@@ -145,6 +145,11 @@ class PositionSyncService(BaseSyncService):
         
         for broker_pos in broker_positions:
             try:
+                self.logger.debug(
+                    f"Processing position: {broker_pos.symbol}, "
+                    f"side={broker_pos.side}, quantity={broker_pos.quantity}"
+                )
+                
                 result = self._sync_single_position(
                     broker_account=broker_account,
                     broker_position=broker_pos,
@@ -152,13 +157,17 @@ class PositionSyncService(BaseSyncService):
                 
                 if result.get('created'):
                     created += 1
+                    self.logger.info(f"Created position for {broker_pos.symbol}")
                 elif result.get('updated'):
                     updated += 1
+                    self.logger.info(f"Updated position for {broker_pos.symbol}")
                 
                 if result.get('position_id'):
                     seen_position_ids.add(result['position_id'])
                     
             except Exception as e:
+                error_msg = f"Failed to sync position {broker_pos.symbol}: {str(e)}"
+                self.logger.error(error_msg, exc_info=True)
                 self._log_error(
                     f"Failed to sync position {broker_pos.symbol}",
                     error=e,
@@ -195,39 +204,94 @@ class PositionSyncService(BaseSyncService):
         Returns:
             Dict with result info
         """
+        # Validate symbol
+        if not broker_position.symbol or not broker_position.symbol.strip():
+            error_msg = f"Position has empty or invalid symbol"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         # Find or create asset
-        asset = self._get_or_create_asset(
-            symbol=broker_position.symbol,
-            broker_type=broker_account.get_broker_type(),
-        )
+        try:
+            asset = self._get_or_create_asset(
+                symbol=broker_position.symbol,
+                broker_type=broker_account.get_broker_type(),
+            )
+        except Exception as e:
+            error_msg = f"Error getting/creating asset for {broker_position.symbol}: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            raise ValueError(error_msg)
         
         if not asset:
-            raise ValueError(f"Could not find or create asset: {broker_position.symbol}")
+            error_msg = f"Could not find or create asset: {broker_position.symbol}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        self.logger.debug(
+            f"Syncing position {broker_position.symbol}: "
+            f"asset_id={asset.id}, side={broker_position.side}, "
+            f"quantity={broker_position.quantity}"
+        )
         
         # Determine broker position ID
         broker_position_id = broker_position.broker_position_id or f"{broker_account.get_broker_type()}_{broker_position.symbol}"
         
-        # Convert side
-        side = 'BUY' if broker_position.side == 'LONG' else 'SELL'
+        # Convert side: BrokerPosition uses 'LONG'/'SHORT', Position model also uses 'LONG'/'SHORT'
+        # So we can use it directly, but ensure it's uppercase
+        side = broker_position.side.upper() if broker_position.side else 'LONG'
+        if side not in ['LONG', 'SHORT']:
+            # Fallback: if side is invalid, determine from quantity
+            side = 'LONG' if broker_position.quantity >= 0 else 'SHORT'
         
-        # Create or update position
-        position, created = Position.objects.update_or_create(
+        # For Binance spot positions, entry_price might be 0
+        # Use current_price as entry_price if entry_price is 0 (for spot balances)
+        entry_price = broker_position.entry_price
+        if entry_price == 0 and broker_position.current_price > 0:
+            entry_price = broker_position.current_price
+        
+        # Try to find existing open position first
+        # Look for open position with same user, broker, asset, and side
+        existing_position = Position.objects.filter(
             user=self.user,
             broker=broker_account.broker,
             asset=asset,
+            side=side,
             is_open=True,
-            defaults={
-                'quantity': broker_position.quantity,
-                'entry_price': broker_position.entry_price,
-                'current_price': broker_position.current_price,
-                'side': side,
-            }
-        )
+        ).first()
         
-        # Update calculated fields
-        position.current_price = broker_position.current_price
-        position.unrealized_pnl = broker_position.pnl
-        position.save()
+        if existing_position:
+            # Update existing position
+            self.logger.info(f"Updating existing position {existing_position.id} for {broker_position.symbol} (side={side})")
+            existing_position.quantity = broker_position.quantity
+            existing_position.entry_price = entry_price
+            existing_position.current_price = broker_position.current_price
+            existing_position.side = side  # Ensure side is correct
+            existing_position.is_open = True  # Ensure it's open
+            existing_position.save()
+            created = False
+            position = existing_position
+            self.logger.info(f"Position {position.id} updated successfully: {position.asset.symbol} {position.side} qty={position.quantity}")
+        else:
+            # Create new position
+            self.logger.info(f"Creating new position for {broker_position.symbol} (side={side}, qty={broker_position.quantity})")
+            try:
+                position = Position.objects.create(
+                    user=self.user,
+                    broker=broker_account.broker,
+                    asset=asset,
+                    side=side,
+                    quantity=broker_position.quantity,
+                    entry_price=entry_price,
+                    current_price=broker_position.current_price,
+                    is_open=True,
+                )
+                created = True
+                self.logger.info(f"Position {position.id} created successfully: {position.asset.symbol} {position.side} qty={position.quantity}")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create position for {broker_position.symbol}: {str(e)}",
+                    exc_info=True
+                )
+                raise
         
         return {
             'created': created,

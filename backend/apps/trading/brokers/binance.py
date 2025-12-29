@@ -26,6 +26,7 @@ from .base import (
     BrokerError,
     AuthenticationError,
     RateLimitError,
+    BrokerAPIError,
 )
 
 logger = logging.getLogger('trading.brokers.binance')
@@ -199,7 +200,12 @@ class BinanceBroker(BrokerBase):
                 error_msg = f"{error_msg} - {error_data.get('msg', str(error_data))}"
             except:
                 pass
-            self._set_error(error_msg)
+            
+            # Don't log "Invalid symbol" errors as critical - they're expected for some symbols
+            if 'Invalid symbol' in error_msg:
+                logger.debug(f"Binance: {error_msg}")
+            else:
+                self._set_error(error_msg)
             return None
         except requests.exceptions.RequestException as e:
             self._set_error(f"Request error: {str(e)}")
@@ -445,19 +451,30 @@ class BinanceBroker(BrokerBase):
                     # Try to get price in USDT
                     current_price = self.get_asset_price(f"{asset}USDT") or Decimal('0')
                 
+                # For spot positions, use current price as entry price
+                # This allows P&L calculation based on current market value
+                entry_price = current_price if current_price > 0 else Decimal('0')
+                
+                # Calculate unrealized P&L (value change from entry)
+                # For spot, we consider entry as current price, so P&L is 0
+                # But we track the value
+                position_value = total * current_price
+                
                 position = BrokerPosition(
                     symbol=asset,
                     quantity=total,
-                    entry_price=Decimal('0'),  # Not tracked in spot
+                    entry_price=entry_price,  # Use current price for spot positions
                     current_price=current_price,
                     side='LONG',  # Spot is always long
-                    pnl=Decimal('0'),
+                    pnl=Decimal('0'),  # Spot positions don't have unrealized P&L in traditional sense
                     pnl_percent=Decimal('0'),
                     broker_position_id=asset,
                     raw_data={
                         'asset': asset,
                         'free': str(free),
                         'locked': str(locked),
+                        'total': str(total),
+                        'value': str(position_value),
                     },
                 )
                 positions.append(position)
@@ -472,66 +489,114 @@ class BinanceBroker(BrokerBase):
     # TRADES
     # ============================================
     
+    def _get_trades_for_symbol(self, symbol: str, limit: int = 1000) -> List[BrokerTrade]:
+        """
+        Internal method to get trades for a specific symbol.
+        This avoids recursion when called from get_trades().
+        """
+        try:
+            params = {'symbol': symbol.upper(), 'limit': limit}
+            # Clear previous error before making request
+            self._clear_error()
+            response = self._make_request('GET', '/api/v3/myTrades', params=params, signed=True)
+            
+            if not response:
+                # Check if error is "Invalid symbol" - this is expected for some symbols
+                error_msg = self.last_error or ''
+                if 'Invalid symbol' in error_msg or '400' in error_msg:
+                    logger.debug(f"Binance: Invalid symbol {symbol}, skipping")
+                    return []
+                # For other errors, return empty list but keep the error logged
+                logger.warning(f"Binance: Failed to get trades for {symbol}: {error_msg}")
+                return []
+            
+            trades = []
+            for item in response:
+                trade = BrokerTrade(
+                    symbol=item.get('symbol', ''),
+                    trade_type='BUY' if item.get('isBuyer') else 'SELL',
+                    quantity=Decimal(str(item.get('qty', 0))),
+                    price=Decimal(str(item.get('price', 0))),
+                    fees=Decimal(str(item.get('commission', 0))),
+                    executed_at=datetime.fromtimestamp(item.get('time', 0) / 1000).isoformat(),
+                    broker_trade_id=str(item.get('id', '')),
+                    raw_data=item,
+                )
+                trades.append(trade)
+            
+            return trades
+        except Exception as e:
+            logger.debug(f"Error getting trades for {symbol}: {e}")
+            return []
+    
     def get_trades(
         self,
         symbol: Optional[str] = None,
-        limit: int = 50,
+        limit: int = 100000,
         **kwargs
     ) -> List[BrokerTrade]:
-        """Get trade history."""
+        """
+        Get trade history.
+        
+        If symbol is provided, returns trades for that symbol.
+        If symbol is None, uses _get_traded_symbols() to find all symbols
+        the user has traded and retrieves trades for each.
+        """
         try:
             if symbol:
                 # Get trades for specific symbol
-                params = {'symbol': symbol.upper(), 'limit': limit}
-                response = self._make_request('GET', '/api/v3/myTrades', params=params, signed=True)
-                
-                if not response:
-                    return []
-                
-                trades = []
-                for item in response:
-                    trade = BrokerTrade(
-                        symbol=item.get('symbol', ''),
-                        trade_type='BUY' if item.get('isBuyer') else 'SELL',
-                        quantity=Decimal(str(item.get('qty', 0))),
-                        price=Decimal(str(item.get('price', 0))),
-                        fees=Decimal(str(item.get('commission', 0))),
-                        executed_at=datetime.fromtimestamp(item.get('time', 0) / 1000).isoformat(),
-                        broker_trade_id=str(item.get('id', '')),
-                        raw_data=item,
-                    )
-                    trades.append(trade)
-                
-                return trades
+                return self._get_trades_for_symbol(symbol, limit)
             else:
                 # Get trades for all symbols (limited to recent)
                 all_trades = []
                 traded_symbols = self._get_traded_symbols()
                 
-                for sym in traded_symbols[:10]:  # Limit to 10 symbols
-                    trades = self.get_trades(symbol=sym, limit=limit // 10)
-                    all_trades.extend(trades)
+                if not traded_symbols:
+                    logger.warning("No traded symbols found. Cannot fetch trades without a symbol.")
+                    return []
                 
-                # Sort by time
+                logger.info(f"Fetching trades for {len(traded_symbols)} symbols")
+                
+                # Limit to prevent too many API calls (Binance rate limit is 1200/min for signed endpoints)
+                # We'll process up to 20 symbols to stay safe
+                symbols_to_check = traded_symbols[:20]
+                
+                for sym in symbols_to_check:
+                    try:
+                        # Use internal method to avoid recursion
+                        # Use limit of 1000 per symbol to get all trades
+                        trades = self._get_trades_for_symbol(sym, limit=1000)
+                        if trades:
+                            logger.debug(f"Found {len(trades)} trades for {sym}")
+                            all_trades.extend(trades)
+                        # Small delay to avoid rate limiting
+                        time.sleep(0.1)
+                    except Exception as e:
+                        logger.debug(f"Error fetching trades for {sym}: {e}")
+                        # Continue with other symbols
+                        continue
+                
+                # Sort by time (most recent first)
                 all_trades.sort(key=lambda x: x.executed_at or '', reverse=True)
+                logger.info(f"Retrieved {len(all_trades)} total trades from {len(symbols_to_check)} symbols")
                 return all_trades[:limit]
             
         except Exception as e:
+            logger.error(f"Get trades error: {str(e)}", exc_info=True)
             self._set_error(f"Get trades error: {str(e)}")
             return []
     
     def _get_traded_symbols(self) -> List[str]:
-        """Get list of symbols the user has traded."""
-        # Get balances to find traded assets
-        positions = self.get_positions()
-        symbols = set()
+        """
+        Get list of symbols to check for trades.
         
-        for pos in positions:
-            # Common quote assets
-            for quote in ['USDT', 'BTC', 'ETH', 'BNB', 'BUSD']:
-                symbols.add(f"{pos.symbol}{quote}")
-        
-        return list(symbols)
+        Method 2: Uses a predefined list of symbols.
+        Simple and explicit approach with full control over which symbols to check.
+        """
+        # Predefined list of target assets to check for trades
+        predefined_symbols = ['ETHEUR', 'BTCEUR', 'ADAEUR', 'AVAXEUR', 'SOLEUR', 'BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+        logger.info(f"Using predefined list of {len(predefined_symbols)} symbols to check for trades")
+        return predefined_symbols
     
     # ============================================
     # ORDERS
@@ -541,7 +606,7 @@ class BinanceBroker(BrokerBase):
         self,
         status: Optional[str] = None,
         symbol: Optional[str] = None,
-        limit: int = 50
+        limit: int = 1000000
     ) -> List[BrokerOrder]:
         """Get orders."""
         try:

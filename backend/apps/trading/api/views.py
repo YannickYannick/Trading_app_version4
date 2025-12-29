@@ -1376,7 +1376,7 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 sync_service = AssetSyncService(request.user)
                 # Utiliser sync_all_asset_types pour synchroniser tous les types d'assets
                 # au lieu de seulement 'Stock' par défaut
-                result = sync_service.sync_all_asset_types(account, limit_per_type=500)
+                result = sync_service.sync_all_asset_types(account, limit_per_type=20000)
                 # Adapter le format de réponse pour correspondre au format attendu
                 if result.get('success'):
                     # Le format de sync_all_asset_types retourne total_created, total_updated

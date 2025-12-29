@@ -56,11 +56,13 @@ class SaxoBroker(BrokerBase):
         'etf': 'Etf',
         'fund': 'Fund',
         'bond': 'Bond',
+        'cfd': 'CfdOnStock',  # Par défaut pour CFD générique
         'cfdonstock': 'CfdOnStock',
         'cfdonindex': 'CfdOnIndex',
         'cfdonforex': 'CfdOnForex',
         'cfdonforward': 'CfdOnForward',
         'cfdonoption': 'CfdOnOption',
+        'fx': 'FxSpot',  # Mapping pour FX générique
         'fxspot': 'FxSpot',
         'fxforward': 'FxForward',
         'fxoption': 'FxOption',
@@ -391,17 +393,17 @@ class SaxoBroker(BrokerBase):
         self, 
         asset_type: str = "Stock", 
         keywords: str = "", 
-        limit: int = 20,
+        limit: int = 20000,
         exchange_id: str = None,
         **kwargs
     ) -> List[BrokerAsset]:
         """
-        Récupérer la liste des assets depuis Saxo
+        Récupérer la liste des assets depuis Saxo avec pagination
         
         Args:
             asset_type: Type d'asset (Stock, Etf, CfdOnStock, etc.)
-            keywords: Mots-clés de recherche
-            limit: Nombre maximum de résultats
+            keywords: Mots-clés de recherche (si fourni, pas de pagination)
+            limit: Nombre maximum de résultats (défaut: 20000)
             exchange_id: ID de la bourse (optionnel)
             
         Returns:
@@ -409,26 +411,74 @@ class SaxoBroker(BrokerBase):
         """
         try:
             # Mapper le type d'asset
+            asset_type_lower = asset_type.lower() if asset_type else ''
             saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
-                asset_type.lower(), 
-                asset_type
+                asset_type_lower, 
+                asset_type  # Utiliser le type original si non trouvé dans le mapping
             )
             
-            params = {
-                "AssetTypes": saxo_asset_type,
-                "$top": limit,
-            }
+            # Si le type n'est toujours pas valide après mapping, logger un avertissement
+            if saxo_asset_type == asset_type and asset_type_lower not in self.ASSET_TYPE_MAPPING:
+                logger.warning(f"Saxo: Asset type '{asset_type}' not in mapping, using as-is")
             
+            # Limite maximale pour la pagination
+            limit_total = min(limit, 20000)
+            batch_size = 1000  # Taille des lots pour la pagination
+            
+            # Si keywords est fourni, on fait une recherche simple sans pagination
             if keywords:
-                params["Keywords"] = keywords
+                params = {
+                    "AssetTypes": saxo_asset_type,
+                    "$top": limit_total,
+                    "Keywords": keywords,
+                }
+                
+                if exchange_id:
+                    params["ExchangeId"] = exchange_id
+                
+                data = self._make_request('GET', '/ref/v1/instruments', params=params)
+                all_items = data.get('Data', [])
+            else:
+                # Pagination pour récupérer jusqu'à limit_total actifs
+                all_items = []
+                skip = 0
+                
+                while len(all_items) < limit_total:
+                    params = {
+                        "AssetTypes": saxo_asset_type,
+                        "$top": batch_size,
+                        "$skip": skip,
+                    }
+                    
+                    if exchange_id:
+                        params["ExchangeId"] = exchange_id
+                    
+                    try:
+                        data = self._make_request('GET', '/ref/v1/instruments', params=params)
+                        batch = data.get('Data', [])
+                        
+                        if not batch:
+                            # Plus de données disponibles
+                            break
+                        
+                        all_items.extend(batch)
+                        skip += batch_size
+                        
+                        # Si on a reçu moins que batch_size, on a atteint la fin
+                        if len(batch) < batch_size:
+                            break
+                            
+                    except BrokerAPIError as e:
+                        # En cas d'erreur, on retourne ce qu'on a déjà récupéré
+                        logger.warning(f"Saxo: Error during pagination at skip={skip}: {e}")
+                        break
             
-            if exchange_id:
-                params["ExchangeId"] = exchange_id
+            # Limiter à limit_total
+            all_items = all_items[:limit_total]
             
-            data = self._make_request('GET', '/ref/v1/instruments', params=params)
-            
+            # Convertir en BrokerAsset
             assets = []
-            for item in data.get('Data', []):
+            for item in all_items:
                 asset = BrokerAsset(
                     symbol=item.get('Symbol', ''),
                     name=item.get('Description', ''),
@@ -437,7 +487,7 @@ class SaxoBroker(BrokerBase):
                     currency=item.get('CurrencyCode', 'USD'),
                     broker_id=str(item.get('Uic', '')),
                     is_tradable=item.get('IsTradable', True),
-                    extra_data={
+                    raw_data={
                         'uic': item.get('Uic'),
                         'exchange_id': item.get('ExchangeId'),
                         'country_code': item.get('CountryCode'),
@@ -449,7 +499,7 @@ class SaxoBroker(BrokerBase):
                 )
                 assets.append(asset)
             
-            logger.info(f"Saxo: Retrieved {len(assets)} assets")
+            logger.info(f"Saxo: Retrieved {len(assets)} assets (limit: {limit_total})")
             return assets
             
         except BrokerError:
@@ -621,6 +671,40 @@ class SaxoBroker(BrokerBase):
     
     # ==================== Positions ====================
     
+    def _get_account_keys(self) -> Dict[str, Optional[str]]:
+        """
+        Récupère ClientKey et AccountKey depuis les comptes.
+        
+        Returns:
+            Dict avec 'client_key' et 'account_key'
+        """
+        try:
+            account_params = {}
+            if self.client_key:
+                account_params['ClientKey'] = self.client_key
+            
+            account_data = self._make_request('GET', '/port/v1/accounts', params=account_params)
+            
+            accounts = account_data.get('Data', [])
+            if not accounts:
+                logger.warning("No accounts found in Saxo response")
+                return {'client_key': self.client_key, 'account_key': self.account_key}
+            
+            primary_account = accounts[0]
+            account_key = primary_account.get('AccountKey')
+            client_key_from_account = primary_account.get('ClientKey')
+            
+            # Utiliser le ClientKey de la réponse si disponible, sinon celui des credentials
+            client_key_to_use = client_key_from_account or self.client_key
+            
+            return {
+                'client_key': client_key_to_use,
+                'account_key': account_key or self.account_key
+            }
+        except Exception as e:
+            logger.warning(f"Error getting account keys: {e}, using credentials values")
+            return {'client_key': self.client_key, 'account_key': self.account_key}
+    
     def get_positions(self, **kwargs) -> List[BrokerPosition]:
         """
         Récupérer les positions ouvertes
@@ -629,9 +713,18 @@ class SaxoBroker(BrokerBase):
             Liste de BrokerPosition
         """
         try:
+            # Récupérer les clés nécessaires
+            keys = self._get_account_keys()
+            
             params = {}
-            if self.client_key:
-                params['ClientKey'] = self.client_key
+            if keys.get('client_key'):
+                params['ClientKey'] = keys['client_key']
+            if keys.get('account_key'):
+                params['AccountKey'] = keys['account_key']
+            
+            # Les deux sont requis par l'API Saxo
+            if not params.get('ClientKey'):
+                logger.warning("ClientKey is required for positions but not available")
             
             data = self._make_request('GET', '/port/v1/positions', params=params)
             
@@ -640,15 +733,30 @@ class SaxoBroker(BrokerBase):
                 position_base = item.get('PositionBase', {})
                 position_view = item.get('PositionView', {})
                 
+                # Déterminer le side (LONG ou SHORT) à partir de la quantité
+                amount = Decimal(str(position_base.get('Amount', 0)))
+                side = 'LONG' if amount >= 0 else 'SHORT'
+                
+                # Extraire les prix et PnL
+                entry_price = Decimal(str(position_view.get('AverageOpenPrice', 0)))
+                current_price = Decimal(str(position_view.get('CurrentPrice', 0)))
+                pnl = Decimal(str(position_view.get('ProfitLossOnTrade', 0)))
+                
+                # Calculer le PnL en pourcentage
+                pnl_percent = Decimal('0')
+                if entry_price and entry_price > 0:
+                    pnl_percent = ((current_price - entry_price) / entry_price) * Decimal('100')
+                
                 position = BrokerPosition(
                     symbol=position_base.get('Symbol', ''),
-                    quantity=Decimal(str(position_base.get('Amount', 0))),
-                    average_price=Decimal(str(position_view.get('AverageOpenPrice', 0))),
-                    current_price=Decimal(str(position_view.get('CurrentPrice', 0))),
-                    unrealized_pnl=Decimal(str(position_view.get('ProfitLossOnTrade', 0))),
-                    currency=position_base.get('Currency', 'USD'),
+                    quantity=abs(amount),  # Quantité absolue
+                    entry_price=entry_price,
+                    current_price=current_price,
+                    side=side,
+                    pnl=pnl,
+                    pnl_percent=pnl_percent,
                     broker_position_id=str(item.get('PositionId', '')),
-                    extra_data={
+                    raw_data={
                         'uic': position_base.get('Uic'),
                         'asset_type': position_base.get('AssetType'),
                         'account_id': position_base.get('AccountId'),
@@ -657,6 +765,7 @@ class SaxoBroker(BrokerBase):
                         'value_date': position_base.get('ValueDate'),
                         'exposure': position_view.get('Exposure'),
                         'market_value': position_view.get('MarketValue'),
+                        'currency': position_base.get('Currency', 'USD'),
                     }
                 )
                 positions.append(position)
@@ -697,17 +806,39 @@ class SaxoBroker(BrokerBase):
             position_base = data.get('PositionBase', {})
             position_view = data.get('PositionView', {})
             
+            # Déterminer le side (LONG ou SHORT) à partir de la quantité
+            amount = Decimal(str(position_base.get('Amount', 0)))
+            side = 'LONG' if amount >= 0 else 'SHORT'
+            
+            # Extraire les prix et PnL
+            entry_price = Decimal(str(position_view.get('AverageOpenPrice', 0)))
+            current_price = Decimal(str(position_view.get('CurrentPrice', 0)))
+            pnl = Decimal(str(position_view.get('ProfitLossOnTrade', 0)))
+            
+            # Calculer le PnL en pourcentage
+            pnl_percent = Decimal('0')
+            if entry_price and entry_price > 0:
+                pnl_percent = ((current_price - entry_price) / entry_price) * Decimal('100')
+            
             return BrokerPosition(
                 symbol=position_base.get('Symbol', ''),
-                quantity=Decimal(str(position_base.get('Amount', 0))),
-                average_price=Decimal(str(position_view.get('AverageOpenPrice', 0))),
-                current_price=Decimal(str(position_view.get('CurrentPrice', 0))),
-                unrealized_pnl=Decimal(str(position_view.get('ProfitLossOnTrade', 0))),
-                currency=position_base.get('Currency', 'USD'),
+                quantity=abs(amount),  # Quantité absolue
+                entry_price=entry_price,
+                current_price=current_price,
+                side=side,
+                pnl=pnl,
+                pnl_percent=pnl_percent,
                 broker_position_id=str(data.get('PositionId', '')),
-                extra_data={
+                raw_data={
                     'uic': position_base.get('Uic'),
                     'asset_type': position_base.get('AssetType'),
+                    'account_id': position_base.get('AccountId'),
+                    'status': position_base.get('Status'),
+                    'execution_time': position_base.get('ExecutionTimeOpen'),
+                    'value_date': position_base.get('ValueDate'),
+                    'exposure': position_view.get('Exposure'),
+                    'market_value': position_view.get('MarketValue'),
+                    'currency': position_base.get('Currency', 'USD'),
                 }
             )
             
@@ -728,11 +859,20 @@ class SaxoBroker(BrokerBase):
             Liste de BrokerTrade
         """
         try:
+            # Récupérer les clés nécessaires
+            keys = self._get_account_keys()
+            
             params = {
                 "$top": limit,
             }
-            if self.client_key:
-                params['ClientKey'] = self.client_key
+            if keys.get('client_key'):
+                params['ClientKey'] = keys['client_key']
+            if keys.get('account_key'):
+                params['AccountKey'] = keys['account_key']
+            
+            # ClientKey est requis par l'API Saxo
+            if not params.get('ClientKey'):
+                logger.warning("ClientKey is required for trades but not available")
             
             # Récupérer les ordres exécutés
             data = self._make_request('GET', '/port/v1/orders', params=params)
@@ -746,13 +886,13 @@ class SaxoBroker(BrokerBase):
                 
                 trade = BrokerTrade(
                     symbol=item.get('Symbol', ''),
-                    side='buy' if item.get('BuySell') == 'Buy' else 'sell',
+                    trade_type='BUY' if item.get('BuySell') == 'Buy' else 'SELL',
                     quantity=Decimal(str(item.get('FilledAmount', item.get('Amount', 0)))),
                     price=Decimal(str(item.get('Price', 0))),
-                    timestamp=item.get('FilledTime') or item.get('OrderTime'),
+                    executed_at=item.get('FilledTime') or item.get('OrderTime'),
                     broker_trade_id=str(item.get('OrderId', '')),
-                    commission=Decimal(str(item.get('Commission', 0))),
-                    extra_data={
+                    fees=Decimal(str(item.get('Commission', 0))),
+                    raw_data={
                         'uic': item.get('Uic'),
                         'asset_type': item.get('AssetType'),
                         'order_type': item.get('OrderType'),
@@ -808,7 +948,7 @@ class SaxoBroker(BrokerBase):
                     broker_order_id=str(item.get('OrderId', '')),
                     filled_quantity=Decimal(str(item.get('FilledAmount', 0))),
                     created_at=item.get('OrderTime'),
-                    extra_data={
+                    raw_data={
                         'uic': item.get('Uic'),
                         'asset_type': item.get('AssetType'),
                         'duration': item.get('Duration', {}),
@@ -905,7 +1045,7 @@ class SaxoBroker(BrokerBase):
                 broker_order_id=str(order_id) if order_id else None,
                 status=data.get('Status', 'Submitted'),
                 filled_quantity=Decimal('0'),
-                extra_data=data
+                raw_data=data
             )
             
         except BrokerError as e:
@@ -1137,11 +1277,11 @@ class SaxoBroker(BrokerBase):
             
             for asset in assets:
                 if asset.symbol.upper() == symbol.upper():
-                    return asset.extra_data.get('uic')
+                    return asset.raw_data.get('uic') if asset.raw_data else None
             
             # Si pas de correspondance exacte, prendre le premier
             if assets:
-                return assets[0].extra_data.get('uic')
+                return assets[0].raw_data.get('uic') if assets[0].raw_data else None
             
             return None
             
