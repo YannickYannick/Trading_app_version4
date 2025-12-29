@@ -164,6 +164,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         - platform: Filtrer par plateforme (SAXO, BINANCE, etc.)
         """
         from ..services.yahoo_validator import validate_single_asset, ValidationStats
+        from ..utils.yahoo_config import ValidationStatus
         from ..constants import DEFAULT_VALIDATION_LIMIT, DEFAULT_PRICE_TOLERANCE_PERCENT
         from django.utils import timezone
         import logging
@@ -241,13 +242,20 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                     )
                     
                     # Mettre à jour les statistiques
-                    if result.status.value.startswith('VALIDATED'):
-                        stats.validated_y4 += result.status.value == 'VALIDATED_Y4'
-                        stats.validated_y3 += result.status.value == 'VALIDATED_Y3'
-                        stats.validated_y0 += result.status.value == 'VALIDATED_Y0'
-                    elif result.status.value == 'NOT_FOUND':
+                    # result.status est déjà une chaîne (ex: 'validated_y4', 'not_found', 'error')
+                    if result.status == ValidationStatus.VALIDATED_Y4:
+                        stats.validated_y4 += 1
+                    elif result.status == ValidationStatus.VALIDATED_Y3:
+                        stats.validated_y3 += 1
+                    elif result.status == ValidationStatus.VALIDATED_Y0:
+                        stats.validated_y0 += 1
+                    elif result.status == ValidationStatus.NOT_FOUND:
                         stats.not_found += 1
+                    elif result.status == ValidationStatus.ERROR:
+                        stats.errors += 1
                     else:
+                        # Cas inattendu, logger et compter comme erreur
+                        logger.warning(f"Status inattendu pour {asset.symbol}: {result.status}")
                         stats.errors += 1
                     
                     # Sauvegarder le résultat
