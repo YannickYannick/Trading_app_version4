@@ -47,14 +47,18 @@ export const useBrokerBalance = (accountId: number | null): UseBrokerBalanceRetu
           // Sauf si c'est vraiment la première fois qu'on charge (hasValidBalance = false)
           const newBalance = response.balance_eur
           
-          if (newBalance > 0 || !hasValidBalance) {
-            // Toujours accepter une valeur positive ou si on n'a jamais eu de valeur valide
+          if (newBalance > 0) {
+            // Toujours accepter une valeur positive
             setBalanceEur(newBalance)
             setAllBalances(response.all_balances || {})
             setError(null) // Clear any previous error
-            if (newBalance > 0) {
-              setHasValidBalance(true)
-            }
+            setHasValidBalance(true) // Marquer comme valide seulement si > 0
+          } else if (!hasValidBalance) {
+            // Si on n'a jamais eu de valeur valide, accepter 0 (mais ne pas marquer comme valide)
+            setBalanceEur(newBalance)
+            setAllBalances(response.all_balances || {})
+            setError(null)
+            // Ne pas mettre hasValidBalance à true si la valeur est 0
           } else {
             // Si on reçoit 0 mais qu'on avait déjà une valeur valide, garder l'ancienne
             console.warn(
