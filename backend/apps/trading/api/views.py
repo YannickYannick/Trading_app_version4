@@ -984,6 +984,12 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                     broker.authenticate()
                 eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
+                
+                # Logger pour déboguer
+                logger.info(
+                    f"Binance balance conversion for account {account.id}: "
+                    f"raw balances={dict(balances)}, eur_balance={eur_balance}"
+                )
             
             # Formater les balances (exclure les clés _free, _locked, _margin_available, _total)
             all_balances = {
@@ -992,6 +998,11 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 if not k.endswith('_free') and not k.endswith('_locked') 
                 and not k.endswith('_margin_available') and not k.endswith('_total')
             }
+            
+            logger.debug(
+                f"Returning balance for account {account.id}: "
+                f"balance_eur={eur_balance}, currency={currency}, all_balances={list(all_balances.keys())}"
+            )
             
             return Response({
                 'success': True,
