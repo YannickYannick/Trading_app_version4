@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from apps.trading.models import BrokerAccount
 from apps.trading.services.sync.position_sync_service import PositionSyncService
 from apps.trading.services.sync.trade_sync_service import TradeSyncService
+from apps.trading.utils.user_utils import get_user_or_error, get_broker_account_or_error
 import logging
 
 logger = logging.getLogger('trading.management.test_sync')
@@ -41,9 +42,9 @@ class Command(BaseCommand):
         user_id = options.get('user_id')
         if user_id:
             try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                self.stdout.write(self.style.ERROR(f'User with ID {user_id} not found'))
+                user = get_user_or_error(user_id)
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(str(e)))
                 return
         else:
             user = User.objects.first()
@@ -57,9 +58,13 @@ class Command(BaseCommand):
         broker_account_id = options.get('broker_account_id')
         if broker_account_id:
             try:
-                accounts = [BrokerAccount.objects.get(id=broker_account_id, user=user, is_active=True)]
-            except BrokerAccount.DoesNotExist:
-                self.stdout.write(self.style.ERROR(f'Broker account with ID {broker_account_id} not found or inactive'))
+                account = get_broker_account_or_error(broker_account_id)
+                if not account.is_active:
+                    self.stdout.write(self.style.ERROR(f'Broker account with ID {broker_account_id} is inactive'))
+                    return
+                accounts = [account]
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(str(e)))
                 return
         else:
             accounts = BrokerAccount.objects.filter(user=user, is_active=True)

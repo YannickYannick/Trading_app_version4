@@ -176,13 +176,13 @@ class SaxoBroker(BrokerBase):
                 from ..utils.token_utils import parse_iso_datetime
                 expires_at = parse_iso_datetime(self.token_expires_at)
                 if expires_at:
-                    # Ajouter une marge de 5 minutes
+                    # Ajouter une marge de sécurité
                     now = timezone.now()
                     if expires_at.tzinfo:
                         now = now.astimezone(expires_at.tzinfo)
                     elif now.tzinfo:
                         expires_at = timezone.make_aware(expires_at) if expires_at.tzinfo is None else expires_at
-                    if now >= expires_at - timedelta(minutes=5):
+                    if now >= expires_at - timedelta(minutes=DEFAULT_TOKEN_EXPIRY_MARGIN_MINUTES):
                         return False
             except (ValueError, TypeError) as e:
                 logger.warning(f"Could not parse token expiry: {e}")
@@ -913,16 +913,20 @@ class SaxoBroker(BrokerBase):
         Cet endpoint fournit un niveau de détail supérieur à hist/v3/positions
         et permet de reconstruire les positions avec plus de précision.
         
-        Note: L'API Saxo REQUIERT FromDate et ToDate. Si non fournis, utilise
-        les 30 derniers jours par défaut.
+        Important: L'API Saxo REQUIERT FromDate et ToDate. Si non fournis, utilise
+        les 30 derniers jours par défaut (voir DEFAULT_TRANSACTION_DAYS_BACK).
         
         Args:
-            from_date: Date de début (format ISO, optionnel - défaut: 30 jours avant aujourd'hui)
-            to_date: Date de fin (format ISO, optionnel - défaut: aujourd'hui)
-            limit: Nombre maximum de transactions à récupérer
+            from_date: Date de début (format ISO YYYY-MM-DD, optionnel)
+            to_date: Date de fin (format ISO YYYY-MM-DD, optionnel)
+            limit: Nombre maximum de transactions à récupérer (défaut: 10000)
             
         Returns:
             Liste de transactions brutes depuis l'API Saxo
+            
+        Raises:
+            BrokerAPIError: Si l'API retourne une erreur
+            BrokerAuthenticationError: Si l'authentification échoue
         """
         try:
             from datetime import datetime, timedelta
@@ -941,9 +945,9 @@ class SaxoBroker(BrokerBase):
             
             # L'API Saxo REQUIERT FromDate et ToDate
             # Format attendu: YYYY-MM-DD (date seulement, sans heure)
-            # Si non fournis, utiliser les 30 derniers jours par défaut
+            # Si non fournis, utiliser les N derniers jours par défaut
             if not from_date:
-                from_date_dt = datetime.utcnow() - timedelta(days=30)
+                from_date_dt = datetime.utcnow() - timedelta(days=DEFAULT_TRANSACTION_DAYS_BACK)
                 # Format date seulement YYYY-MM-DD
                 from_date = from_date_dt.strftime('%Y-%m-%d')
             elif 'T' in from_date:

@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from apps.trading.models import BrokerAccount
 from apps.trading.services.broker_service import BrokerService
 from apps.trading.utils.token_utils import parse_iso_datetime
+from apps.trading.constants import DEFAULT_TOKEN_REFRESH_MINUTES_BEFORE
 import logging
 
 logger = logging.getLogger('trading.management.refresh_tokens')
@@ -20,8 +21,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--minutes-before',
             type=int,
-            default=30,
-            help='Rafraîchir les tokens expirant dans X minutes (défaut: 30)'
+            default=DEFAULT_TOKEN_REFRESH_MINUTES_BEFORE,
+            help=f'Rafraîchir les tokens expirant dans X minutes (défaut: {DEFAULT_TOKEN_REFRESH_MINUTES_BEFORE})'
         )
         parser.add_argument(
             '--force',

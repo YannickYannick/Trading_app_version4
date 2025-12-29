@@ -1,0 +1,28 @@
+"""
+Constantes pour l'application trading.
+
+Regroupe toutes les valeurs magiques et constantes utilisées dans le code.
+"""
+
+# Validation Yahoo Finance
+DEFAULT_VALIDATION_LIMIT = 100
+DEFAULT_PRICE_TOLERANCE_PERCENT = 5.0
+DEFAULT_SYNC_BATCH_SIZE = 50
+
+# Refresh tokens
+DEFAULT_TOKEN_REFRESH_MINUTES_BEFORE = 30
+DEFAULT_TOKEN_EXPIRY_MARGIN_MINUTES = 5
+
+# Synchronisation
+DEFAULT_SYNC_LIMIT = 1000
+MAX_WORKERS_DEFAULT = 4
+
+# Pagination
+DEFAULT_PAGE_SIZE = 50
+LARGE_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 500
+
+# Dates
+DEFAULT_TRANSACTION_DAYS_BACK = 30
+DEFAULT_HISTORICAL_PRICES_DAYS = 100
+

@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 
 from apps.trading.models import BrokerAccount
 from apps.trading.services.sync.trade_sync_service import TradeSyncService
+from apps.trading.utils.user_utils import get_broker_account_or_error
 
 
 class Command(BaseCommand):
@@ -32,10 +33,7 @@ class Command(BaseCommand):
         account_id = options['account_id']
         limit = options['limit']
         
-        try:
-            account = BrokerAccount.objects.get(id=account_id)
-        except BrokerAccount.DoesNotExist:
-            raise CommandError(f"Broker account with ID {account_id} not found")
+        account = get_broker_account_or_error(account_id)
         
         if account.get_broker_type().upper() != 'BINANCE':
             raise CommandError(f"Account {account_id} is not a Binance account (type: {account.get_broker_type()})")

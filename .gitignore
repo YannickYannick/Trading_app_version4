@@ -41,6 +41,9 @@ staticfiles/
 *.swp
 *.swo
 *~
+*.sublime-workspace
+*.sublime-project
+# Note: *.code-workspace conservé par choix utilisateur
 
 # Environment variables
 .env

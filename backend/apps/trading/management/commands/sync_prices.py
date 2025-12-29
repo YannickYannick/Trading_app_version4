@@ -12,6 +12,7 @@ from django.contrib.auth.models import User
 from apps.trading.models import BrokerAccount, Asset
 from apps.trading.services.sync import PriceSyncService
 from apps.trading.services.data_providers import YahooFinanceService
+from apps.trading.utils.user_utils import get_user_or_error
 
 
 class Command(BaseCommand):
@@ -70,10 +71,7 @@ class Command(BaseCommand):
         
         # Get user
         if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                raise CommandError(f"User with ID {user_id} not found")
+            user = get_user_or_error(user_id)
         else:
             user = User.objects.first()
             if not user:
