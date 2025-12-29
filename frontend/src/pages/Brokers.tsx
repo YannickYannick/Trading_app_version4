@@ -31,6 +31,7 @@ export default function Brokers() {
   const [isSaxoTransactionsModalOpen, setIsSaxoTransactionsModalOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState<BrokerAccount | null>(null)
   const [refreshingTokens, setRefreshingTokens] = useState<Set<number>>(new Set())
+  const [validatingYahoo, setValidatingYahoo] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'>('ALL')
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
@@ -142,6 +143,51 @@ export default function Brokers() {
     }
   }
 
+  const handleValidateYahooSymbols = async () => {
+    if (validatingYahoo) return
+
+    const confirmed = window.confirm(
+      'Voulez-vous valider les symboles Yahoo Finance pour tous les assets?\n\n' +
+      'Cette opération peut prendre plusieurs minutes et mettra à jour le champ symbole_yahoo.'
+    )
+
+    if (!confirmed) return
+
+    setValidatingYahoo(true)
+
+    try {
+      const result = await brokerService.validateYahooSymbols({
+        limit: 100, // Limiter à 100 par défaut
+        reset: false
+      })
+
+      if (result.success) {
+        alert(
+          `✅ Validation terminée!\n\n` +
+          `Assets traités: ${result.processed}\n` +
+          `✅ Validés: ${result.validated}\n` +
+          `❌ Non trouvés: ${result.not_found}\n` +
+          `⚠️ Erreurs: ${result.failed}\n\n` +
+          `Détails:\n` +
+          `- Y4 (MIC): ${result.details.y4_matches}\n` +
+          `- Y3 (Nom): ${result.details.y3_matches}\n` +
+          `- Y0 (Symbole): ${result.details.y0_matches}`
+        )
+      } else {
+        alert(`❌ Erreur: ${result.error || 'Échec de la validation'}`)
+      }
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Erreur lors de la validation'
+      alert(`❌ Erreur: ${errorMsg}`)
+    } finally {
+      setValidatingYahoo(false)
+    }
+  }
+
   if (loading) {
     return <Loading fullScreen text="Chargement des brokers..." />
   }
@@ -159,9 +205,19 @@ export default function Brokers() {
     <div className="brokers-page">
       <div className="brokers-header">
         <h1 className="page-title">Brokers</h1>
-        <Button onClick={handleCreate} variant="primary">
-          + Nouveau Broker
-        </Button>
+        <div className="brokers-header-actions">
+          <Button
+            onClick={handleValidateYahooSymbols}
+            variant="info"
+            disabled={validatingYahoo}
+            title="Valider les symboles Yahoo Finance pour tous les assets"
+          >
+            {validatingYahoo ? '🔄 Validation...' : '📊 Valider Yahoo Symbols'}
+          </Button>
+          <Button onClick={handleCreate} variant="primary">
+            + Nouveau Broker
+          </Button>
+        </div>
       </div>
 
       {/* Filtres et recherche */}

@@ -13,13 +13,17 @@ from .models import (
 class AllAssetsAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'is_tradable', 'last_updated']
     list_filter = ['platform', 'asset_type', 'market', 'is_tradable', 'currency']
-    search_fields = ['symbol', 'name', 'saxo_uic']
+    search_fields = ['symbol', 'name', 'saxo_uic', 'symbole_yahoo']
     ordering = ['symbol']
-    readonly_fields = ['last_updated', 'created_at']
+    readonly_fields = ['last_updated', 'created_at', 'yahoo_validated_at']
     
     fieldsets = (
         ('Informations générales', {
             'fields': ('symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'exchange', 'is_tradable')
+        }),
+        ('Yahoo Finance', {
+            'fields': ('symbole_yahoo', 'yahoo_validation_method', 'yahoo_validated_at'),
+            'classes': ('collapse',)
         }),
         ('Saxo Bank', {
             'fields': ('saxo_uic', 'saxo_exchange_id', 'saxo_country_code'),

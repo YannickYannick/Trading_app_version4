@@ -151,6 +151,115 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             'count': len(serializer.data),
             'results': serializer.data
         })
+    
+    @action(detail=False, methods=['post'], url_path='validate-yahoo-symbols')
+    def validate_yahoo_symbols(self, request):
+        """
+        POST /api/all-assets/validate-yahoo-symbols/
+        Met à jour les symboles Yahoo Finance pour tous les assets.
+        
+        Query params optionnels:
+        - reset: Si 'true', réinitialise tous les symboles avant validation
+        - limit: Nombre max d'assets à traiter (défaut: 100)
+        - platform: Filtrer par plateforme (SAXO, BINANCE, etc.)
+        """
+        from ..services.yahoo_validator import validate_single_asset, ValidationStats
+        from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger('trading.api.assets')
+        
+        try:
+            # Récupérer les paramètres
+            reset = request.query_params.get('reset', 'false').lower() == 'true'
+            limit = int(request.query_params.get('limit', 100))
+            platform = request.query_params.get('platform')
+            
+            # Construire le queryset
+            queryset = AllAssets.objects.all()
+            
+            if platform:
+                queryset = queryset.filter(platform=platform)
+            
+            # Si reset, réinitialiser les symboles Yahoo
+            if reset:
+                updated_count = queryset.update(symbole_yahoo='Not_searched')
+                logger.info(f"Reset symbole_yahoo pour {updated_count} assets")
+            
+            # Filtrer les assets qui ont besoin de validation
+            queryset = queryset.filter(
+                symbole_yahoo__in=['Not_searched', 'not_found']
+            )[:limit]
+            
+            assets_list = list(queryset)
+            assets_count = len(assets_list)
+            
+            if assets_count == 0:
+                return Response({
+                    'success': True,
+                    'message': 'Aucun asset à valider',
+                    'processed': 0,
+                    'validated': 0,
+                    'failed': 0,
+                    'not_found': 0
+                })
+            
+            logger.info(f"Démarrage validation Yahoo pour {assets_count} assets")
+            
+            # Initialiser les stats
+            stats = ValidationStats()
+            stats.total = assets_count
+            
+            # Valider chaque asset
+            for asset in assets_list:
+                try:
+                    # Utiliser validate_single_asset qui ne nécessite pas broker_name
+                    result = validate_single_asset(asset, broker_config={}, tolerance_percent=5.0)
+                    
+                    # Mettre à jour les statistiques
+                    if result.status.value.startswith('VALIDATED'):
+                        stats.validated_y4 += result.status.value == 'VALIDATED_Y4'
+                        stats.validated_y3 += result.status.value == 'VALIDATED_Y3'
+                        stats.validated_y0 += result.status.value == 'VALIDATED_Y0'
+                    elif result.status.value == 'NOT_FOUND':
+                        stats.not_found += 1
+                    else:
+                        stats.errors += 1
+                    
+                    # Sauvegarder le résultat
+                    asset.symbole_yahoo = result.yahoo_symbol
+                    asset.yahoo_validation_method = result.method
+                    asset.yahoo_validated_at = timezone.now()
+                    asset.save(update_fields=[
+                        'symbole_yahoo',
+                        'yahoo_validation_method',
+                        'yahoo_validated_at'
+                    ])
+                    
+                except Exception as e:
+                    logger.error(f"Erreur validation asset {asset.symbol}: {e}")
+                    stats.errors += 1
+            
+            return Response({
+                'success': True,
+                'message': f'Validation terminée pour {assets_count} assets',
+                'processed': stats.processed_total,
+                'validated': stats.validated_total,
+                'failed': stats.errors,
+                'not_found': stats.not_found,
+                'details': {
+                    'y4_matches': stats.validated_y4,
+                    'y3_matches': stats.validated_y3,
+                    'y0_matches': stats.validated_y0,
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la validation Yahoo: {e}", exc_info=True)
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ============================================

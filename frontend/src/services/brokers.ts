@@ -499,6 +499,44 @@ export const brokerService = {
     
     return response.data.results[0] || null
   },
+
+  /**
+   * Valider les symboles Yahoo Finance pour tous les assets
+   */
+  async validateYahooSymbols(options?: {
+    reset?: boolean
+    limit?: number
+    platform?: string
+  }): Promise<{
+    success: boolean
+    message: string
+    processed: number
+    validated: number
+    failed: number
+    not_found: number
+    details: {
+      y4_matches: number
+      y3_matches: number
+      y0_matches: number
+    }
+    error?: string
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      processed: number
+      validated: number
+      failed: number
+      not_found: number
+      details: {
+        y4_matches: number
+        y3_matches: number
+        y0_matches: number
+      }
+      error?: string
+    }>('/all-assets/validate-yahoo-symbols/', options || {})
+    return response.data
+  },
 }
 
 export default brokerService

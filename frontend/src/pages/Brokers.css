@@ -9,6 +9,12 @@
   margin-bottom: var(--spacing-xl);
 }
 
+.brokers-header-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
 .brokers-filters {
   display: flex;
   gap: var(--spacing-md);
