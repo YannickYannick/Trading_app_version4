@@ -1200,6 +1200,57 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+    @action(detail=True, methods=['get'], url_path='saxo-transactions')
+    def saxo_transactions(self, request, pk=None):
+        """
+        GET /api/broker-accounts/{id}/saxo-transactions/
+        Récupère les transactions depuis Saxo (hist/v1/transactions).
+        
+        Query params:
+            - from_date: Date de début (format ISO, optionnel)
+            - to_date: Date de fin (format ISO, optionnel)
+            - limit: Nombre maximum de transactions - default: 1000
+        """
+        from ..services.broker_service import BrokerService
+        
+        account = self.get_object()
+        
+        if account.broker_type != 'SAXO':
+            return Response({
+                'success': False,
+                'error': 'Cette méthode est uniquement pour Saxo Bank'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            service = BrokerService(request.user)
+            broker = service.get_broker_instance(account, use_cache=False)
+            
+            # Récupérer les paramètres
+            from_date = request.query_params.get('from_date')
+            to_date = request.query_params.get('to_date')
+            limit = int(request.query_params.get('limit', 1000))
+            
+            # Récupérer les transactions
+            transactions = broker.get_transactions(
+                from_date=from_date,
+                to_date=to_date,
+                limit=limit
+            )
+            
+            return Response({
+                'success': True,
+                'count': len(transactions),
+                'transactions': transactions,
+            })
+        except Exception as e:
+            logger.error(f"Error fetching Saxo transactions for account {account.id}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=True, methods=['get'], url_path='binance-assets')
     def binance_assets(self, request, pk=None):
         """

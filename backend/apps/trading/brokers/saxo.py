@@ -909,15 +909,20 @@ class SaxoBroker(BrokerBase):
         Cet endpoint fournit un niveau de détail supérieur à hist/v3/positions
         et permet de reconstruire les positions avec plus de précision.
         
+        Note: L'API Saxo REQUIERT FromDate et ToDate. Si non fournis, utilise
+        les 30 derniers jours par défaut.
+        
         Args:
-            from_date: Date de début (format ISO, optionnel)
-            to_date: Date de fin (format ISO, optionnel)
+            from_date: Date de début (format ISO, optionnel - défaut: 30 jours avant aujourd'hui)
+            to_date: Date de fin (format ISO, optionnel - défaut: aujourd'hui)
             limit: Nombre maximum de transactions à récupérer
             
         Returns:
             Liste de transactions brutes depuis l'API Saxo
         """
         try:
+            from datetime import datetime, timedelta
+            
             # Récupérer les clés nécessaires
             keys = self._get_account_keys()
             
@@ -930,14 +935,33 @@ class SaxoBroker(BrokerBase):
             if keys.get('account_key'):
                 params['AccountKey'] = keys['account_key']
             
-            if from_date:
-                params['FromDate'] = from_date
-            if to_date:
-                params['ToDate'] = to_date
+            # L'API Saxo REQUIERT FromDate et ToDate
+            # Format attendu: YYYY-MM-DD (date seulement, sans heure)
+            # Si non fournis, utiliser les 30 derniers jours par défaut
+            if not from_date:
+                from_date_dt = datetime.utcnow() - timedelta(days=30)
+                # Format date seulement YYYY-MM-DD
+                from_date = from_date_dt.strftime('%Y-%m-%d')
+            elif 'T' in from_date:
+                # Si format ISO avec heure, extraire seulement la date
+                from_date = from_date.split('T')[0]
+            
+            if not to_date:
+                to_date_dt = datetime.utcnow()
+                # Format date seulement YYYY-MM-DD
+                to_date = to_date_dt.strftime('%Y-%m-%d')
+            elif 'T' in to_date:
+                # Si format ISO avec heure, extraire seulement la date
+                to_date = to_date.split('T')[0]
+            
+            params['FromDate'] = from_date
+            params['ToDate'] = to_date
             
             # ClientKey est requis par l'API Saxo
             if not params.get('ClientKey'):
                 logger.warning("ClientKey is required for transactions but not available")
+            
+            logger.debug(f"Fetching transactions from {from_date} to {to_date}")
             
             # Récupérer les transactions
             data = self._make_request('GET', '/hist/v1/transactions', params=params)
@@ -955,60 +979,180 @@ class SaxoBroker(BrokerBase):
     
     def get_trades(self, limit: int = 50, **kwargs) -> List[BrokerTrade]:
         """
-        Récupérer l'historique des trades
+        Récupérer l'historique des trades depuis les transactions.
+        
+        Utilise hist/v1/transactions pour avoir un historique complet et détaillé
+        des trades, incluant les clôtures partielles et toutes les transactions.
         
         Args:
             limit: Nombre maximum de trades à récupérer
+            from_date: Date de début (optionnel)
+            to_date: Date de fin (optionnel)
+            symbol: Symbole à filtrer (optionnel)
             
         Returns:
             Liste de BrokerTrade
         """
         try:
-            # Récupérer les clés nécessaires
-            keys = self._get_account_keys()
+            from datetime import datetime, timedelta
             
-            params = {
-                "$top": limit,
-            }
-            if keys.get('client_key'):
-                params['ClientKey'] = keys['client_key']
-            if keys.get('account_key'):
-                params['AccountKey'] = keys['account_key']
+            # Récupérer les paramètres de date
+            from_date = kwargs.get('from_date')
+            to_date = kwargs.get('to_date')
+            symbol_filter = kwargs.get('symbol')
             
-            # ClientKey est requis par l'API Saxo
-            if not params.get('ClientKey'):
-                logger.warning("ClientKey is required for trades but not available")
+            # Si pas de dates spécifiées, utiliser les 90 derniers jours
+            if not from_date or not to_date:
+                if not to_date:
+                    to_date_dt = datetime.utcnow()
+                    to_date = to_date_dt.strftime('%Y-%m-%d')
+                if not from_date:
+                    from_date_dt = datetime.utcnow() - timedelta(days=90)
+                    from_date = from_date_dt.strftime('%Y-%m-%d')
             
-            # Récupérer les ordres exécutés
-            data = self._make_request('GET', '/port/v1/orders', params=params)
+            # Récupérer les transactions
+            transactions = self.get_transactions(
+                from_date=from_date,
+                to_date=to_date,
+                limit=min(limit * 5, 10000)  # Plus de transactions que de trades (certaines sont des frais)
+            )
             
+            # Convertir les transactions en BrokerTrade
             trades = []
-            for item in data.get('Data', []):
-                # Filtrer seulement les ordres exécutés
-                status = item.get('Status', '')
-                if status not in ['Filled', 'PartiallyFilled']:
+            seen_trade_ids = set()
+            
+            for txn in transactions:
+                # Filtrer les transactions de type Trade
+                tx_type = txn.get('TransactionType', '')
+                if tx_type != 'Trade':
                     continue
                 
-                trade = BrokerTrade(
-                    symbol=item.get('Symbol', ''),
-                    trade_type='BUY' if item.get('BuySell') == 'Buy' else 'SELL',
-                    quantity=Decimal(str(item.get('FilledAmount', item.get('Amount', 0)))),
-                    price=Decimal(str(item.get('Price', 0))),
-                    executed_at=item.get('FilledTime') or item.get('OrderTime'),
-                    broker_trade_id=str(item.get('OrderId', '')),
-                    fees=Decimal(str(item.get('Commission', 0))),
-                    raw_data={
-                        'uic': item.get('Uic'),
-                        'asset_type': item.get('AssetType'),
-                        'order_type': item.get('OrderType'),
-                        'duration': item.get('Duration', {}).get('DurationType'),
-                        'status': status,
-                        'account_id': item.get('AccountId'),
-                    }
-                )
-                trades.append(trade)
+                # Les données de trade sont dans le tableau Trades[]
+                trades_array = txn.get('Trades', [])
+                if not trades_array:
+                    continue
+                
+                # Extraire les infos de l'instrument
+                instrument = txn.get('Instrument', {})
+                symbol = instrument.get('Symbol', '')
+                uic = instrument.get('Uic')
+                asset_type = instrument.get('AssetType', 'Stock')
+                
+                # Nettoyer le symbole (enlever l'échange si présent, ex: "MP:xnys" -> "MP")
+                if symbol and ':' in symbol:
+                    symbol = symbol.split(':')[0]
+                
+                # Si pas de symbole, essayer de le récupérer depuis l'UIC
+                if not symbol and uic:
+                    try:
+                        symbol = self._get_symbol_from_uic(uic, asset_type)
+                        if not symbol:
+                            symbol = f"UIC_{uic}"
+                    except:
+                        symbol = f"UIC_{uic}" if uic else 'UNKNOWN'
+                elif not symbol:
+                    symbol = 'UNKNOWN'
+                
+                # Filtrer par symbole si spécifié
+                if symbol_filter and symbol != symbol_filter:
+                    continue
+                
+                # Extraire les frais depuis Bookings
+                total_fees = Decimal('0')
+                bookings = txn.get('Bookings', [])
+                for booking in bookings:
+                    amount_type = booking.get('AmountType', '')
+                    if amount_type == 'Commission':
+                        booked_amount = Decimal(str(booking.get('BookedAmount', 0)))
+                        total_fees += abs(booked_amount)  # Frais en valeur absolue
+                
+                # Parcourir chaque trade dans le tableau Trades[]
+                for trade_item in trades_array:
+                    to_open_or_close = trade_item.get('ToOpenOrClose', '')
+                    if not to_open_or_close or to_open_or_close not in ['ToOpen', 'ToClose']:
+                        continue
+                    
+                    # Extraire les données du trade
+                    trade_id = str(trade_item.get('TradeId', ''))
+                    if not trade_id:
+                        trade_id = str(txn.get('TradeId', ''))
+                    
+                    traded_quantity = Decimal(str(trade_item.get('TradedQuantity', 0)))
+                    price = Decimal(str(trade_item.get('Price', 0)))
+                    trade_execution_time = trade_item.get('TradeExecutionTime')
+                    
+                    # Utiliser la date du trade ou de la transaction
+                    executed_at = trade_execution_time or txn.get('Date')
+                    if executed_at and 'T' not in str(executed_at):
+                        # Si seulement une date, ajouter une heure par défaut
+                        executed_at = f"{executed_at}T00:00:00Z"
+                    
+                    # Déterminer le trade_type
+                    trade_event_type = trade_item.get('TradeEventType', '')
+                    event = txn.get('Event', '')
+                    
+                    if trade_event_type in ['Bought', 'BoughtOddLot'] or event == 'Buy':
+                        trade_type = 'BUY'
+                    elif trade_event_type in ['Sold', 'SoldOddLot'] or event == 'Sell':
+                        trade_type = 'SELL'
+                    elif to_open_or_close == 'ToOpen':
+                        # Pour l'ouverture, on détermine selon TradedValue
+                        # Si TradedValue est négatif, c'est un achat (débit)
+                        traded_value = Decimal(str(trade_item.get('TradedValue', 0)))
+                        trade_type = 'BUY' if traded_value < 0 else 'SELL'
+                    else:  # ToClose
+                        trade_type = 'SELL' if traded_quantity > 0 else 'BUY'
+                    
+                    # Créer un identifiant unique pour ce trade
+                    position_id = str(trade_item.get('PositionId', ''))
+                    order_id = str(trade_item.get('OrderId', ''))
+                    
+                    # ID composite pour éviter les doublons
+                    if trade_id and order_id:
+                        broker_trade_id = f"{trade_id}_{order_id}"
+                    elif trade_id:
+                        broker_trade_id = f"{trade_id}_{position_id}" if position_id else trade_id
+                    else:
+                        broker_trade_id = f"TX_{position_id}" if position_id else f"TX_{len(trades)}"
+                    
+                    # Éviter les doublons
+                    if broker_trade_id in seen_trade_ids:
+                        continue
+                    seen_trade_ids.add(broker_trade_id)
+                    
+                    # Créer le BrokerTrade
+                    trade = BrokerTrade(
+                        symbol=symbol,
+                        trade_type=trade_type,
+                        quantity=abs(traded_quantity),  # Quantité absolue
+                        price=price,
+                        executed_at=executed_at,
+                        broker_trade_id=broker_trade_id,
+                        fees=total_fees,
+                        raw_data={
+                            'uic': uic,
+                            'asset_type': asset_type,
+                            'to_open_or_close': to_open_or_close,
+                            'trade_id': trade_id,
+                            'position_id': position_id,
+                            'order_id': order_id,
+                            'traded_value': float(trade_item.get('TradedValue', 0)),
+                            'trade_event_type': trade_event_type,
+                            'venue': trade_item.get('Venue'),
+                            'exchange': trade_item.get('ExchangeName'),
+                        }
+                    )
+                    trades.append(trade)
+                    
+                    # Limiter le nombre de trades retournés
+                    if len(trades) >= limit:
+                        break
+                    
+                # Si on a atteint la limite, sortir aussi de la boucle principale
+                if len(trades) >= limit:
+                    break
             
-            logger.info(f"Saxo: Retrieved {len(trades)} trades")
+            logger.info(f"Saxo: Retrieved {len(trades)} trades from {len(transactions)} transactions")
             return trades
             
         except BrokerError:

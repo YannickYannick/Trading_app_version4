@@ -6,20 +6,29 @@ Cette phase consiste à tester et valider toutes les intégrations entre les dif
 
 ## 📋 Checklist
 
-- [ ] **Connexion frontend ↔ backend testée**
+- [x] **Connexion frontend ↔ backend testée**
   - Voir : [CONNEXION_FRONTEND_BACKEND.md](./CONNEXION_FRONTEND_BACKEND.md)
   
-- [ ] **Intégration Saxo testée**
+- [x] **Intégration Saxo testée**
   - Voir : [INTEGRATION_SAXO.md](./INTEGRATION_SAXO.md)
+  - Voir : [SAXO_SYNC_IMPROVEMENTS.md](./SAXO_SYNC_IMPROVEMENTS.md)
+  - Voir : [PROBLEMES_SYNC_SAXO.md](./PROBLEMES_SYNC_SAXO.md)
   
-- [ ] **Intégration Binance testée**
+- [x] **Intégration Binance testée**
   - Voir : [INTEGRATION_BINANCE.md](./INTEGRATION_BINANCE.md)
   
-- [ ] **Synchronisations testées**
+- [x] **Synchronisations testées**
   - Voir : [SYNCHRONISATIONS_TESTEES.md](./SYNCHRONISATIONS_TESTEES.md)
+  - Voir : [SAXO_TRADES_SYNC_FROM_TRANSACTIONS.md](./SAXO_TRADES_SYNC_FROM_TRANSACTIONS.md)
   
-- [ ] **Gestion d'erreurs frontend**
+- [x] **Gestion d'erreurs frontend**
   - Voir : [GESTION_ERREURS_FRONTEND.md](./GESTION_ERREURS_FRONTEND.md)
+
+- [x] **Reconstruction des positions depuis transactions**
+  - Voir : [SAXO_POSITION_RECONSTRUCTION.md](./SAXO_POSITION_RECONSTRUCTION.md)
+  
+- [x] **Endpoint transactions Saxo**
+  - Voir : [SAXO_TRANSACTIONS_ENDPOINT.md](./SAXO_TRANSACTIONS_ENDPOINT.md)
 
 ---
 

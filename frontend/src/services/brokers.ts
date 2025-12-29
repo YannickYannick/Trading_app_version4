@@ -327,6 +327,44 @@ export const brokerService = {
   },
 
   /**
+   * Récupérer les transactions depuis Saxo (hist/v1/transactions)
+   */
+  async getSaxoTransactions(
+    accountId: number,
+    options?: {
+      from_date?: string
+      to_date?: string
+      limit?: number
+    }
+  ): Promise<{
+    success: boolean
+    count: number
+    transactions: Array<any>
+    error?: string
+  }> {
+    const params = new URLSearchParams()
+    if (options?.from_date) params.append('from_date', options.from_date)
+    if (options?.to_date) params.append('to_date', options.to_date)
+    if (options?.limit) params.append('limit', options.limit.toString())
+
+    try {
+      const response = await apiClient.get<{
+        success: boolean
+        count: number
+        transactions: Array<any>
+      }>(`/broker-accounts/${accountId}/saxo-transactions/?${params.toString()}`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        transactions: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Saxo transactions',
+      }
+    }
+  },
+
+  /**
    * Récupérer les assets depuis Binance
    */
   async getBinanceAssets(

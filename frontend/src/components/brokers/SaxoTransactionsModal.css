@@ -1,0 +1,135 @@
+.saxo-transactions-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 80vh;
+}
+
+.saxo-transactions-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.saxo-transactions-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.saxo-transactions-filter-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.saxo-transactions-error {
+  padding: 1rem;
+  background: var(--danger-light);
+  color: var(--danger);
+  border-radius: 8px;
+  border: 1px solid var(--danger);
+}
+
+.saxo-transactions-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.saxo-transactions-header {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.saxo-transactions-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.saxo-transactions-table-container {
+  overflow: auto;
+  max-height: 50vh;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.saxo-transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.saxo-transactions-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  z-index: 1;
+}
+
+.saxo-transactions-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.saxo-transactions-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.saxo-transactions-table tbody tr:hover {
+  background: var(--bg-secondary);
+}
+
+.transaction-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.transaction-details {
+  cursor: pointer;
+}
+
+.transaction-details summary {
+  color: var(--primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.transaction-details summary:hover {
+  text-decoration: underline;
+}
+
+.transaction-details pre {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  overflow: auto;
+  max-height: 200px;
+}
+
+.saxo-transactions-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+

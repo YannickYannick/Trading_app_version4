@@ -17,6 +17,7 @@ import BrokerTestModal from '@components/brokers/BrokerTestModal'
 import BrokerSyncModal from '@components/brokers/BrokerSyncModal'
 import BrokerBalance from '@components/brokers/BrokerBalance'
 import SaxoOAuthModal from '@components/brokers/SaxoOAuthModal'
+import SaxoTransactionsModal from '@components/brokers/SaxoTransactionsModal'
 import './Brokers.css'
 
 export default function Brokers() {
@@ -27,6 +28,7 @@ export default function Brokers() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isSaxoOAuthModalOpen, setIsSaxoOAuthModalOpen] = useState(false)
+  const [isSaxoTransactionsModalOpen, setIsSaxoTransactionsModalOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState<BrokerAccount | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'>('ALL')
@@ -232,17 +234,30 @@ export default function Brokers() {
                   🔑 Creds
                 </Button>
                 {account.broker_type === 'SAXO' && (
-                  <Button
-                    size="sm"
-                    variant="info"
-                    onClick={() => {
-                      setSelectedAccount(account)
-                      setIsSaxoOAuthModalOpen(true)
-                    }}
-                    title="Gérer l'authentification OAuth2 Saxo"
-                  >
-                    🔐 OAuth2
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="info"
+                      onClick={() => {
+                        setSelectedAccount(account)
+                        setIsSaxoOAuthModalOpen(true)
+                      }}
+                      title="Gérer l'authentification OAuth2 Saxo"
+                    >
+                      🔐 OAuth2
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="info"
+                      onClick={() => {
+                        setSelectedAccount(account)
+                        setIsSaxoTransactionsModalOpen(true)
+                      }}
+                      title="Voir les transactions Saxo"
+                    >
+                      📊 Transactions
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
@@ -359,28 +374,49 @@ export default function Brokers() {
 
       {/* Modal OAuth2 Saxo */}
       {selectedAccount && selectedAccount.broker_type === 'SAXO' && (
-        <Modal
-          isOpen={isSaxoOAuthModalOpen}
-          onClose={() => {
-            setIsSaxoOAuthModalOpen(false)
-            setSelectedAccount(null)
-          }}
-          title={`OAuth2 Saxo: ${selectedAccount.name}`}
-          size="md"
-        >
-          <SaxoOAuthModal
-            account={selectedAccount}
-            onSuccess={() => {
-              refetch()
-              setIsSaxoOAuthModalOpen(false)
-              setSelectedAccount(null)
-            }}
+        <>
+          <Modal
+            isOpen={isSaxoOAuthModalOpen}
             onClose={() => {
               setIsSaxoOAuthModalOpen(false)
               setSelectedAccount(null)
             }}
-          />
-        </Modal>
+            title={`OAuth2 Saxo: ${selectedAccount.name}`}
+            size="md"
+          >
+            <SaxoOAuthModal
+              account={selectedAccount}
+              onSuccess={() => {
+                refetch()
+                setIsSaxoOAuthModalOpen(false)
+                setSelectedAccount(null)
+              }}
+              onClose={() => {
+                setIsSaxoOAuthModalOpen(false)
+                setSelectedAccount(null)
+              }}
+            />
+          </Modal>
+
+          {/* Modal Transactions Saxo */}
+          <Modal
+            isOpen={isSaxoTransactionsModalOpen}
+            onClose={() => {
+              setIsSaxoTransactionsModalOpen(false)
+              setSelectedAccount(null)
+            }}
+            title={`Transactions Saxo: ${selectedAccount.name}`}
+            size="xl"
+          >
+            <SaxoTransactionsModal
+              account={selectedAccount}
+              onClose={() => {
+                setIsSaxoTransactionsModalOpen(false)
+                setSelectedAccount(null)
+              }}
+            />
+          </Modal>
+        </>
       )}
 
       {/* Modal de confirmation de suppression */}
