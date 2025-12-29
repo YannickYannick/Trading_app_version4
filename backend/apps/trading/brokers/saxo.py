@@ -610,14 +610,44 @@ class SaxoBroker(BrokerBase):
             
             data = self._make_request('GET', '/trade/v1/infoprices', params=params)
             
-            quote = data.get("Quote", {})
-            if quote:
-                # Prendre Ask, puis Mid, puis Bid
-                price = quote.get("Ask") or quote.get("Mid") or quote.get("Bid")
-                if price:
-                    return Decimal(str(price))
+            # Log pour débogage
+            logger.debug(f"Saxo get_asset_price response for UIC {uic}: structure keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
             
-            return None
+            # L'API peut retourner soit {"Data": [...]} soit directement l'objet avec Quote
+            # Essayer d'abord la structure avec Data
+            if "Data" in data:
+                data_items = data.get("Data", [])
+                if not data_items:
+                    logger.debug(f"Saxo: No data in response for UIC {uic}, asset_type={saxo_asset_type}, response keys: {list(data.keys())}")
+                    # Essayer de voir si la structure est différente
+                    if "Quote" in data:
+                        logger.debug(f"Saxo: Found Quote directly in response (not in Data array) for UIC {uic}")
+                        quote = data.get("Quote", {})
+                        price = quote.get("Mid") or quote.get("Bid") or quote.get("Ask")
+                        if price:
+                            return Decimal(str(price))
+                    return None
+                
+                first_item = data_items[0]
+                quote = first_item.get("Quote", {})
+                if not quote:
+                    logger.debug(f"Saxo: No Quote in first item for UIC {uic}, first_item keys: {list(first_item.keys()) if isinstance(first_item, dict) else 'not a dict'}")
+                    return None
+            else:
+                # Pas de structure Data, essayer directement
+                quote = data.get("Quote", {})
+                if not quote:
+                    logger.debug(f"Saxo: No Quote and no Data in response for UIC {uic}, response keys: {list(data.keys())}")
+                    return None
+            
+            # Priorité: Mid > Bid > Ask (comme dans votre exemple qui fonctionne)
+            price = quote.get("Mid") or quote.get("Bid") or quote.get("Ask")
+            if price:
+                logger.debug(f"Saxo: Price found for UIC {uic}: {price}")
+                return Decimal(str(price))
+            else:
+                logger.debug(f"Saxo: No price (Mid/Bid/Ask) in Quote for UIC {uic}, Quote keys: {list(quote.keys())}")
+                return None
             
         except BrokerError:
             raise

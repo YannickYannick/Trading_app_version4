@@ -98,6 +98,7 @@ docs/
 ├── fix-uic-extraction-and-optimization.md      # Correction UIC et optimisations (29/12/2025)
 ├── debug-binance-balance-conversion.md         # Debug conversion balance Binance
 ├── debug-yahoo-validation.md                   # Debug validation Yahoo Finance
+├── debug-saxo-price-api.md                     # Problème récupération prix Saxo (29/12/2025)
 ├── phase_1/                                    # Phase 1 - Backend
 │   ├── README.md
 │   ├── 01_STRUCTURE_DOSSIERS.md
@@ -129,4 +130,15 @@ Correction de l'extraction UIC Saxo et optimisations majeures :
 - ✅ Optimisation : bulk operations au lieu de requêtes individuelles
 - ✅ Timeout frontend augmenté à 10 minutes pour synchronisations longues
 - ✅ Handler logging sécurisé pour Windows
+
+## 🐛 Débogage et Problèmes
+
+### [Problème récupération prix Saxo pour validation Yahoo](debug-saxo-price-api.md)
+**Date :** 29 Décembre 2025
+
+Problème rencontré lors de la récupération des prix Saxo pour la validation Yahoo Finance :
+- 🔍 Structure de réponse API variable (avec/sans tableau `Data`)
+- 🔍 Accès aux prix refusé (`PriceTypeAsk/Bid: "NoAccess"`, `Amount: 0`)
+- ✅ Solutions implémentées : gestion des structures multiples, priorités des champs, logging détaillé
+- ⚠️ Limitation : permissions du compte peuvent bloquer l'accès aux prix
 

@@ -197,25 +197,81 @@ def get_saxo_price(
             "Accept": "application/json"
         }
         
+        # Utiliser FieldGroups pour obtenir les champs de prix complets
+        # Utiliser PriceInfo et Quote pour avoir toutes les options
+        params = {
+            "Uic": uic,
+            "AssetType": asset_type,
+            "FieldGroups": "PriceInfo,Quote"  # Inclure PriceInfo pour LastTraded, Bid, Ask
+        }
+        
         response = requests.get(
             f"{base_url}/trade/v1/infoprices",
-            params={
-                "Uic": uic,
-                "AssetType": asset_type,
-                "FieldGroups": "Quote"
-            },
+            params=params,
             headers=headers,
             timeout=REQUEST_TIMEOUT
         )
         
         if response.status_code == 200:
             data = response.json()
-            quote = data.get("Quote", {})
-            # Priorité: Mid > Ask > Bid
-            price = quote.get("Mid") or quote.get("Ask") or quote.get("Bid")
-            return float(price) if price else None
+            
+            # Log pour débogage
+            logger.debug(f"Saxo API response for UIC {uic}: {str(data)[:500]}")
+            
+            # L'API peut retourner soit {"Data": [...]} soit directement l'objet avec Quote
+            # Format observé : structure directe {"Quote": {...}, "Uic": ..., "PriceSource": ...}
+            
+            quote = None
+            price_info = None
+            data_items = None
+            
+            # Vérifier si c'est un tableau Data
+            if "Data" in data:
+                data_items = data.get("Data", [])
+                if data_items:
+                    first_item = data_items[0]
+                    quote = first_item.get("Quote", {})
+                    price_info = first_item.get("PriceInfo", {})
+            
+            # Sinon, structure directe (format observé dans les tests)
+            if not quote:
+                quote = data.get("Quote", {})
+                price_info = data.get("PriceInfo", {})
+            
+            if not quote:
+                logger.warning(f"No Quote in response for UIC {uic}, response keys: {list(data.keys())}")
+                return None
+            
+            # Vérifier si l'accès au prix est bloqué
+            price_type_ask = quote.get("PriceTypeAsk", "")
+            price_type_bid = quote.get("PriceTypeBid", "")
+            if price_type_ask == "NoAccess" and price_type_bid == "NoAccess":
+                logger.debug(f"Price access denied for UIC {uic}: PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid}")
+                # Même si l'accès est refusé, essayer d'utiliser Amount s'il est > 0
+            
+            # Format 1: Mid, Bid, Ask (quand disponible avec FieldGroups appropriés)
+            price = quote.get("Mid") or quote.get("Bid") or quote.get("Ask")
+            
+            # Format 2: Amount (mais peut être 0 si pas d'accès)
+            if not price and "Amount" in quote:
+                amount = quote.get("Amount")
+                if amount and amount > 0:
+                    logger.debug(f"Using Amount field for UIC {uic}: {amount}")
+                    return float(amount)
+            
+            # Format 3: Utiliser PriceInfo si disponible
+            if not price and price_info:
+                price = price_info.get("LastTraded") or price_info.get("Bid") or price_info.get("Ask")
+                if price:
+                    logger.debug(f"Using PriceInfo for UIC {uic}: {price}")
+                    return float(price)
+            
+            # Log détaillé pour débogage
+            logger.warning(f"No price found for UIC {uic} (Amount={quote.get('Amount')}, PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid})")
+            return None
         else:
-            logger.warning(f"Saxo API error {response.status_code} for UIC {uic}")
+            error_text = response.text[:500] if hasattr(response, 'text') else 'No response text'
+            logger.warning(f"Saxo API error {response.status_code} for UIC {uic}, asset_type={asset_type}: {error_text}")
             
     except requests.exceptions.Timeout:
         logger.warning(f"Saxo API timeout for UIC {uic}")
@@ -379,11 +435,13 @@ def validate_single_asset(
                     error_message='Missing access token'
                 )
             
-            logger.debug(f"Asset {asset.symbol}: Getting Saxo price for UIC {asset.saxo_uic}")
+            logger.debug(f"Asset {asset.symbol}: Getting Saxo price for UIC {asset.saxo_uic}, asset_type={asset.asset_type or 'Stock'}")
+            # Utiliser 'Stock' par défaut si asset_type est vide
+            asset_type_for_request = asset.asset_type or 'Stock'
             ref_price = get_saxo_price(
                 access_token=access_token,
                 uic=asset.saxo_uic,
-                asset_type=asset.asset_type,
+                asset_type=asset_type_for_request,
                 base_url=broker_config.get('base_url', 'https://gateway.saxobank.com/sim/openapi')
             )
             if ref_price is None:
