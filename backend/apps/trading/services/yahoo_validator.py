@@ -363,23 +363,42 @@ def validate_single_asset(
         
         if asset.platform == 'SAXO':
             if not asset.saxo_uic:
+                logger.warning(f"Asset {asset.symbol}: Missing Saxo UIC")
                 return ValidationResult(
                     yahoo_symbol='not_found',
                     status=ValidationStatus.ERROR,
                     error_message='Missing Saxo UIC'
                 )
             
+            access_token = broker_config.get('access_token', '')
+            if not access_token:
+                logger.warning(f"Asset {asset.symbol}: No access token in broker_config")
+                return ValidationResult(
+                    yahoo_symbol='not_found',
+                    status=ValidationStatus.ERROR,
+                    error_message='Missing access token'
+                )
+            
+            logger.debug(f"Asset {asset.symbol}: Getting Saxo price for UIC {asset.saxo_uic}")
             ref_price = get_saxo_price(
-                access_token=broker_config.get('access_token', ''),
+                access_token=access_token,
                 uic=asset.saxo_uic,
                 asset_type=asset.asset_type,
                 base_url=broker_config.get('base_url', 'https://gateway.saxobank.com/sim/openapi')
             )
+            if ref_price is None:
+                logger.warning(f"Asset {asset.symbol}: Failed to get Saxo price for UIC {asset.saxo_uic}")
             
         elif asset.platform == 'BINANCE':
             # Pour Binance, construire le symbole de trading
             trading_symbol = f"{asset.binance_base_asset}{asset.binance_quote_asset}"
+            logger.debug(f"Asset {asset.symbol}: Getting Binance price for {trading_symbol}")
             ref_price = get_binance_price(trading_symbol)
+            if ref_price is None:
+                logger.warning(f"Asset {asset.symbol}: Failed to get Binance price for {trading_symbol}")
+        else:
+            logger.warning(f"Asset {asset.symbol}: Unknown platform {asset.platform}")
+            ref_price = None
         
         if ref_price is None:
             return ValidationResult(

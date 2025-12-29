@@ -241,21 +241,37 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                         tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
                     )
                     
+                    # Log détaillé pour débogage
+                    logger.debug(
+                        f"Asset {asset.symbol}: status={result.status}, "
+                        f"yahoo_symbol={result.yahoo_symbol}, method={result.method}, "
+                        f"error={result.error_message}"
+                    )
+                    
                     # Mettre à jour les statistiques
                     # result.status est déjà une chaîne (ex: 'validated_y4', 'not_found', 'error')
-                    if result.status == ValidationStatus.VALIDATED_Y4:
+                    # Comparaison en utilisant les valeurs string des constantes ValidationStatus
+                    status_str = str(result.status) if result.status else ''
+                    if status_str == ValidationStatus.VALIDATED_Y4:
                         stats.validated_y4 += 1
-                    elif result.status == ValidationStatus.VALIDATED_Y3:
+                    elif status_str == ValidationStatus.VALIDATED_Y3:
                         stats.validated_y3 += 1
-                    elif result.status == ValidationStatus.VALIDATED_Y0:
+                    elif status_str == ValidationStatus.VALIDATED_Y0:
                         stats.validated_y0 += 1
-                    elif result.status == ValidationStatus.NOT_FOUND:
+                    elif status_str == ValidationStatus.NOT_FOUND:
                         stats.not_found += 1
-                    elif result.status == ValidationStatus.ERROR:
+                    elif status_str == ValidationStatus.ERROR:
                         stats.errors += 1
+                        # Logger l'erreur pour comprendre pourquoi
+                        logger.warning(
+                            f"Validation ERROR pour {asset.symbol}: {result.error_message or 'No error message'}"
+                        )
                     else:
                         # Cas inattendu, logger et compter comme erreur
-                        logger.warning(f"Status inattendu pour {asset.symbol}: {result.status}")
+                        logger.warning(
+                            f"Status inattendu pour {asset.symbol}: {result.status} "
+                            f"(type: {type(result.status)})"
+                        )
                         stats.errors += 1
                     
                     # Sauvegarder le résultat
