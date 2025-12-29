@@ -281,31 +281,59 @@ class PositionSerializer(serializers.ModelSerializer):
 
 class TradeSerializer(serializers.ModelSerializer):
     """
-    Serializer pour les trades.
+    Serializer pour Trade.
     
-    Inclut les infos de l'asset et calcule la valeur totale.
+    Utilise AllAssets comme source de vérité principale.
+    Asset est optionnel (pour enrichissement futur).
     """
-    # Relations imbriquées (lecture)
-    asset = AssetNestedSerializer(read_only=True)
+    # Champs depuis AllAssets (source de vérité)
+    all_asset = AllAssetsSerializer(read_only=True)
+    all_asset_id = serializers.IntegerField(write_only=True, required=False)
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    all_asset_platform = serializers.CharField(source='all_asset.platform', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+    
+    # Relations imbriquées (lecture) - Asset optionnel pour compatibilité
+    asset = AssetNestedSerializer(read_only=True, allow_null=True)
     broker_name = serializers.CharField(source='broker.name', read_only=True)
     
-    # IDs pour création
-    asset_id = serializers.IntegerField(write_only=True, required=False)
+    # IDs pour création/modification
+    asset_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     broker_id = serializers.IntegerField(write_only=True, required=False)
     
-    # Champ calculé
+    # Champs calculés (propriétés du modèle)
     total_value = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
+    
+    # Champ symbol pour compatibilité (utilise all_asset en priorité)
+    symbol = serializers.SerializerMethodField()
     
     class Meta:
         model = Trade
         fields = [
-            'id', 
+            'id',
+            # Relations AllAssets (principal)
+            'all_asset', 'all_asset_id', 'all_asset_symbol', 'all_asset_name',
+            'all_asset_platform', 'all_asset_yahoo_symbol',
+            # Relations Asset (optionnel, compatibilité)
             'asset', 'asset_id',
             'broker_name', 'broker_id',
-            'position', 'trade_type', 'quantity', 'price', 'fees',
-            'total_value', 'executed_at', 'broker_trade_id'
+            'position',
+            # Données
+            'trade_type', 'quantity', 'price', 'fees',
+            'executed_at', 'broker_trade_id',
+            # Calculés
+            'symbol', 'total_value'
         ]
         read_only_fields = ['id', 'total_value']
+    
+    def get_symbol(self, obj):
+        """Retourne le symbol depuis all_asset (ou asset en fallback)."""
+        if obj.all_asset:
+            return obj.all_asset.symbol
+        elif obj.asset:
+            return obj.asset.symbol
+        return None
     
     def validate_quantity(self, value):
         """Valider que la quantité est positive."""
