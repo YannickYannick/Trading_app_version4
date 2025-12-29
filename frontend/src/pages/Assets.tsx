@@ -26,59 +26,59 @@ export default function Assets() {
     {
       key: 'symbol',
       label: 'Symbole',
-      render: (asset: Asset) => (
-        <Link to={`/assets/${asset.id}`} className="asset-symbol link-symbol">
-          {asset.symbol}
+      render: (_value: any, row: Asset) => (
+        <Link to={`/assets/${row?.id || ''}`} className="asset-symbol link-symbol">
+          {row?.symbol || 'N/A'}
         </Link>
       ),
     },
     {
       key: 'name',
       label: 'Nom',
-      render: (asset: Asset) => (
-        <span className="asset-name">{asset.name}</span>
+      render: (_value: any, row: Asset) => (
+        <span className="asset-name">{row?.name || 'N/A'}</span>
       ),
     },
     {
       key: 'platform',
       label: 'Plateforme',
-      render: (asset: Asset) => (
-        <Badge variant="outline">{asset.platform}</Badge>
+      render: (_value: any, row: Asset) => (
+        <Badge variant="outline">{row?.platform || 'N/A'}</Badge>
       ),
     },
     {
       key: 'asset_type',
       label: 'Type',
-      render: (asset: Asset) => (
-        <span className="asset-type">{asset.asset_type}</span>
+      render: (_value: any, row: Asset) => (
+        <span className="asset-type">{row?.asset_type || 'N/A'}</span>
       ),
     },
     {
       key: 'current_price',
       label: 'Prix',
       align: 'right' as const,
-      render: (asset: Asset) => (
+      render: (_value: any, row: Asset) => (
         <span className="asset-price">
-          {asset.current_price != null ? formatCurrency(asset.current_price) : '-'}
+          {row?.current_price != null ? formatCurrency(row.current_price) : '-'}
         </span>
       ),
     },
     {
       key: 'currency',
       label: 'Devise',
-      render: (asset: Asset) => asset.currency,
+      render: (_value: any, row: Asset) => row?.currency || '-',
     },
     {
       key: 'exchange',
       label: 'Exchange',
-      render: (asset: Asset) => asset.exchange || '-',
+      render: (_value: any, row: Asset) => row?.exchange || '-',
     },
     {
       key: 'is_tradable',
       label: 'Tradable',
-      render: (asset: Asset) => (
-        <Badge variant={asset.is_tradable ? 'success' : 'secondary'}>
-          {asset.is_tradable ? 'Oui' : 'Non'}
+      render: (_value: any, row: Asset) => (
+        <Badge variant={row?.is_tradable ? 'success' : 'secondary'}>
+          {row?.is_tradable ? 'Oui' : 'Non'}
         </Badge>
       ),
     },

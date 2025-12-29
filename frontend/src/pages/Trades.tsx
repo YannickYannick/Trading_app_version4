@@ -24,23 +24,23 @@ export default function Trades() {
     {
       key: 'timestamp',
       label: 'Date',
-      render: (trade: Trade) => formatDate(trade.timestamp || trade.executed_at || '', 'dd/MM/yyyy HH:mm'),
+      render: (_value: any, row: Trade) => formatDate(row?.timestamp || row?.executed_at || '', 'dd/MM/yyyy HH:mm'),
     },
     {
       key: 'symbol',
       label: 'Symbole',
-      render: (trade: Trade) => (
-        <Link to={`/trades/${trade.id}`} className="trade-symbol link-symbol">
-          {trade.asset?.symbol || 'N/A'}
+      render: (_value: any, row: Trade) => (
+        <Link to={`/trades/${row?.id || ''}`} className="trade-symbol link-symbol">
+          {row?.asset?.symbol || 'N/A'}
         </Link>
       ),
     },
     {
       key: 'side',
       label: 'Side',
-      render: (trade: Trade) => (
-        <Badge variant={trade.side === 'BUY' ? 'success' : 'danger'}>
-          {trade.side}
+      render: (_value: any, row: Trade) => (
+        <Badge variant={row?.side === 'BUY' ? 'success' : 'danger'}>
+          {row?.side || 'N/A'}
         </Badge>
       ),
     },
@@ -48,25 +48,25 @@ export default function Trades() {
       key: 'size',
       label: 'Taille',
       align: 'right' as const,
-      render: (trade: Trade) => (trade.size || trade.quantity || 0).toFixed(4),
+      render: (_value: any, row: Trade) => (row?.size || row?.quantity || 0).toFixed(4),
     },
     {
       key: 'price',
       label: 'Prix',
       align: 'right' as const,
-      render: (trade: Trade) => formatCurrency(trade.price || 0),
+      render: (_value: any, row: Trade) => formatCurrency(row?.price || 0),
     },
     {
       key: 'total',
       label: 'Total',
       align: 'right' as const,
-      render: (trade: Trade) => formatCurrency((trade.size || trade.quantity || 0) * (trade.price || 0)),
+      render: (_value: any, row: Trade) => formatCurrency((row?.size || row?.quantity || 0) * (row?.price || 0)),
     },
     {
       key: 'fees',
       label: 'Frais',
       align: 'right' as const,
-      render: (trade: Trade) => formatCurrency(trade.fees || 0),
+      render: (_value: any, row: Trade) => formatCurrency(row?.fees || 0),
     },
   ]
 
