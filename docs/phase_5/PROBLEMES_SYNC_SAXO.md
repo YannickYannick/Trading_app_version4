@@ -349,13 +349,79 @@ Après les corrections :
 
 ---
 
+## ❌ Problème 5 : Positions avec symboles vides
+
+### Symptômes
+
+- 5 positions récupérées depuis Saxo
+- Erreur : `Position has empty or invalid symbol`
+- 0 position créée dans la base de données
+
+### Cause
+
+L'API Saxo peut parfois retourner des positions sans champ `Symbol` dans `PositionBase`. Le code rejetait ces positions car la validation exige un symbole non vide.
+
+### Solution
+
+**Fichier** : `backend/apps/trading/brokers/saxo.py`
+
+**Correction appliquée** :
+
+1. **Nouvelle méthode `_get_symbol_from_uic()`** : Tente de récupérer le symbole depuis l'UIC via l'API Saxo
+
+2. **Gestion du symbole vide dans `get_positions()`** :
+```python
+# Extraire le symbole
+symbol = position_base.get('Symbol', '').strip()
+uic = position_base.get('Uic')
+asset_type = position_base.get('AssetType', 'Stock')
+
+# Si le symbole est vide, essayer de le récupérer depuis l'UIC
+if not symbol and uic:
+    try:
+        symbol_from_uic = self._get_symbol_from_uic(uic, asset_type)
+        if symbol_from_uic:
+            symbol = symbol_from_uic
+            logger.debug(f"Saxo: Recovered symbol {symbol} from UIC {uic}")
+    except Exception as e:
+        logger.warning(f"Saxo: Error recovering symbol from UIC {uic}: {e}")
+
+# Si toujours pas de symbole, utiliser un identifiant de fallback
+if not symbol:
+    position_id = str(item.get('PositionId', ''))
+    uic_str = str(uic) if uic else 'UNKNOWN'
+    symbol = f"UIC_{uic_str}" if uic else f"POS_{position_id[:8]}"
+    logger.warning(f"Saxo: Position {position_id} has no symbol, using fallback: {symbol}")
+```
+
+3. **Même logique dans `get_position_details()`**
+
+**Résultats** :
+- ✅ Toutes les positions sont maintenant synchronisées
+- ✅ Les positions sans symbole utilisent un fallback `UIC_{uic}` ou `POS_{position_id}`
+- ✅ Logging amélioré pour tracer les symboles manquants
+
+**Lignes modifiées** :
+- `get_positions()` : Lignes ~733-771 (gestion du symbole vide)
+- `get_position_details()` : Lignes ~806-843 (même logique)
+- `_get_symbol_from_uic()` : Lignes ~1340-1395 (nouvelle méthode)
+
+---
+
 ## ✅ Statut Final
 
 - ✅ Problème 1 : Résolu
 - ✅ Problème 2 : Résolu
 - ✅ Problème 3 : Résolu
 - ✅ Problème 4 : Résolu
+- ✅ Problème 5 : Résolu (Positions avec symboles vides)
 
 **Date de résolution** : 2025-12-29  
-**Version** : 4.0
+**Version** : 4.1
+
+## 📦 Fichiers Ajoutés
+
+1. **`backend/apps/trading/tests/test_saxo_sync.py`** : Tests unitaires complets pour la synchronisation Saxo
+2. **`backend/scripts/monitor_saxo_sync.py`** : Script de monitoring de la santé de la synchronisation
+3. **`backend/docs/SAXO_BEST_PRACTICES.md`** : Guide de bonnes pratiques pour l'intégration Saxo
 

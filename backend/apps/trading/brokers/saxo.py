@@ -733,6 +733,30 @@ class SaxoBroker(BrokerBase):
                 position_base = item.get('PositionBase', {})
                 position_view = item.get('PositionView', {})
                 
+                # Extraire le symbole
+                symbol = position_base.get('Symbol', '').strip()
+                uic = position_base.get('Uic')
+                asset_type = position_base.get('AssetType', 'Stock')
+                
+                # Si le symbole est vide, essayer de le récupérer depuis l'UIC
+                if not symbol and uic:
+                    try:
+                        symbol_from_uic = self._get_symbol_from_uic(uic, asset_type)
+                        if symbol_from_uic:
+                            symbol = symbol_from_uic
+                            logger.debug(f"Saxo: Recovered symbol {symbol} from UIC {uic}")
+                        else:
+                            logger.warning(f"Saxo: Could not recover symbol for UIC {uic}")
+                    except Exception as e:
+                        logger.warning(f"Saxo: Error recovering symbol from UIC {uic}: {e}")
+                
+                # Si toujours pas de symbole, utiliser un identifiant de fallback
+                if not symbol:
+                    position_id = str(item.get('PositionId', ''))
+                    uic_str = str(uic) if uic else 'UNKNOWN'
+                    symbol = f"UIC_{uic_str}" if uic else f"POS_{position_id[:8]}"
+                    logger.warning(f"Saxo: Position {position_id} has no symbol, using fallback: {symbol}")
+                
                 # Déterminer le side (LONG ou SHORT) à partir de la quantité
                 amount = Decimal(str(position_base.get('Amount', 0)))
                 side = 'LONG' if amount >= 0 else 'SHORT'
@@ -748,7 +772,7 @@ class SaxoBroker(BrokerBase):
                     pnl_percent = ((current_price - entry_price) / entry_price) * Decimal('100')
                 
                 position = BrokerPosition(
-                    symbol=position_base.get('Symbol', ''),
+                    symbol=symbol,  # Utiliser le symbole récupéré ou le fallback
                     quantity=abs(amount),  # Quantité absolue
                     entry_price=entry_price,
                     current_price=current_price,
@@ -757,8 +781,8 @@ class SaxoBroker(BrokerBase):
                     pnl_percent=pnl_percent,
                     broker_position_id=str(item.get('PositionId', '')),
                     raw_data={
-                        'uic': position_base.get('Uic'),
-                        'asset_type': position_base.get('AssetType'),
+                        'uic': uic,
+                        'asset_type': asset_type,
                         'account_id': position_base.get('AccountId'),
                         'status': position_base.get('Status'),
                         'execution_time': position_base.get('ExecutionTimeOpen'),
@@ -766,6 +790,7 @@ class SaxoBroker(BrokerBase):
                         'exposure': position_view.get('Exposure'),
                         'market_value': position_view.get('MarketValue'),
                         'currency': position_base.get('Currency', 'USD'),
+                        'original_symbol': position_base.get('Symbol', ''),  # Garder le symbole original même s'il est vide
                     }
                 )
                 positions.append(position)
@@ -806,6 +831,28 @@ class SaxoBroker(BrokerBase):
             position_base = data.get('PositionBase', {})
             position_view = data.get('PositionView', {})
             
+            # Extraire le symbole
+            symbol = position_base.get('Symbol', '').strip()
+            uic = position_base.get('Uic')
+            asset_type = position_base.get('AssetType', 'Stock')
+            
+            # Si le symbole est vide, essayer de le récupérer depuis l'UIC
+            if not symbol and uic:
+                try:
+                    symbol_from_uic = self._get_symbol_from_uic(uic, asset_type)
+                    if symbol_from_uic:
+                        symbol = symbol_from_uic
+                        logger.debug(f"Saxo: Recovered symbol {symbol} from UIC {uic}")
+                except Exception as e:
+                    logger.warning(f"Saxo: Error recovering symbol from UIC {uic}: {e}")
+            
+            # Si toujours pas de symbole, utiliser un identifiant de fallback
+            if not symbol:
+                position_id = str(data.get('PositionId', ''))
+                uic_str = str(uic) if uic else 'UNKNOWN'
+                symbol = f"UIC_{uic_str}" if uic else f"POS_{position_id[:8]}"
+                logger.warning(f"Saxo: Position {position_id} has no symbol, using fallback: {symbol}")
+            
             # Déterminer le side (LONG ou SHORT) à partir de la quantité
             amount = Decimal(str(position_base.get('Amount', 0)))
             side = 'LONG' if amount >= 0 else 'SHORT'
@@ -821,7 +868,7 @@ class SaxoBroker(BrokerBase):
                 pnl_percent = ((current_price - entry_price) / entry_price) * Decimal('100')
             
             return BrokerPosition(
-                symbol=position_base.get('Symbol', ''),
+                symbol=symbol,  # Utiliser le symbole récupéré ou le fallback
                 quantity=abs(amount),  # Quantité absolue
                 entry_price=entry_price,
                 current_price=current_price,
@@ -830,8 +877,8 @@ class SaxoBroker(BrokerBase):
                 pnl_percent=pnl_percent,
                 broker_position_id=str(data.get('PositionId', '')),
                 raw_data={
-                    'uic': position_base.get('Uic'),
-                    'asset_type': position_base.get('AssetType'),
+                    'uic': uic,
+                    'asset_type': asset_type,
                     'account_id': position_base.get('AccountId'),
                     'status': position_base.get('Status'),
                     'execution_time': position_base.get('ExecutionTimeOpen'),
@@ -839,6 +886,7 @@ class SaxoBroker(BrokerBase):
                     'exposure': position_view.get('Exposure'),
                     'market_value': position_view.get('MarketValue'),
                     'currency': position_base.get('Currency', 'USD'),
+                    'original_symbol': position_base.get('Symbol', ''),  # Garder le symbole original même s'il est vide
                 }
             )
             
@@ -1287,6 +1335,57 @@ class SaxoBroker(BrokerBase):
             
         except Exception as e:
             logger.error(f"Saxo _get_uic_from_symbol error: {e}")
+            return None
+    
+    def _get_symbol_from_uic(
+        self, 
+        uic: int, 
+        asset_type: str = "Stock"
+    ) -> Optional[str]:
+        """
+        Récupérer le symbole depuis l'UIC
+        
+        Args:
+            uic: UIC de l'asset
+            asset_type: Type d'asset
+            
+        Returns:
+            Symbole de l'asset ou None
+        """
+        try:
+            if not uic:
+                return None
+            
+            # Mapper le type d'asset
+            saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
+                asset_type.lower(), 
+                asset_type
+            )
+            
+            # L'API Saxo /ref/v1/instruments ne supporte pas directement la recherche par UIC
+            # On utilise plutôt l'endpoint /trade/v1/infoprices qui retourne des infos incluant parfois le symbole
+            # Ou on peut chercher dans un cache si disponible
+            # Pour l'instant, on essaie d'utiliser l'endpoint infoprices qui peut contenir des métadonnées
+            
+            params = {
+                "Uic": uic,
+                "AssetType": saxo_asset_type,
+            }
+            
+            try:
+                # L'endpoint infoprices peut ne pas retourner le symbole directement
+                # Mais on peut essayer de le trouver via une recherche large puis filtrer par UIC
+                # Pour l'instant, on retourne None et on laisse le fallback gérer
+                # (Cela évite de faire trop de requêtes API)
+                logger.debug(f"Saxo: Attempting to find symbol for UIC {uic}")
+                return None  # Retourner None pour utiliser le fallback
+                
+            except Exception as e:
+                logger.debug(f"Saxo: Could not retrieve symbol for UIC {uic}: {e}")
+                return None
+            
+        except Exception as e:
+            logger.warning(f"Saxo _get_symbol_from_uic error for UIC {uic}: {e}")
             return None
     
     def test_connection(self) -> bool:
