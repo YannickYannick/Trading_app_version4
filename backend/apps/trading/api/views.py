@@ -859,6 +859,9 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 # Pour Binance, convertir toutes les balances crypto en EUR
                 from ..utils.binance_balance_converter import get_binance_eur_balance
                 broker = service.get_broker_instance(account)
+                # S'assurer que le broker est authentifié pour récupérer les prix
+                if broker and hasattr(broker, 'is_authenticated') and not broker.is_authenticated():
+                    broker.authenticate()
                 eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
             
@@ -976,6 +979,9 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 # Pour Binance, convertir toutes les balances crypto en EUR
                 from ..utils.binance_balance_converter import get_binance_eur_balance
                 broker = service.get_broker_instance(account)
+                # S'assurer que le broker est authentifié pour récupérer les prix
+                if broker and hasattr(broker, 'is_authenticated') and not broker.is_authenticated():
+                    broker.authenticate()
                 eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
             

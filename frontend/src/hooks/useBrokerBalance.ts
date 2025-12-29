@@ -39,17 +39,26 @@ export const useBrokerBalance = (accountId: number | null): UseBrokerBalanceRetu
       const response = await brokerService.getBalanceEur(accountId)
       
       if (response.success) {
-        setBalanceEur(response.balance_eur)
-        setAllBalances(response.all_balances)
+        // Ne mettre à jour que si on a une valeur valide
+        if (response.balance_eur !== null && response.balance_eur !== undefined) {
+          setBalanceEur(response.balance_eur)
+          setAllBalances(response.all_balances || {})
+          setError(null) // Clear any previous error
+        } else {
+          // Garder la valeur précédente si la nouvelle est invalide
+          console.warn('Received null/undefined balance_eur, keeping previous value')
+        }
       } else {
         setError(response.error || 'Erreur lors de la récupération du solde')
-        setBalanceEur(0)
+        // Ne pas réinitialiser à 0 si on avait déjà une valeur
+        // setBalanceEur(prev => prev !== null ? prev : 0)
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message || 'Erreur de connexion'
       setError(errorMessage)
-      setBalanceEur(0)
-      setAllBalances(null)
+      // Ne pas réinitialiser à 0 en cas d'erreur, garder la dernière valeur valide
+      // setBalanceEur(prev => prev !== null ? prev : 0)
+      console.error('Error fetching balance:', errorMessage)
     } finally {
       setLoading(false)
     }

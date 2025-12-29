@@ -102,12 +102,24 @@ def convert_binance_balances_to_eur(
                 except Exception as e:
                     logger.debug(f"Could not convert {asset_upper} via USDT: {e}")
             
-            # Si toujours pas converti, utiliser une valeur par défaut si disponible
-            if converted_value == 0 and asset_upper in default_rates:
-                rate = default_rates[asset_upper]
-                converted_value = balance * rate
-                converted_balances[asset] = balance
-                logger.warning(f"Used default rate for {asset_upper}: {rate}")
+            # Si toujours pas converti, essayer les taux par défaut pour les paires courantes
+            if converted_value == 0:
+                # Chercher dans les paires EUR directes
+                eur_pair_key = f"{asset_upper}EUR"
+                if eur_pair_key in default_rates:
+                    rate = default_rates[eur_pair_key]
+                    converted_value = balance * rate
+                    converted_balances[asset] = balance
+                    logger.warning(f"Used default rate for {asset_upper} via {eur_pair_key}: {rate}")
+                # Sinon chercher dans conversion_order
+                elif asset_upper in [base for base, _ in conversion_order]:
+                    for base_asset, pair in conversion_order:
+                        if asset_upper == base_asset and pair in default_rates:
+                            rate = default_rates[pair]
+                            converted_value = balance * rate
+                            converted_balances[asset] = balance
+                            logger.warning(f"Used default rate for {asset_upper} via {pair}: {rate}")
+                            break
         
         else:
             # Pas de broker_instance, utiliser les taux par défaut
