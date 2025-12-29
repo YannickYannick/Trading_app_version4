@@ -213,11 +213,32 @@ class AssetSyncService:
                 }
                 
                 # Add broker-specific fields
-                if platform == 'SAXO' and broker_asset.broker_id:
-                    try:
-                        defaults['saxo_uic'] = int(broker_asset.broker_id)
-                    except (ValueError, TypeError):
-                        pass
+                if platform == 'SAXO':
+                    # Récupérer l'UIC depuis broker_id ou raw_data
+                    uic_value = None
+                    
+                    # Essayer depuis broker_id d'abord
+                    if broker_asset.broker_id and broker_asset.broker_id != 'None' and broker_asset.broker_id.strip():
+                        try:
+                            uic_value = int(broker_asset.broker_id)
+                        except (ValueError, TypeError) as e:
+                            logger.debug(f"Could not convert broker_id to int for {broker_asset.symbol}: {broker_asset.broker_id} ({e})")
+                    
+                    # Fallback: vérifier dans raw_data (plus fiable car c'est la valeur brute de l'API)
+                    if uic_value is None and hasattr(broker_asset, 'raw_data') and broker_asset.raw_data:
+                        raw_uic = broker_asset.raw_data.get('uic')
+                        if raw_uic is not None and raw_uic != '':
+                            try:
+                                uic_value = int(raw_uic)
+                                logger.debug(f"Using UIC from raw_data for {broker_asset.symbol}: {uic_value}")
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Could not convert raw_data UIC to int for {broker_asset.symbol}: {raw_uic} ({e})")
+                    
+                    if uic_value is not None:
+                        defaults['saxo_uic'] = uic_value
+                        logger.info(f"✅ UIC trouvé pour {broker_asset.symbol}: saxo_uic={uic_value} (broker_id={broker_asset.broker_id}, raw_data.uic={broker_asset.raw_data.get('uic') if hasattr(broker_asset, 'raw_data') and broker_asset.raw_data else 'N/A'})")
+                    else:
+                        logger.warning(f"⚠️  No valid UIC found for Saxo asset {broker_asset.symbol} (broker_id={broker_asset.broker_id}, raw_data={broker_asset.raw_data if hasattr(broker_asset, 'raw_data') else 'N/A'})")
                 elif platform == 'BINANCE':
                     if hasattr(broker_asset, 'base_asset'):
                         defaults['binance_base_asset'] = broker_asset.base_asset or ''
@@ -232,18 +253,43 @@ class AssetSyncService:
                 if existing:
                     if update_existing:
                         # Update existing asset
+                        old_uic = existing.saxo_uic if hasattr(existing, 'saxo_uic') else None
                         # Exclure symbole_yahoo pour préserver la validation Yahoo existante
                         for key, value in defaults.items():
                             if key != 'symbole_yahoo':
                                 setattr(existing, key, value)
+                                # Log spécifique pour saxo_uic
+                                if key == 'saxo_uic' and value is not None:
+                                    logger.info(f"✅ Setting saxo_uic={value} for existing asset {existing.symbol} (ID: {existing.id}, old_uic={old_uic})")
                         assets_to_update.append(existing)
                 else:
                     # Create new asset
+                    # Pour SAXO, s'assurer que les champs Binance sont des chaînes vides et non None
+                    asset_defaults = defaults.copy()
+                    if platform == 'SAXO':
+                        # Ne pas inclure les champs Binance pour SAXO (seront None par défaut)
+                        # Django utilisera blank=True donc chaîne vide
+                        pass  # On laisse Django gérer avec blank=True
+                    elif platform == 'BINANCE':
+                        # Pour BINANCE, s'assurer que les champs sont présents (déjà dans defaults)
+                        pass
+                    
                     new_asset = AllAssets(
                         symbol=broker_asset.symbol,
                         platform=platform,
-                        **defaults
+                        **asset_defaults
                     )
+                    # Pour SAXO, initialiser explicitement les champs Binance à '' si non présents
+                    if platform == 'SAXO':
+                        if not hasattr(new_asset, 'binance_base_asset') or new_asset.binance_base_asset is None:
+                            new_asset.binance_base_asset = ''
+                        if not hasattr(new_asset, 'binance_quote_asset') or new_asset.binance_quote_asset is None:
+                            new_asset.binance_quote_asset = ''
+                        if not hasattr(new_asset, 'binance_status') or new_asset.binance_status is None:
+                            new_asset.binance_status = ''
+                    
+                    if platform == 'SAXO' and 'saxo_uic' in asset_defaults and asset_defaults['saxo_uic'] is not None:
+                        logger.info(f"✅ Creating new asset {broker_asset.symbol} with saxo_uic={asset_defaults['saxo_uic']}")
                     assets_to_create.append(new_asset)
                     
             except Exception as e:
@@ -254,15 +300,26 @@ class AssetSyncService:
                 logger.warning(f"Error preparing asset for bulk operation: {e}")
         
         # Perform bulk operations in batches
+        # On utilise bulk_create et bulk_update car on a déjà séparé les assets existants des nouveaux
         if assets_to_create:
+            logger.info(f"📦 Creating {len(assets_to_create)} new assets for {platform}")
+            sax_assets_with_uic = [a for a in assets_to_create if hasattr(a, 'saxo_uic') and getattr(a, 'saxo_uic', None) is not None]
+            if sax_assets_with_uic:
+                logger.info(f"   → {len(sax_assets_with_uic)} assets avec saxo_uic dans ce batch")
+            
             for i in range(0, len(assets_to_create), batch_size):
                 batch = assets_to_create[i:i + batch_size]
                 try:
-                    AllAssets.objects.bulk_create(batch, ignore_conflicts=True)
+                    uic_count = sum(1 for a in batch if hasattr(a, 'saxo_uic') and getattr(a, 'saxo_uic', None) is not None)
+                    logger.info(f"   → Bulk creating batch {i//batch_size + 1} ({len(batch)} assets, {uic_count} with UIC)")
+                    
+                    # Utiliser bulk_create directement - on sait que ces assets n'existent pas
+                    # car on les a déjà filtrés avec existing_assets
+                    AllAssets.objects.bulk_create(batch, ignore_conflicts=False)
                     created += len(batch)
                 except Exception as e:
-                    logger.error(f"Error in bulk_create batch: {e}")
-                    # Fallback to individual creates
+                    logger.error(f"Error in bulk_create batch: {e}", exc_info=True)
+                    # Fallback to individual creates en cas d'erreur
                     for asset in batch:
                         try:
                             asset.save()
@@ -274,18 +331,48 @@ class AssetSyncService:
                             })
         
         if assets_to_update and update_existing:
-            # Get fields to update
+            # Get fields to update (dynamically based on what's actually in defaults)
+            # Base fields always updated
             update_fields = ['name', 'asset_type', 'exchange', 'currency', 'is_tradable', 'last_updated']
-            if platform == 'SAXO':
-                update_fields.append('saxo_uic')
-            elif platform == 'BINANCE':
-                update_fields.extend(['binance_base_asset', 'binance_quote_asset', 'binance_status'])
+            
+            # Add platform-specific fields only if they exist in any asset's defaults
+            # Check first asset in batch to see what fields are available
+            if assets_to_update:
+                # Sample first asset to see what fields might need updating
+                sample_asset = assets_to_update[0]
+                if platform == 'SAXO':
+                    # Always include saxo_uic if platform is SAXO (will update to None if not set)
+                    if 'saxo_uic' not in update_fields:
+                        update_fields.append('saxo_uic')
+                elif platform == 'BINANCE':
+                    if hasattr(sample_asset, 'binance_base_asset'):
+                        if 'binance_base_asset' not in update_fields:
+                            update_fields.append('binance_base_asset')
+                    if hasattr(sample_asset, 'binance_quote_asset'):
+                        if 'binance_quote_asset' not in update_fields:
+                            update_fields.append('binance_quote_asset')
+                    if hasattr(sample_asset, 'binance_status'):
+                        if 'binance_status' not in update_fields:
+                            update_fields.append('binance_status')
+            
+            logger.info(f"🔄 Updating {len(assets_to_update)} existing assets for {platform}")
+            logger.debug(f"Bulk update fields for {platform}: {update_fields}")
+            
+            # Compter les assets avec UIC avant update
+            uic_count_before = sum(1 for a in assets_to_update if hasattr(a, 'saxo_uic') and getattr(a, 'saxo_uic', None) is not None)
+            if uic_count_before > 0:
+                logger.info(f"   → {uic_count_before} assets avec saxo_uic à mettre à jour")
             
             for i in range(0, len(assets_to_update), batch_size):
                 batch = assets_to_update[i:i + batch_size]
                 try:
+                    # Log UIC updates before bulk_update
+                    for asset in batch:
+                        if hasattr(asset, 'saxo_uic') and asset.saxo_uic is not None:
+                            logger.info(f"   → Asset {asset.symbol} (ID: {asset.id}) will be updated with saxo_uic={asset.saxo_uic}")
                     AllAssets.objects.bulk_update(batch, update_fields)
                     updated += len(batch)
+                    logger.info(f"   ✅ Bulk updated batch {i//batch_size + 1} ({len(batch)} assets)")
                 except Exception as e:
                     logger.error(f"Error in bulk_update batch: {e}")
                     # Fallback to individual updates
@@ -331,11 +418,32 @@ class AssetSyncService:
         }
         
         # Add broker-specific fields
-        if platform == 'SAXO' and broker_asset.broker_id:
-            try:
-                defaults['saxo_uic'] = int(broker_asset.broker_id)
-            except (ValueError, TypeError):
-                pass
+        if platform == 'SAXO':
+            # Récupérer l'UIC depuis broker_id ou raw_data
+            uic_value = None
+            
+            # Essayer depuis broker_id d'abord
+            if broker_asset.broker_id and broker_asset.broker_id != 'None' and broker_asset.broker_id.strip():
+                try:
+                    uic_value = int(broker_asset.broker_id)
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Could not convert broker_id to int for {broker_asset.symbol}: {broker_asset.broker_id} ({e})")
+            
+            # Fallback: vérifier dans raw_data (plus fiable car c'est la valeur brute de l'API)
+            if uic_value is None and hasattr(broker_asset, 'raw_data') and broker_asset.raw_data:
+                raw_uic = broker_asset.raw_data.get('uic')
+                if raw_uic is not None and raw_uic != '':
+                    try:
+                        uic_value = int(raw_uic)
+                        logger.debug(f"Using UIC from raw_data for {broker_asset.symbol}: {uic_value}")
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Could not convert raw_data UIC to int for {broker_asset.symbol}: {raw_uic} ({e})")
+            
+            if uic_value is not None:
+                defaults['saxo_uic'] = uic_value
+                logger.debug(f"Setting saxo_uic={uic_value} for Saxo asset {broker_asset.symbol}")
+            else:
+                logger.warning(f"No valid UIC found for Saxo asset {broker_asset.symbol} (broker_id={broker_asset.broker_id}, raw_data.uic={broker_asset.raw_data.get('uic') if hasattr(broker_asset, 'raw_data') and broker_asset.raw_data else 'N/A'})")
         
         # Check if exists
         existing = AllAssets.objects.filter(

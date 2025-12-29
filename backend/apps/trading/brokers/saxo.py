@@ -491,22 +491,40 @@ class SaxoBroker(BrokerBase):
             # Convertir en BrokerAsset
             assets = []
             for item in all_items:
+                symbol = item.get('Symbol', '')
+                # Extraire et valider le UIC
+                # L'API /ref/v1/instruments retourne 'Identifier' et non 'Uic'
+                uic_value = item.get('Identifier')  # ✅ CORRECTION: utiliser 'Identifier' au lieu de 'Uic'
+                broker_id = None
+                
+                if uic_value is not None and uic_value != '':
+                    try:
+                        # Convertir en string pour broker_id (doit être valide)
+                        broker_id = str(int(uic_value))  # Valider que c'est un entier valide
+                        logger.debug(f"Saxo: Asset {symbol} - Identifier={uic_value}, broker_id={broker_id}")
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Saxo: Invalid Identifier value for symbol {symbol}: {uic_value} ({e})")
+                        broker_id = None
+                else:
+                    logger.debug(f"Saxo: Asset {symbol} - No Identifier found in response (Identifier={uic_value})")
+                
                 asset = BrokerAsset(
-                    symbol=item.get('Symbol', ''),
+                    symbol=symbol,
                     name=item.get('Description', ''),
                     asset_type=item.get('AssetType', asset_type),
                     exchange=item.get('ExchangeId', ''),
                     currency=item.get('CurrencyCode', 'USD'),
-                    broker_id=str(item.get('Uic', '')),
+                    broker_id=broker_id or '',  # Utiliser chaîne vide si None pour compatibilité
                     is_tradable=item.get('IsTradable', True),
                     raw_data={
-                        'uic': item.get('Uic'),
+                        'identifier': uic_value,  # Conserver la valeur originale de l'API
+                        'uic': uic_value,  # Alias pour compatibilité avec le reste du code
                         'exchange_id': item.get('ExchangeId'),
                         'country_code': item.get('CountryCode'),
+                        'issuer_country': item.get('IssuerCountry'),
                         'primary_listing': item.get('PrimaryListing'),
                         'group_id': item.get('GroupId'),
-                        'lot_size': item.get('LotSize'),
-                        'tick_size': item.get('TickSize'),
+                        'tradable_as': item.get('TradableAs', []),
                     }
                 )
                 assets.append(asset)

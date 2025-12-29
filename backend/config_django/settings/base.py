@@ -2,8 +2,28 @@
 Configuration Django de base (commune à tous les environnements).
 """
 import os
+import logging.handlers
 from pathlib import Path
 from decouple import config
+
+
+class SafeRotatingFileHandler(logging.handlers.RotatingFileHandler):
+    """
+    RotatingFileHandler qui ignore les erreurs de permission sur Windows.
+    
+    Sur Windows, le fichier peut être verrouillé par un autre processus,
+    ce qui empêche la rotation. Cette classe ignore silencieusement ces erreurs.
+    """
+    def doRollover(self):
+        """
+        Fait la rotation du fichier, en ignorant les PermissionError.
+        """
+        try:
+            super().doRollover()
+        except (PermissionError, OSError) as e:
+            # Ignorer les erreurs de permission sur Windows
+            # Le fichier continuera à être écrit, seule la rotation échoue
+            pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -280,7 +300,7 @@ LOGGING = {
         # Fichier principal avec rotation
         'file': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SafeRotatingFileHandler,  # Utiliser le handler personnalisé
             'filename': LOG_DIR / 'django.log',
             'maxBytes': 1024 * 1024 * 10,  # 10 MB
             'backupCount': 5,
@@ -291,7 +311,7 @@ LOGGING = {
         # Fichier d'erreurs
         'error_file': {
             'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SafeRotatingFileHandler,  # Utiliser le handler personnalisé
             'filename': LOG_DIR / 'errors.log',
             'maxBytes': 1024 * 1024 * 10,  # 10 MB
             'backupCount': 10,
@@ -302,7 +322,7 @@ LOGGING = {
         # Fichier pour les brokers
         'broker_file': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SafeRotatingFileHandler,  # Utiliser le handler personnalisé
             'filename': LOG_DIR / 'brokers.log',
             'maxBytes': 1024 * 1024 * 10,  # 10 MB
             'backupCount': 5,
@@ -313,7 +333,7 @@ LOGGING = {
         # Fichier pour la synchronisation
         'sync_file': {
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SafeRotatingFileHandler,  # Utiliser le handler personnalisé
             'filename': LOG_DIR / 'sync.log',
             'maxBytes': 1024 * 1024 * 10,  # 10 MB
             'backupCount': 5,

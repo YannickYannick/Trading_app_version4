@@ -464,11 +464,15 @@ export const brokerService = {
 
   /**
    * Synchroniser les données depuis un broker
+   * Timeout augmenté à 10 minutes pour les synchronisations longues (ex: 20k+ assets)
    */
   async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {
     const response = await apiClient.post<BrokerSyncLog>(
       `/broker-accounts/${accountId}/sync/`,
-      syncRequest
+      syncRequest,
+      {
+        timeout: 180, // 10 minutes (600000 ms) pour les synchronisations longues
+      }
     )
     return response.data
   },
@@ -534,7 +538,13 @@ export const brokerService = {
         y0_matches: number
       }
       error?: string
-    }>('/all-assets/validate-yahoo-symbols/', options || {})
+    }>(
+      '/all-assets/validate-yahoo-symbols/',
+      options || {},
+      {
+        timeout: 600000, // 10 minutes pour la validation Yahoo (peut prendre du temps)
+      }
+    )
     return response.data
   },
 }
