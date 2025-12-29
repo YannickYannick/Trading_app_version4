@@ -15,9 +15,9 @@ export default function Dashboard() {
   const { trades, loading: tradesLoading, statistics } = useTrades()
 
   const stats = useMemo(() => {
-    const totalPnl = positions.reduce((sum, pos) => sum + (pos.pnl || 0), 0)
+    const totalPnl = positions.reduce((sum, pos) => sum + (pos?.pnl || 0), 0)
     const totalValue = positions.reduce(
-      (sum, pos) => sum + (pos.size * (pos.current_price || 0)),
+      (sum, pos) => sum + ((pos?.size || 0) * (pos?.current_price || 0)),
       0
     )
     const winRate = statistics?.win_rate || 0
@@ -45,9 +45,9 @@ export default function Dashboard() {
     {
       key: 'symbol',
       label: 'Symbole',
-      render: (pos: Position) => (
-        <Link to={`/positions/${pos.id}`} className="link-symbol">
-          {pos.asset.symbol}
+      render: (_value: any, row: Position) => (
+        <Link to={`/positions/${row?.id || ''}`} className="link-symbol">
+          {row?.asset?.symbol || 'N/A'}
         </Link>
       ),
     },
@@ -55,27 +55,30 @@ export default function Dashboard() {
       key: 'size',
       label: 'Taille',
       align: 'right' as const,
-      render: (pos: Position) => pos.size.toFixed(4),
+      render: (_value: any, row: Position) => {
+        const size = Number(row?.size || 0)
+        return isNaN(size) ? '0.0000' : size.toFixed(4)
+      },
     },
     {
       key: 'entry_price',
       label: 'Prix d\'entrée',
       align: 'right' as const,
-      render: (pos: Position) => formatCurrency(pos.entry_price),
+      render: (_value: any, row: Position) => formatCurrency(row?.entry_price || 0),
     },
     {
       key: 'current_price',
       label: 'Prix actuel',
       align: 'right' as const,
-      render: (pos: Position) => formatCurrency(pos.current_price),
+      render: (_value: any, row: Position) => formatCurrency(row?.current_price || 0),
     },
     {
       key: 'pnl',
       label: 'P&L',
       align: 'right' as const,
-      render: (pos: Position) => (
-        <Badge variant={(pos.pnl || 0) >= 0 ? 'success' : 'danger'}>
-          {formatCurrency(pos.pnl)}
+      render: (_value: any, row: Position) => (
+        <Badge variant={(row?.pnl || 0) >= 0 ? 'success' : 'danger'}>
+          {formatCurrency(row?.pnl || 0)}
         </Badge>
       ),
     },
@@ -161,7 +164,7 @@ export default function Dashboard() {
           <Table
             columns={positionColumns}
             data={recentPositions}
-            keyExtractor={(pos) => pos.id}
+            keyExtractor={(pos) => pos?.id || ''}
             compact
           />
         ) : (
@@ -187,21 +190,28 @@ export default function Dashboard() {
           className="dashboard-trades-card"
         >
           <div className="trades-list">
-            {trades.slice(0, 5).map((trade) => (
-              <div key={trade.id} className="trade-item">
-                <div className="trade-item-main">
-                  <span className="trade-symbol">{trade.asset.symbol}</span>
-                  <Badge variant={trade.side === 'BUY' ? 'success' : 'danger'}>
-                    {trade.side}
-                  </Badge>
+            {trades.slice(0, 5).map((trade) => {
+              const size = Number(trade?.size || trade?.quantity || 0)
+              return (
+                <div key={trade?.id || Math.random()} className="trade-item">
+                  <div className="trade-item-main">
+                    <span className="trade-symbol">{trade?.asset?.symbol || 'N/A'}</span>
+                    <Badge variant={trade?.side === 'BUY' ? 'success' : 'danger'}>
+                      {trade?.side || 'N/A'}
+                    </Badge>
+                  </div>
+                  <div className="trade-item-details">
+                    <span>{formatCurrency(trade?.price || 0)}</span>
+                    <span className="trade-size">
+                      {isNaN(size) ? '0.0000' : size.toFixed(4)}
+                    </span>
+                    <span className="trade-date">
+                      {formatDate(trade?.timestamp || trade?.executed_at || '', 'dd/MM HH:mm')}
+                    </span>
+                  </div>
                 </div>
-                <div className="trade-item-details">
-                  <span>{formatCurrency(trade.price)}</span>
-                  <span className="trade-size">{trade.size.toFixed(4)}</span>
-                  <span className="trade-date">{formatDate(trade.timestamp, 'dd/MM HH:mm')}</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
       )}
