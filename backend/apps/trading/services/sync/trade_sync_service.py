@@ -206,19 +206,19 @@ class TradeSyncService(BaseSyncService):
             if existing:
                 return {'skipped': True, 'trade_id': existing.id}
         
-        # Find or create asset
-        asset = self._get_or_create_asset(
+        # Find or create AllAsset (source de vérité unique)
+        all_asset = self._get_or_create_all_asset(
             symbol=broker_trade.symbol,
             broker_type=broker_account.get_broker_type(),
         )
         
-        if not asset:
-            raise ValueError(f"Could not find or create asset: {broker_trade.symbol}")
+        if not all_asset:
+            raise ValueError(f"Could not find or create AllAsset: {broker_trade.symbol}")
         
-        # Try to find related position
+        # Try to find related position (utilise all_asset maintenant)
         position = self._find_related_position(
             broker_account=broker_account,
-            asset=asset,
+            all_asset=all_asset,
             trade_type=broker_trade.trade_type,
         )
         
@@ -237,11 +237,11 @@ class TradeSyncService(BaseSyncService):
         else:
             executed_at = timezone.now()
         
-        # Create trade
+        # Create trade (utilise all_asset directement)
         trade = Trade.objects.create(
             user=self.user,
             broker=broker_account.broker,
-            asset=asset,
+            all_asset=all_asset,  # Utiliser AllAssets directement
             position=position,
             trade_type=broker_trade.trade_type,
             quantity=broker_trade.quantity,
@@ -259,7 +259,7 @@ class TradeSyncService(BaseSyncService):
     def _find_related_position(
         self,
         broker_account: BrokerAccount,
-        asset: Asset,
+        all_asset: AllAssets,
         trade_type: str,
     ) -> Optional[Position]:
         """
@@ -267,68 +267,76 @@ class TradeSyncService(BaseSyncService):
         
         Args:
             broker_account: BrokerAccount
-            asset: Asset for the trade
+            all_asset: AllAssets for the trade
             trade_type: 'BUY' or 'SELL'
             
         Returns:
             Position or None
         """
-        # Find open position for this asset
+        # Find open position for this all_asset
         position = Position.objects.filter(
             user=self.user,
-            broker=broker_account.broker,  # Position model uses broker, not broker_account
-            asset=asset,
+            broker=broker_account.broker,
+            all_asset=all_asset,  # Utiliser all_asset directement
             is_open=True,
         ).first()
         
         return position
     
-    def _get_or_create_asset(
+    def _get_or_create_all_asset(
         self,
         symbol: str,
         broker_type: str,
-    ) -> Optional[Asset]:
+    ) -> Optional[AllAssets]:
         """
-        Get or create an asset for the given symbol.
+        Get or create an AllAsset for the given symbol.
+        
+        AllAssets est la source de vérité unique. Si l'asset n'existe pas,
+        on essaie de le créer avec les données minimales.
         
         Args:
             symbol: Asset symbol
-            broker_type: Type of broker
+            broker_type: Type of broker (SAXO, BINANCE, etc.)
             
         Returns:
-            Asset instance or None
+            AllAssets instance or None
         """
-        # First try to find existing asset
-        asset = Asset.objects.filter(symbol=symbol).first()
-        if asset:
-            return asset
-        
-        # Try to find in AllAssets
         platform = broker_type.upper()
+        
+        # Chercher dans AllAssets avec (symbol, platform) unique
         all_asset = AllAssets.objects.filter(
             symbol=symbol,
             platform=platform,
         ).first()
         
         if all_asset:
-            asset = Asset.objects.create(
-                all_asset=all_asset,
-                symbol=all_asset.symbol,
-                name=all_asset.name,
-                asset_type=all_asset.asset_type,
-                currency=all_asset.currency,
-            )
-            return asset
+            return all_asset
         
-        # Create basic asset
-        asset = Asset.objects.create(
-            symbol=symbol,
-            name=symbol,
-            asset_type='UNKNOWN',
-            currency='USD',
+        # Si pas trouvé, créer un AllAsset minimal
+        # L'utilisateur devra lancer une sync AllAssets pour enrichir les données
+        self.logger.warning(
+            f"AllAsset not found for {symbol} ({platform}). "
+            f"Creating minimal AllAsset. Consider running asset sync first."
         )
         
-        return asset
+        try:
+            all_asset = AllAssets.objects.create(
+                symbol=symbol,
+                name=symbol,  # Nom par défaut = symbol
+                platform=platform,
+                asset_type='UNKNOWN',
+                market='',
+                currency='USD',
+                is_tradable=True,
+            )
+            self.logger.info(f"Created minimal AllAsset for {symbol} ({platform})")
+            return all_asset
+        except Exception as e:
+            self.logger.error(
+                f"Failed to create AllAsset for {symbol} ({platform}): {str(e)}",
+                exc_info=True
+            )
+            return None
     
     def _filter_trades_by_date(
         self,

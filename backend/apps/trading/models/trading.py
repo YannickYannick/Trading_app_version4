@@ -105,9 +105,25 @@ class Trade(TimeStampedModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='trades'
     )
-    asset = models.ForeignKey(
-        'Asset', on_delete=models.CASCADE, related_name='trades'
+    
+    # ForeignKey DIRECT vers AllAssets (source de vérité)
+    all_asset = models.ForeignKey(
+        'AllAssets',
+        on_delete=models.CASCADE,
+        related_name='trades',
+        help_text="Asset depuis le catalogue universel AllAssets"
     )
+    
+    # Asset devient optionnel (pour compatibilité et enrichissement futur)
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='trades',
+        help_text="Asset enrichi optionnel (pour données supplémentaires)"
+    )
+    
     broker = models.ForeignKey(
         'Broker', on_delete=models.CASCADE, related_name='trades'
     )
@@ -132,7 +148,8 @@ class Trade(TimeStampedModel):
         verbose_name_plural = 'Trades'
     
     def __str__(self):
-        return f"{self.trade_type} {self.quantity} {self.asset.symbol} @ {self.price}"
+        symbol = self.all_asset.symbol if self.all_asset else (self.asset.symbol if self.asset else 'Unknown')
+        return f"{self.trade_type} {self.quantity} {symbol} @ {self.price}"
     
     @property
     def total_value(self):

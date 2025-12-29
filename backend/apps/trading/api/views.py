@@ -566,7 +566,7 @@ class TradeViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
     
     filterset_fields = ['trade_type', 'broker', 'asset']
-    search_fields = ['asset__symbol', 'broker_trade_id']
+    search_fields = ['all_asset__symbol', 'all_asset__name', 'asset__symbol', 'broker_trade_id']
     ordering_fields = ['executed_at', 'price', 'quantity']
     ordering = ['-executed_at']
     
