@@ -626,7 +626,11 @@ class AssetSyncService:
         broker_type = broker_account.get_broker_type().upper()
         if broker_type == 'SAXO':
             if 'environment' not in credentials:
-                credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
+                # ✅ MIGRATION: Utiliser saxo_environment si disponible, sinon basé sur is_sandbox
+                if hasattr(broker_account, 'saxo_environment') and broker_account.saxo_environment:
+                    credentials['environment'] = broker_account.saxo_environment
+                else:
+                    credentials['environment'] = 'simulation' if broker_account.is_sandbox else 'live'
         elif broker_type == 'BINANCE':
             if 'testnet' not in credentials:
                 credentials['testnet'] = broker_account.is_sandbox or broker_account.binance_testnet

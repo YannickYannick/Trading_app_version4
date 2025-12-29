@@ -118,7 +118,8 @@ class SaxoBroker(BrokerBase):
             self.redirect_uri = 'http://localhost:8080/callback'
         
         # Environnement (live ou simulation)
-        environment = credentials.get('environment', 'simulation')
+        # ✅ MIGRATION: Défaut changé de 'simulation' vers 'live'
+        environment = credentials.get('environment', 'live')
         if environment == 'live':
             self.base_url = "https://gateway.saxobank.com/openapi"
             self.auth_url = "https://live.logonvalidation.net"

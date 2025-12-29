@@ -136,8 +136,9 @@ class BrokerService:
             credentials['account_id'] = broker_account.account_id
         
         # S'assurer que l'environnement est défini
+        # ✅ MIGRATION: Défaut changé de 'simulation' vers 'live'
         if 'environment' not in credentials:
-            credentials['environment'] = broker_account.environment or 'simulation'
+            credentials['environment'] = broker_account.environment or 'live'
         
         return credentials
     

@@ -75,7 +75,7 @@ class BrokerAccount(TimeStampedModel):
     environment = models.CharField(
         max_length=20, 
         choices=ENVIRONMENT_CHOICES, 
-        default='simulation',
+        default='live',  # ✅ MIGRATION: Défaut changé de 'simulation' vers 'live'
         help_text="Environnement de trading (Live ou Simulation)"
     )
     
@@ -91,7 +91,7 @@ class BrokerAccount(TimeStampedModel):
     saxo_environment = models.CharField(
         max_length=20,
         choices=[('live', 'Live'), ('simulation', 'Simulation')],
-        default='simulation',
+        default='live',  # ✅ MIGRATION: Défaut changé de 'simulation' vers 'live'
         verbose_name="Environnement Saxo"
     )
     saxo_access_token = models.TextField(blank=True, null=True)
@@ -193,7 +193,8 @@ class BrokerAccount(TimeStampedModel):
                 'access_token': self.saxo_access_token or self.access_token,
                 'refresh_token': self.saxo_refresh_token or self.refresh_token,
                 'token_expires_at': self.saxo_token_expires_at or self.token_expires_at,
-                'environment': self.environment or (self.saxo_environment if hasattr(self, 'saxo_environment') else 'simulation'),
+                # ✅ MIGRATION: Pour Saxo, privilégier saxo_environment, sinon environment, sinon défaut 'live'
+                'environment': (self.saxo_environment if hasattr(self, 'saxo_environment') and self.saxo_environment else None) or self.environment or 'live',
             }
         elif broker_type == 'BINANCE':
             return {

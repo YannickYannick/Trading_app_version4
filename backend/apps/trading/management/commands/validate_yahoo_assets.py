@@ -262,7 +262,8 @@ class Command(BaseCommand):
             if saxo_env == 'live':
                 config['base_url'] = 'https://gateway.saxobank.com/openapi'
             else:
-                config['base_url'] = 'https://gateway.saxobank.com/sim/openapi'
+                # ✅ MIGRATION: Fallback changé de SIM vers LIVE
+                config['base_url'] = 'https://gateway.saxobank.com/openapi'
         
         elif broker == 'BINANCE':
             # Binance n'a pas besoin de token pour les prix publics

@@ -174,7 +174,8 @@ def get_saxo_price(
     access_token: str, 
     uic: int, 
     asset_type: str = "Stock",
-    base_url: str = "https://gateway.saxobank.com/sim/openapi"
+    # ✅ MIGRATION: URL changée de SIM vers LIVE
+    base_url: str = "https://gateway.saxobank.com/openapi"
 ) -> Optional[float]:
     """
     Récupère le prix actuel depuis l'API Saxo Bank.
@@ -218,12 +219,11 @@ def get_saxo_price(
             # Log pour débogage
             logger.debug(f"Saxo API response for UIC {uic}: {str(data)[:500]}")
             
+            # ✅ CORRECTION: L'API LIVE retourne directement {"Quote": {...}} avec Mid, Bid, Ask
             # L'API peut retourner soit {"Data": [...]} soit directement l'objet avec Quote
-            # Format observé : structure directe {"Quote": {...}, "Uic": ..., "PriceSource": ...}
             
             quote = None
             price_info = None
-            data_items = None
             
             # Vérifier si c'est un tableau Data
             if "Data" in data:
@@ -233,7 +233,7 @@ def get_saxo_price(
                     quote = first_item.get("Quote", {})
                     price_info = first_item.get("PriceInfo", {})
             
-            # Sinon, structure directe (format observé dans les tests)
+            # Sinon, structure directe (format observé en LIVE et parfois en SIM)
             if not quote:
                 quote = data.get("Quote", {})
                 price_info = data.get("PriceInfo", {})
@@ -246,20 +246,29 @@ def get_saxo_price(
             price_type_ask = quote.get("PriceTypeAsk", "")
             price_type_bid = quote.get("PriceTypeBid", "")
             if price_type_ask == "NoAccess" and price_type_bid == "NoAccess":
-                logger.debug(f"Price access denied for UIC {uic}: PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid}")
-                # Même si l'accès est refusé, essayer d'utiliser Amount s'il est > 0
+                logger.warning(f"Price access denied for UIC {uic}: PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid}")
+                # En LIVE, NoAccess signifie généralement que les permissions Market Data ne sont pas activées
+                # ou que l'instrument n'est pas disponible
+                return None
             
-            # Format 1: Mid, Bid, Ask (quand disponible avec FieldGroups appropriés)
+            # ✅ PRIORITÉ: Mid > Bid > Ask (format standard de l'API LIVE)
+            # En LIVE, ces champs sont directement disponibles dans Quote
             price = quote.get("Mid") or quote.get("Bid") or quote.get("Ask")
             
-            # Format 2: Amount (mais peut être 0 si pas d'accès)
-            if not price and "Amount" in quote:
+            if price:
+                logger.debug(f"Saxo price found for UIC {uic}: {price} (Mid={quote.get('Mid')}, Bid={quote.get('Bid')}, Ask={quote.get('Ask')})")
+                return float(price)
+            
+            # Format alternatif: Amount (pour certains types d'instruments)
+            if "Amount" in quote:
                 amount = quote.get("Amount")
-                if amount and amount > 0:
+                # Amount peut être un montant nominal (ex: 10000 pour EURUSD)
+                # Ne pas utiliser Amount comme prix sauf indication contraire
+                if amount and amount > 0 and amount != 10000:  # 10000 est souvent un nominal, pas un prix
                     logger.debug(f"Using Amount field for UIC {uic}: {amount}")
                     return float(amount)
             
-            # Format 3: Utiliser PriceInfo si disponible
+            # Format PriceInfo si disponible
             if not price and price_info:
                 price = price_info.get("LastTraded") or price_info.get("Bid") or price_info.get("Ask")
                 if price:
@@ -267,7 +276,11 @@ def get_saxo_price(
                     return float(price)
             
             # Log détaillé pour débogage
-            logger.warning(f"No price found for UIC {uic} (Amount={quote.get('Amount')}, PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid})")
+            logger.warning(
+                f"No price found for UIC {uic} "
+                f"(Mid={quote.get('Mid')}, Bid={quote.get('Bid')}, Ask={quote.get('Ask')}, "
+                f"Amount={quote.get('Amount')}, PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid})"
+            )
             return None
         else:
             error_text = response.text[:500] if hasattr(response, 'text') else 'No response text'
@@ -442,7 +455,8 @@ def validate_single_asset(
                 access_token=access_token,
                 uic=asset.saxo_uic,
                 asset_type=asset_type_for_request,
-                base_url=broker_config.get('base_url', 'https://gateway.saxobank.com/sim/openapi')
+                # ✅ MIGRATION: Fallback changé de SIM vers LIVE
+                base_url=broker_config.get('base_url', 'https://gateway.saxobank.com/openapi')
             )
             if ref_price is None:
                 logger.warning(f"Asset {asset.symbol}: Failed to get Saxo price for UIC {asset.saxo_uic}")

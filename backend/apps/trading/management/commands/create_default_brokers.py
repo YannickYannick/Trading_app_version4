@@ -13,7 +13,8 @@ class Command(BaseCommand):
             {
                 'name': 'Saxo Bank',
                 'broker_type': Broker.BrokerType.SAXO,
-                'api_base_url': 'https://gateway.saxobank.com/sim/openapi',
+                # ✅ MIGRATION: URL changée de SIM vers LIVE
+                'api_base_url': 'https://gateway.saxobank.com/openapi',
                 'api_version': 'v1',
                 'is_active': True,
                 'supports_stocks': True,

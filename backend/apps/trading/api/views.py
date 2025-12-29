@@ -249,7 +249,8 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                                 # Fallback: utiliser le token stocké directement (peut être expiré)
                                 if saxo_account.saxo_access_token:
                                     broker_config['access_token'] = saxo_account.saxo_access_token
-                                    broker_config['base_url'] = 'https://gateway.saxobank.com/sim/openapi'
+                                    # ✅ MIGRATION: Fallback changé de SIM vers LIVE
+                                    broker_config['base_url'] = 'https://gateway.saxobank.com/openapi'
                                     logger.debug(f"Using stored Saxo token (may be expired)")
                     
                     # Utiliser validate_single_asset
