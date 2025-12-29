@@ -113,9 +113,38 @@ export default function YahooValidationModal({
         'La validation est en cours. Êtes-vous sûr de vouloir fermer?'
       )
       if (!confirmed) return
+      // Arrêter la validation si confirmé
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      setIsValidating(false)
     }
+    // Réinitialiser l'état quand on ferme
+    setStatus('idle')
+    setProgress(0)
+    setCurrent(0)
+    setTotal(0)
+    setError(null)
+    setResult(null)
+    setIsValidating(false)
+    startTimeRef.current = null
     onClose()
   }
+
+  // Réinitialiser l'état quand le modal s'ouvre
+  useEffect(() => {
+    if (isOpen && status !== 'running') {
+      setStatus('idle')
+      setProgress(0)
+      setCurrent(0)
+      setTotal(0)
+      setError(null)
+      setResult(null)
+      setIsValidating(false)
+      startTimeRef.current = null
+    }
+  }, [isOpen]) // Se déclenche quand isOpen change
 
   useEffect(() => {
     return () => {
