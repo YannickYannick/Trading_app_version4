@@ -90,6 +90,11 @@ class BinanceBroker(BrokerBase):
         # Cache for exchange info
         self._exchange_info: Optional[Dict] = None
         self._exchange_info_updated: Optional[datetime] = None
+        
+        # Cache pour synchronisation timestamp Binance
+        self._server_time_offset: Optional[int] = None  # Offset en ms entre local et Binance
+        self._server_time_cache: Optional[int] = None  # Timestamp Binance mis en cache
+        self._server_time_cache_time: Optional[float] = None  # Quand le cache a été créé (local time)
     
     # ============================================
     # AUTHENTICATION
@@ -168,7 +173,9 @@ class BinanceBroker(BrokerBase):
             params = {}
         
         if signed:
-            params['timestamp'] = int(time.time() * 1000)
+            # Utiliser le timestamp Binance pour éviter les erreurs de synchronisation
+            timestamp = self._get_binance_timestamp()
+            params['timestamp'] = timestamp
             params['signature'] = self._sign_params(params)
         
         try:
@@ -210,6 +217,62 @@ class BinanceBroker(BrokerBase):
         except requests.exceptions.RequestException as e:
             self._set_error(f"Request error: {str(e)}")
             return None
+    
+    def _get_binance_timestamp(self) -> int:
+        """
+        Récupère le timestamp Binance, en utilisant le cache si disponible.
+        
+        Binance rejette les requêtes si le timestamp est en avance de plus de 1000ms.
+        Cette méthode synchronise avec le serveur Binance pour éviter ce problème.
+        
+        Returns:
+            Timestamp Binance en millisecondes
+        """
+        current_local_time = time.time()
+        
+        # Si on a un cache récent (< 30 secondes), l'utiliser
+        if (self._server_time_cache is not None and 
+            self._server_time_cache_time is not None and
+            current_local_time - self._server_time_cache_time < 30):
+            # Calculer le timestamp Binance en appliquant l'offset
+            local_ms = int(current_local_time * 1000)
+            binance_timestamp = local_ms + (self._server_time_offset or 0)
+            logger.debug(f"Using cached Binance timestamp: {binance_timestamp} (offset: {self._server_time_offset}ms)")
+            return binance_timestamp
+        
+        # Sinon, récupérer le serveur time de Binance
+        try:
+            response = self._make_request('GET', '/api/v3/time', signed=False)
+            if response and 'serverTime' in response:
+                server_time = response['serverTime']
+                local_ms = int(current_local_time * 1000)
+                
+                # Calculer l'offset entre local et Binance
+                self._server_time_offset = server_time - local_ms
+                self._server_time_cache = server_time
+                self._server_time_cache_time = current_local_time
+                
+                logger.debug(
+                    f"Binance server time synced: server={server_time}, local={local_ms}, "
+                    f"offset={self._server_time_offset}ms"
+                )
+                
+                # Si l'offset est trop grand (> 5000ms), logger un warning
+                if abs(self._server_time_offset) > 5000:
+                    logger.warning(
+                        f"Large time offset detected: {self._server_time_offset}ms. "
+                        f"Consider synchronizing system clock."
+                    )
+                
+                return server_time
+            else:
+                logger.warning("Could not get Binance server time, using local time")
+                # Fallback: utiliser local time - 1000ms pour compenser une éventuelle avance
+                return int(current_local_time * 1000) - 1000
+        except Exception as e:
+            logger.warning(f"Error getting Binance server time: {e}, using local time - offset")
+            # Fallback: utiliser local time - 1000ms pour compenser une éventuelle avance
+            return int(current_local_time * 1000) - 1000
     
     def _sign_params(self, params: Dict) -> str:
         """Sign parameters with HMAC SHA256."""
