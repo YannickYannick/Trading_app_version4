@@ -896,6 +896,63 @@ class SaxoBroker(BrokerBase):
     
     # ==================== Trades ====================
     
+    def get_transactions(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: int = 10000,
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """
+        Récupérer l'historique des transactions depuis hist/v1/transactions.
+        
+        Cet endpoint fournit un niveau de détail supérieur à hist/v3/positions
+        et permet de reconstruire les positions avec plus de précision.
+        
+        Args:
+            from_date: Date de début (format ISO, optionnel)
+            to_date: Date de fin (format ISO, optionnel)
+            limit: Nombre maximum de transactions à récupérer
+            
+        Returns:
+            Liste de transactions brutes depuis l'API Saxo
+        """
+        try:
+            # Récupérer les clés nécessaires
+            keys = self._get_account_keys()
+            
+            params = {
+                "$top": min(limit, 10000),  # Limite max de l'API
+            }
+            
+            if keys.get('client_key'):
+                params['ClientKey'] = keys['client_key']
+            if keys.get('account_key'):
+                params['AccountKey'] = keys['account_key']
+            
+            if from_date:
+                params['FromDate'] = from_date
+            if to_date:
+                params['ToDate'] = to_date
+            
+            # ClientKey est requis par l'API Saxo
+            if not params.get('ClientKey'):
+                logger.warning("ClientKey is required for transactions but not available")
+            
+            # Récupérer les transactions
+            data = self._make_request('GET', '/hist/v1/transactions', params=params)
+            
+            transactions = data.get('Data', [])
+            
+            logger.info(f"Saxo: Retrieved {len(transactions)} transactions")
+            return transactions
+            
+        except BrokerError:
+            raise
+        except Exception as e:
+            logger.error(f"Saxo get_transactions error: {e}")
+            raise BrokerAPIError(f"Failed to get transactions: {e}")
+    
     def get_trades(self, limit: int = 50, **kwargs) -> List[BrokerTrade]:
         """
         Récupérer l'historique des trades

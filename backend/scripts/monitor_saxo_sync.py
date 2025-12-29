@@ -118,7 +118,9 @@ def check_saxo_sync_health():
 
             for pos in positions:
 
-                pnl_sign = "+" if pos.pnl >= 0 else ""
+                pnl = pos.pnl if pos.pnl is not None else 0
+                pnl_percent = pos.pnl_percent if pos.pnl_percent is not None else 0
+                pnl_sign = "+" if pnl >= 0 else ""
 
                 print(f"  - {pos.asset.symbol:8} {pos.side:5} "
 
@@ -126,9 +128,9 @@ def check_saxo_sync_health():
 
                       f"entry={pos.entry_price:8.2f} "
 
-                      f"current={pos.current_price:8.2f} "
+                      f"current={pos.current_price or 0:8.2f} "
 
-                      f"PnL={pnl_sign}{pos.pnl:.2f} ({pnl_sign}{pos.pnl_percent:.2f}%)")
+                      f"PnL={pnl_sign}{pnl:.2f} ({pnl_sign}{pnl_percent:.2f}%)")
 
         else:
 
