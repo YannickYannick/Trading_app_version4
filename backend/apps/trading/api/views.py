@@ -979,16 +979,10 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             account.saxo_access_token = token_data['access_token']
             account.saxo_refresh_token = token_data.get('refresh_token')
             if token_data.get('token_expires_at'):
-                from datetime import datetime
-                try:
-                    account.saxo_token_expires_at = datetime.fromisoformat(
-                        token_data['token_expires_at'].replace('Z', '+00:00')
-                    )
-                except ValueError:
-                    # Si le format est différent, essayer sans timezone
-                    account.saxo_token_expires_at = datetime.fromisoformat(
-                        token_data['token_expires_at'].replace('Z', '')
-                    )
+                from ..utils.token_utils import parse_iso_datetime
+                account.saxo_token_expires_at = parse_iso_datetime(
+                    token_data['token_expires_at']
+                )
             account.save(update_fields=['saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at'])
             
             # Nettoyer le state de la session
@@ -1037,19 +1031,15 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             
             if success:
                 # Sauvegarder les nouveaux tokens
+                from ..utils.token_utils import parse_iso_datetime
+                
                 account.saxo_access_token = broker.access_token
                 if broker.refresh_token:
                     account.saxo_refresh_token = broker.refresh_token
                 if broker.token_expires_at:
-                    from datetime import datetime
-                    try:
-                        account.saxo_token_expires_at = datetime.fromisoformat(
-                            broker.token_expires_at.replace('Z', '+00:00')
-                        )
-                    except ValueError:
-                        account.saxo_token_expires_at = datetime.fromisoformat(
-                            broker.token_expires_at.replace('Z', '')
-                        )
+                    account.saxo_token_expires_at = parse_iso_datetime(
+                        broker.token_expires_at
+                    )
                 account.save(update_fields=['saxo_access_token', 'saxo_refresh_token', 'saxo_token_expires_at'])
                 
                 return Response({

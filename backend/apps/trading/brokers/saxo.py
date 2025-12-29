@@ -172,14 +172,13 @@ class SaxoBroker(BrokerBase):
         
         if self.token_expires_at:
             try:
-                if isinstance(self.token_expires_at, str):
-                    expires_at = datetime.fromisoformat(self.token_expires_at.replace('Z', '+00:00'))
-                else:
-                    expires_at = self.token_expires_at
-                
-                # Ajouter une marge de 5 minutes
-                if datetime.now(expires_at.tzinfo) >= expires_at - timedelta(minutes=5):
-                    return False
+                from ..utils.token_utils import parse_iso_datetime
+                expires_at = parse_iso_datetime(self.token_expires_at)
+                if expires_at:
+                    # Ajouter une marge de 5 minutes
+                    now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.now()
+                    if now >= expires_at - timedelta(minutes=5):
+                        return False
             except (ValueError, TypeError) as e:
                 logger.warning(f"Could not parse token expiry: {e}")
                 return False

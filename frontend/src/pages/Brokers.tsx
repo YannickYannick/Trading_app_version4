@@ -30,6 +30,7 @@ export default function Brokers() {
   const [isSaxoOAuthModalOpen, setIsSaxoOAuthModalOpen] = useState(false)
   const [isSaxoTransactionsModalOpen, setIsSaxoTransactionsModalOpen] = useState(false)
   const [accountToDelete, setAccountToDelete] = useState<BrokerAccount | null>(null)
+  const [refreshingTokens, setRefreshingTokens] = useState<Set<number>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'>('ALL')
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
@@ -104,6 +105,40 @@ export default function Brokers() {
       refetch()
     } catch (err: any) {
       alert(`Erreur: ${err.error || err.message}`)
+    }
+  }
+
+  const handleRefreshToken = async (account: BrokerAccount) => {
+    if (account.broker_type !== 'SAXO') {
+      alert('Le refresh de token est uniquement disponible pour Saxo Bank')
+      return
+    }
+
+    setRefreshingTokens((prev) => new Set(prev).add(account.id))
+
+    try {
+      const updatedAccount = await brokerService.refreshSaxoToken(account.id)
+      alert(
+        `✅ Token rafraîchi avec succès!\n${
+          updatedAccount.saxo_token_expires_at
+            ? `Expire le: ${new Date(updatedAccount.saxo_token_expires_at).toLocaleString('fr-FR')}`
+            : ''
+        }`
+      )
+      refetch()
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Erreur lors du rafraîchissement du token'
+      alert(`❌ Erreur: ${errorMsg}`)
+    } finally {
+      setRefreshingTokens((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(account.id)
+        return newSet
+      })
     }
   }
 
@@ -256,6 +291,15 @@ export default function Brokers() {
                       title="Voir les transactions Saxo"
                     >
                       📊 Transactions
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="info"
+                      onClick={() => handleRefreshToken(account)}
+                      disabled={refreshingTokens.has(account.id)}
+                      title="Rafraîchir le token d'accès Saxo"
+                    >
+                      {refreshingTokens.has(account.id) ? '🔄...' : '🔄 Refresh Token'}
                     </Button>
                   </>
                 )}
