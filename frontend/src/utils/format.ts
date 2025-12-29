@@ -31,7 +31,13 @@ export function formatPercent(
 ): string {
   if (value === null || value === undefined) return '-'
   
-  return `${value >= 0 ? '+' : ''}${value.toFixed(decimals)}%`
+  // Convertir en nombre si ce n'est pas déjà le cas
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+  
+  // Vérifier si c'est un nombre valide
+  if (isNaN(numValue) || !isFinite(numValue)) return '-'
+  
+  return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(decimals)}%`
 }
 
 /**

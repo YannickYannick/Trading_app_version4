@@ -292,8 +292,8 @@ export default function Positions() {
                 </div>
                 <div>
                   <span className="detail-label">P&L %</span>
-                  <span className={`detail-value ${selectedPosition.pnl_percent >= 0 ? 'positive' : 'negative'}`}>
-                    {formatPercent(selectedPosition.pnl_percent)}
+                  <span className={`detail-value ${(selectedPosition.pnl_percent || 0) >= 0 ? 'positive' : 'negative'}`}>
+                    {formatPercent(selectedPosition.pnl_percent || 0)}
                   </span>
                 </div>
               </div>
