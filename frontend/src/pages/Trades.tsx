@@ -48,7 +48,10 @@ export default function Trades() {
       key: 'size',
       label: 'Taille',
       align: 'right' as const,
-      render: (_value: any, row: Trade) => (row?.size || row?.quantity || 0).toFixed(4),
+      render: (_value: any, row: Trade) => {
+        const size = Number(row?.size || row?.quantity || 0)
+        return isNaN(size) ? '0.0000' : size.toFixed(4)
+      },
     },
     {
       key: 'price',
@@ -100,8 +103,8 @@ export default function Trades() {
             {statistics && (
               <>
                 {' • '}
-                <span className={statistics.win_rate >= 50 ? 'positive' : 'negative'}>
-                  {statistics.win_rate.toFixed(1)}% de réussite
+                <span className={(statistics.win_rate || 0) >= 50 ? 'positive' : 'negative'}>
+                  {(statistics.win_rate || 0).toFixed(1)}% de réussite
                 </span>
               </>
             )}
@@ -133,19 +136,19 @@ export default function Trades() {
         <div className="trades-statistics">
           <Card className="stat-card">
             <h3>Volume Total</h3>
-            <p className="stat-value">{formatCurrency(statistics.total_volume)}</p>
+            <p className="stat-value">{formatCurrency(statistics.total_volume || 0)}</p>
           </Card>
           <Card className="stat-card">
             <h3>Frais Totaux</h3>
-            <p className="stat-value">{formatCurrency(statistics.total_fees)}</p>
+            <p className="stat-value">{formatCurrency(statistics.total_fees || 0)}</p>
           </Card>
           <Card className="stat-card">
             <h3>Achats</h3>
-            <p className="stat-value">{statistics.buy_trades}</p>
+            <p className="stat-value">{statistics.buy_trades || 0}</p>
           </Card>
           <Card className="stat-card">
             <h3>Ventes</h3>
-            <p className="stat-value">{statistics.sell_trades}</p>
+            <p className="stat-value">{statistics.sell_trades || 0}</p>
           </Card>
         </div>
       )}
@@ -186,7 +189,7 @@ export default function Trades() {
           <Table
             columns={columns}
             data={trades}
-            keyExtractor={(trade) => trade.id}
+            keyExtractor={(trade) => trade?.id || ''}
           />
         ) : (
           <div className="empty-state">
