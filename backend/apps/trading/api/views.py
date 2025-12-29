@@ -446,7 +446,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
     
     filterset_fields = ['is_open', 'side', 'broker', 'strategy']
-    search_fields = ['asset__symbol', 'asset__name']
+    search_fields = ['all_asset__symbol', 'all_asset__name', 'asset__symbol', 'asset__name']
     ordering_fields = ['opened_at', 'entry_price', 'quantity']
     ordering = ['-opened_at']
     

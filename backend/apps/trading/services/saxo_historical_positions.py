@@ -191,3 +191,4 @@ class SaxoHistoricalPositionsService:
             'worst_trade': float(min((p.net_pnl for p in positions), default=0)),
         }
 
+

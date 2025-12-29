@@ -208,30 +208,44 @@ class StrategyNestedSerializer(serializers.ModelSerializer):
 
 class PositionSerializer(serializers.ModelSerializer):
     """
-    Serializer pour les positions.
+    Serializer pour Position.
     
-    Inclut les infos de l'asset, broker et stratégie.
-    Calcule automatiquement le P&L.
+    Utilise AllAssets comme source de vérité principale.
+    Asset est optionnel (pour enrichissement futur).
     """
-    # Relations imbriquées (lecture)
-    asset = AssetNestedSerializer(read_only=True)
+    # Champs depuis AllAssets (source de vérité)
+    all_asset = AllAssetsSerializer(read_only=True)
+    all_asset_id = serializers.IntegerField(write_only=True, required=False)
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    all_asset_platform = serializers.CharField(source='all_asset.platform', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+    
+    # Relations imbriquées (lecture) - Asset optionnel pour compatibilité
+    asset = AssetNestedSerializer(read_only=True, allow_null=True)
     broker_name = serializers.CharField(source='broker.name', read_only=True)
-    strategy = StrategyNestedSerializer(read_only=True)
+    strategy = StrategyNestedSerializer(read_only=True, allow_null=True)
     
     # IDs pour création/modification
-    asset_id = serializers.IntegerField(write_only=True, required=False)
+    asset_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     broker_id = serializers.IntegerField(write_only=True, required=False)
-    strategy_id = serializers.IntegerField(write_only=True, required=False)
+    strategy_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     # Champs calculés (propriétés du modèle)
     pnl = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
     pnl_percent = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
+    # Champ symbol pour compatibilité (utilise all_asset en priorité)
+    symbol = serializers.SerializerMethodField()
+    
     class Meta:
         model = Position
         fields = [
             'id', 
-            # Relations
+            # Relations AllAssets (principal)
+            'all_asset', 'all_asset_id', 'all_asset_symbol', 'all_asset_name', 
+            'all_asset_platform', 'all_asset_yahoo_symbol',
+            # Relations Asset (optionnel, compatibilité)
             'asset', 'asset_id',
             'broker_name', 'broker_id',
             'strategy', 'strategy_id',
@@ -240,9 +254,17 @@ class PositionSerializer(serializers.ModelSerializer):
             'stop_loss', 'take_profit', 'is_open',
             'opened_at', 'closed_at',
             # Calculés
-            'pnl', 'pnl_percent'
+            'symbol', 'pnl', 'pnl_percent'
         ]
         read_only_fields = ['id', 'opened_at', 'pnl', 'pnl_percent']
+    
+    def get_symbol(self, obj):
+        """Retourne le symbol depuis all_asset (ou asset en fallback)."""
+        if obj.all_asset:
+            return obj.all_asset.symbol
+        elif obj.asset:
+            return obj.asset.symbol
+        return None
     
     def validate_quantity(self, value):
         """Valider que la quantité est positive."""

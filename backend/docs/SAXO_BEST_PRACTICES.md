@@ -445,3 +445,4 @@ En suivant ces bonnes pratiques, vous éviterez les erreurs courantes d'intégra
 
 **Dernière mise à jour** : 2025-12-29
 
+

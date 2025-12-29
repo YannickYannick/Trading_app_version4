@@ -210,25 +210,25 @@ class PositionSyncService(BaseSyncService):
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # Find or create asset
+        # Find or create AllAsset (source de vérité unique)
         try:
-            asset = self._get_or_create_asset(
+            all_asset = self._get_or_create_all_asset(
                 symbol=broker_position.symbol,
                 broker_type=broker_account.get_broker_type(),
             )
         except Exception as e:
-            error_msg = f"Error getting/creating asset for {broker_position.symbol}: {str(e)}"
+            error_msg = f"Error getting/creating AllAsset for {broker_position.symbol}: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             raise ValueError(error_msg)
         
-        if not asset:
-            error_msg = f"Could not find or create asset: {broker_position.symbol}"
+        if not all_asset:
+            error_msg = f"Could not find or create AllAsset: {broker_position.symbol}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
         self.logger.debug(
             f"Syncing position {broker_position.symbol}: "
-            f"asset_id={asset.id}, side={broker_position.side}, "
+            f"all_asset_id={all_asset.id}, side={broker_position.side}, "
             f"quantity={broker_position.quantity}"
         )
         
@@ -249,11 +249,11 @@ class PositionSyncService(BaseSyncService):
             entry_price = broker_position.current_price
         
         # Try to find existing open position first
-        # Look for open position with same user, broker, asset, and side
+        # Look for open position with same user, broker, all_asset, and side
         existing_position = Position.objects.filter(
             user=self.user,
             broker=broker_account.broker,
-            asset=asset,
+            all_asset=all_asset,
             side=side,
             is_open=True,
         ).first()
@@ -269,7 +269,8 @@ class PositionSyncService(BaseSyncService):
             existing_position.save()
             created = False
             position = existing_position
-            self.logger.info(f"Position {position.id} updated successfully: {position.asset.symbol} {position.side} qty={position.quantity}")
+            symbol = position.all_asset.symbol if position.all_asset else 'Unknown'
+            self.logger.info(f"Position {position.id} updated successfully: {symbol} {position.side} qty={position.quantity}")
         else:
             # Create new position
             self.logger.info(f"Creating new position for {broker_position.symbol} (side={side}, qty={broker_position.quantity})")
@@ -277,7 +278,7 @@ class PositionSyncService(BaseSyncService):
                 position = Position.objects.create(
                     user=self.user,
                     broker=broker_account.broker,
-                    asset=asset,
+                    all_asset=all_asset,  # Utiliser AllAssets directement
                     side=side,
                     quantity=broker_position.quantity,
                     entry_price=entry_price,
@@ -285,7 +286,8 @@ class PositionSyncService(BaseSyncService):
                     is_open=True,
                 )
                 created = True
-                self.logger.info(f"Position {position.id} created successfully: {position.asset.symbol} {position.side} qty={position.quantity}")
+                symbol = position.all_asset.symbol if position.all_asset else 'Unknown'
+                self.logger.info(f"Position {position.id} created successfully: {symbol} {position.side} qty={position.quantity}")
             except Exception as e:
                 self.logger.error(
                     f"Failed to create position for {broker_position.symbol}: {str(e)}",
@@ -337,53 +339,60 @@ class PositionSyncService(BaseSyncService):
         
         return count
     
-    def _get_or_create_asset(
+    def _get_or_create_all_asset(
         self,
         symbol: str,
         broker_type: str,
-    ) -> Optional[Asset]:
+    ) -> Optional[AllAssets]:
         """
-        Get or create an asset for the given symbol.
+        Get or create an AllAsset for the given symbol.
+        
+        AllAssets est la source de vérité unique. Si l'asset n'existe pas,
+        on essaie de le créer avec les données minimales.
         
         Args:
             symbol: Asset symbol
-            broker_type: Type of broker
+            broker_type: Type of broker (SAXO, BINANCE, etc.)
             
         Returns:
-            Asset instance or None
+            AllAssets instance or None
         """
-        # First try to find existing asset
-        asset = Asset.objects.filter(symbol=symbol).first()
-        if asset:
-            return asset
-        
-        # Try to find in AllAssets
         platform = broker_type.upper()
+        
+        # Chercher dans AllAssets avec (symbol, platform) unique
         all_asset = AllAssets.objects.filter(
             symbol=symbol,
             platform=platform,
         ).first()
         
         if all_asset:
-            # Create Asset from AllAssets
-            asset = Asset.objects.create(
-                all_asset=all_asset,
-                symbol=all_asset.symbol,
-                name=all_asset.name,
-                asset_type=all_asset.asset_type,
-                currency=all_asset.currency,
-            )
-            return asset
+            return all_asset
         
-        # Create basic asset
-        asset = Asset.objects.create(
-            symbol=symbol,
-            name=symbol,
-            asset_type='UNKNOWN',
-            currency='USD',
+        # Si pas trouvé, créer un AllAsset minimal
+        # L'utilisateur devra lancer une sync AllAssets pour enrichir les données
+        self.logger.warning(
+            f"AllAsset not found for {symbol} ({platform}). "
+            f"Creating minimal AllAsset. Consider running asset sync first."
         )
         
-        return asset
+        try:
+            all_asset = AllAssets.objects.create(
+                symbol=symbol,
+                name=symbol,  # Nom par défaut = symbol
+                platform=platform,
+                asset_type='UNKNOWN',
+                market='',
+                currency='USD',
+                is_tradable=True,
+            )
+            self.logger.info(f"Created minimal AllAsset for {symbol} ({platform})")
+            return all_asset
+        except Exception as e:
+            self.logger.error(
+                f"Failed to create AllAsset for {symbol} ({platform}): {str(e)}",
+                exc_info=True
+            )
+            return None
     
     def _get_credentials(self, broker_account: BrokerAccount) -> Dict[str, Any]:
         """

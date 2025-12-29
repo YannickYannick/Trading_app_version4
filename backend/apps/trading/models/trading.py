@@ -16,9 +16,25 @@ class Position(TimeStampedModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='positions'
     )
-    asset = models.ForeignKey(
-        'Asset', on_delete=models.CASCADE, related_name='positions'
+    
+    # ForeignKey DIRECT vers AllAssets (source de vérité)
+    all_asset = models.ForeignKey(
+        'AllAssets',
+        on_delete=models.CASCADE,
+        related_name='positions',
+        help_text="Asset depuis le catalogue universel AllAssets"
     )
+    
+    # Asset devient optionnel (pour compatibilité et enrichissement futur)
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='positions',
+        help_text="Asset enrichi optionnel (pour données supplémentaires)"
+    )
+    
     broker = models.ForeignKey(
         'Broker', on_delete=models.CASCADE, related_name='positions'
     )
@@ -55,7 +71,8 @@ class Position(TimeStampedModel):
     
     def __str__(self):
         status = "Open" if self.is_open else "Closed"
-        return f"{self.asset.symbol} {self.side} ({status})"
+        symbol = self.all_asset.symbol if self.all_asset else (self.asset.symbol if self.asset else 'Unknown')
+        return f"{symbol} {self.side} ({status})"
     
     @property
     def pnl(self):

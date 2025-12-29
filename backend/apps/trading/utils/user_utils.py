@@ -43,3 +43,4 @@ def get_broker_account_or_error(account_id: int) -> BrokerAccount:
     except BrokerAccount.DoesNotExist:
         raise CommandError(f"BrokerAccount with ID {account_id} does not exist")
 
+
