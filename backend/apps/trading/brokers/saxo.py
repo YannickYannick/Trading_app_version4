@@ -177,7 +177,11 @@ class SaxoBroker(BrokerBase):
                 expires_at = parse_iso_datetime(self.token_expires_at)
                 if expires_at:
                     # Ajouter une marge de 5 minutes
-                    now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.now()
+                    now = timezone.now()
+                    if expires_at.tzinfo:
+                        now = now.astimezone(expires_at.tzinfo)
+                    elif now.tzinfo:
+                        expires_at = timezone.make_aware(expires_at) if expires_at.tzinfo is None else expires_at
                     if now >= expires_at - timedelta(minutes=5):
                         return False
             except (ValueError, TypeError) as e:
