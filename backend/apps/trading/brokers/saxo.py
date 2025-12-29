@@ -27,6 +27,14 @@ from .base import (
     BrokerRateLimitError,
 )
 
+# Import constants
+try:
+    from ..constants import DEFAULT_TRANSACTION_DAYS_BACK, DEFAULT_TOKEN_EXPIRY_MARGIN_MINUTES
+except ImportError:
+    # Fallback si constants n'existe pas encore
+    DEFAULT_TRANSACTION_DAYS_BACK = 30
+    DEFAULT_TOKEN_EXPIRY_MARGIN_MINUTES = 5
+
 logger = logging.getLogger('trading_app.brokers')
 
 
