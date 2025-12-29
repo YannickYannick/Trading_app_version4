@@ -158,22 +158,25 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         POST /api/all-assets/validate-yahoo-symbols/
         Met à jour les symboles Yahoo Finance pour tous les assets.
         
-        Query params optionnels:
-        - reset: Si 'true', réinitialise tous les symboles avant validation
-        - limit: Nombre max d'assets à traiter (défaut: 100)
+        Body optionnel:
+        - reset: Si true, réinitialise tous les symboles avant validation
+        - limit: Nombre max d'assets à traiter (défaut: DEFAULT_VALIDATION_LIMIT)
         - platform: Filtrer par plateforme (SAXO, BINANCE, etc.)
         """
         from ..services.yahoo_validator import validate_single_asset, ValidationStats
+        from ..constants import DEFAULT_VALIDATION_LIMIT, DEFAULT_PRICE_TOLERANCE_PERCENT
         from django.utils import timezone
         import logging
         
         logger = logging.getLogger('trading.api.assets')
         
         try:
-            # Récupérer les paramètres
-            reset = request.query_params.get('reset', 'false').lower() == 'true'
-            limit = int(request.query_params.get('limit', 100))
-            platform = request.query_params.get('platform')
+            # Récupérer les paramètres du body ou query params
+            data = request.data if hasattr(request, 'data') and request.data else {}
+            reset = data.get('reset', request.query_params.get('reset', 'false'))
+            reset = str(reset).lower() == 'true'
+            limit = int(data.get('limit', request.query_params.get('limit', DEFAULT_VALIDATION_LIMIT)))
+            platform = data.get('platform') or request.query_params.get('platform')
             
             # Construire le queryset
             queryset = AllAssets.objects.all()
@@ -213,8 +216,26 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             # Valider chaque asset
             for asset in assets_list:
                 try:
-                    # Utiliser validate_single_asset qui ne nécessite pas broker_name
-                    result = validate_single_asset(asset, broker_config={}, tolerance_percent=5.0)
+                    # Récupérer le broker config si disponible (pour Saxo)
+                    broker_config = {}
+                    if asset.platform == 'SAXO':
+                        # Essayer de récupérer un access token d'un compte Saxo actif
+                        from ..models import BrokerAccount
+                        saxo_account = BrokerAccount.objects.filter(
+                            broker_type='SAXO',
+                            is_active=True,
+                            saxo_access_token__isnull=False
+                        ).exclude(saxo_access_token='').first()
+                        if saxo_account:
+                            broker_config['access_token'] = saxo_account.saxo_access_token
+                            broker_config['base_url'] = 'https://gateway.saxobank.com/sim/openapi'
+                    
+                    # Utiliser validate_single_asset
+                    result = validate_single_asset(
+                        asset,
+                        broker_config=broker_config,
+                        tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
+                    )
                     
                     # Mettre à jour les statistiques
                     if result.status.value.startswith('VALIDATED'):
