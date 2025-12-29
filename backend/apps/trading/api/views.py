@@ -856,8 +856,10 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                     currency = list(balances.keys())[0]
                     eur_balance = balances[currency]
             else:
-                # Pour Binance, utiliser directement EUR
-                eur_balance = balances.get('EUR', Decimal('0'))
+                # Pour Binance, convertir toutes les balances crypto en EUR
+                from ..utils.binance_balance_converter import get_binance_eur_balance
+                broker = service.get_broker_instance(account)
+                eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
             
             # Mettre à jour le modèle
@@ -971,8 +973,10 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                     currency = list(balances.keys())[0]
                     eur_balance = balances[currency]
             else:
-                # Pour Binance, utiliser directement EUR
-                eur_balance = balances.get('EUR', Decimal('0'))
+                # Pour Binance, convertir toutes les balances crypto en EUR
+                from ..utils.binance_balance_converter import get_binance_eur_balance
+                broker = service.get_broker_instance(account)
+                eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
             
             # Formater les balances (exclure les clés _free, _locked, _margin_available, _total)
