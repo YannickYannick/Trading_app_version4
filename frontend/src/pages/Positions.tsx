@@ -43,7 +43,7 @@ export default function Positions() {
       label: 'Symbole',
       render: (pos: Position) => (
         <Link to={`/positions/${pos.id}`} className="link-symbol">
-          {pos.asset.symbol}
+          {pos.asset?.symbol || 'N/A'}
         </Link>
       ),
     },
@@ -60,19 +60,19 @@ export default function Positions() {
       key: 'size',
       label: 'Taille',
       align: 'right' as const,
-      render: (pos: Position) => pos.size.toFixed(4),
+      render: (pos: Position) => (pos.size || 0).toFixed(4),
     },
     {
       key: 'entry_price',
       label: 'Prix d\'entrée',
       align: 'right' as const,
-      render: (pos: Position) => formatCurrency(pos.entry_price),
+      render: (pos: Position) => formatCurrency(pos.entry_price || 0),
     },
     {
       key: 'current_price',
       label: 'Prix actuel',
       align: 'right' as const,
-      render: (pos: Position) => formatCurrency(pos.current_price),
+      render: (pos: Position) => formatCurrency(pos.current_price || 0),
     },
     {
       key: 'pnl',
@@ -80,7 +80,7 @@ export default function Positions() {
       align: 'right' as const,
       render: (pos: Position) => (
         <Badge variant={(pos.pnl || 0) >= 0 ? 'success' : 'danger'}>
-          {formatCurrency(pos.pnl)}
+          {formatCurrency(pos.pnl || 0)}
         </Badge>
       ),
     },
@@ -89,8 +89,8 @@ export default function Positions() {
       label: 'P&L %',
       align: 'right' as const,
       render: (pos: Position) => (
-        <span className={pos.pnl_percent >= 0 ? 'positive' : 'negative'}>
-          {formatPercent(pos.pnl_percent)}
+        <span className={(pos.pnl_percent || 0) >= 0 ? 'positive' : 'negative'}>
+          {formatPercent(pos.pnl_percent || 0)}
         </span>
       ),
     },

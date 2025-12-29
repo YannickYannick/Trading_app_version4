@@ -59,7 +59,7 @@ export default function Assets() {
       align: 'right' as const,
       render: (asset: Asset) => (
         <span className="asset-price">
-          {asset.current_price ? formatCurrency(asset.current_price) : '-'}
+          {asset.current_price != null ? formatCurrency(asset.current_price) : '-'}
         </span>
       ),
     },

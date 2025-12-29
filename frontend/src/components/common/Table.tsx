@@ -55,8 +55,8 @@ export default function Table<T extends Record<string, any>>({
           ) : (
             data.map((row, rowIndex) => {
               const key = keyExtractor
-                ? keyExtractor(row, rowIndex)
-                : row.id || rowIndex
+                ? String(keyExtractor(row, rowIndex))
+                : String(row.id || rowIndex)
               return (
                 <tr
                   key={key}

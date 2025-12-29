@@ -24,14 +24,14 @@ export default function Trades() {
     {
       key: 'timestamp',
       label: 'Date',
-      render: (trade: Trade) => formatDate(trade.timestamp, 'dd/MM/yyyy HH:mm'),
+      render: (trade: Trade) => formatDate(trade.timestamp || trade.executed_at || '', 'dd/MM/yyyy HH:mm'),
     },
     {
       key: 'symbol',
       label: 'Symbole',
       render: (trade: Trade) => (
         <Link to={`/trades/${trade.id}`} className="trade-symbol link-symbol">
-          {trade.asset.symbol}
+          {trade.asset?.symbol || 'N/A'}
         </Link>
       ),
     },
@@ -54,13 +54,13 @@ export default function Trades() {
       key: 'price',
       label: 'Prix',
       align: 'right' as const,
-      render: (trade: Trade) => formatCurrency(trade.price),
+      render: (trade: Trade) => formatCurrency(trade.price || 0),
     },
     {
       key: 'total',
       label: 'Total',
       align: 'right' as const,
-      render: (trade: Trade) => formatCurrency(trade.size * trade.price),
+      render: (trade: Trade) => formatCurrency((trade.size || trade.quantity || 0) * (trade.price || 0)),
     },
     {
       key: 'fees',
