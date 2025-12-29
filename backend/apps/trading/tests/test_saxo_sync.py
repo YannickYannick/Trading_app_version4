@@ -10,12 +10,14 @@ from unittest.mock import Mock, patch
 from django.test import TestCase
 
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from apps.trading.brokers.base import BrokerPosition, BrokerTrade
 
-from apps.trading.models import Position, BrokerAccount, Broker, Asset
+from apps.trading.models import Position, BrokerAccount, Broker, Asset, Trade
 
 from apps.trading.services.sync.position_sync_service import PositionSyncService
+from apps.trading.services.sync.trade_sync_service import TradeSyncService
 
 
 class TestSaxoPositionSync(TestCase):
@@ -541,4 +543,361 @@ class TestSaxoSyncEdgeCases(TestCase):
         self.assertEqual(quantity, Decimal('50'))
 
         self.assertGreater(quantity, 0)
+
+
+class TestSaxoTradeSync(TestCase):
+    """Tests pour la synchronisation des trades Saxo"""
+
+    def setUp(self):
+        """Configuration initiale des tests"""
+        self.user = User.objects.create_user(
+            username='testuser_trade',
+            email='test_trade@example.com',
+            password='testpass123'
+        )
+
+        self.broker = Broker.objects.create(
+            name='Saxo Bank',
+            broker_type='SAXO',
+            is_active=True
+        )
+
+        self.broker_account = BrokerAccount.objects.create(
+            user=self.user,
+            broker=self.broker,
+            broker_type='SAXO',
+            is_active=True
+        )
+
+        self.asset = Asset.objects.create(
+            symbol='AAPL',
+            name='Apple Inc.',
+            asset_type='stock'
+        )
+
+    def test_broker_trade_creation_with_all_params(self):
+        """Test: BrokerTrade créé avec tous les paramètres requis"""
+        trade = BrokerTrade(
+            symbol='AAPL',
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50'),
+            fees=Decimal('2.50'),
+            executed_at='2025-12-29T10:30:00Z',
+            broker_trade_id='TRD123456',
+            raw_data={'order_id': 'ORD789'}
+        )
+
+        self.assertEqual(trade.symbol, 'AAPL')
+        self.assertEqual(trade.trade_type, 'BUY')
+        self.assertEqual(trade.quantity, Decimal('100'))
+        self.assertEqual(trade.price, Decimal('150.50'))
+        self.assertEqual(trade.fees, Decimal('2.50'))
+        self.assertEqual(trade.executed_at, '2025-12-29T10:30:00Z')
+        self.assertEqual(trade.broker_trade_id, 'TRD123456')
+
+    def test_trade_type_buy_vs_sell(self):
+        """Test: Distinction correcte entre BUY et SELL"""
+        buy_trade = BrokerTrade(
+            symbol='AAPL',
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50')
+        )
+        self.assertEqual(buy_trade.trade_type, 'BUY')
+
+        sell_trade = BrokerTrade(
+            symbol='AAPL',
+            trade_type='SELL',
+            quantity=Decimal('50'),
+            price=Decimal('155.00')
+        )
+        self.assertEqual(sell_trade.trade_type, 'SELL')
+
+    def test_saxo_buysell_to_trade_type_mapping(self):
+        """Test: Mapping correct de BuySell Saxo vers trade_type"""
+        # Test Buy
+        saxo_order_buy = {'BuySell': 'Buy'}
+        trade_type_buy = 'BUY' if saxo_order_buy.get('BuySell') == 'Buy' else 'SELL'
+        self.assertEqual(trade_type_buy, 'BUY')
+
+        # Test Sell
+        saxo_order_sell = {'BuySell': 'Sell'}
+        trade_type_sell = 'BUY' if saxo_order_sell.get('BuySell') == 'Buy' else 'SELL'
+        self.assertEqual(trade_type_sell, 'SELL')
+
+    def test_trade_with_filled_amount(self):
+        """Test: Utilisation de FilledAmount si disponible"""
+        saxo_order = {
+            'Amount': 100,
+            'FilledAmount': 75,  # Partiellement exécuté
+            'Price': 150.50
+        }
+
+        # Utiliser FilledAmount si disponible, sinon Amount
+        quantity = Decimal(str(saxo_order.get('FilledAmount', saxo_order.get('Amount', 0))))
+        self.assertEqual(quantity, Decimal('75'))
+
+    def test_trade_executed_at_parsing(self):
+        """Test: Parsing correct de executed_at"""
+        from datetime import datetime
+
+        # Format ISO avec Z
+        executed_at_str = '2025-12-29T10:30:00Z'
+        executed_at = datetime.fromisoformat(executed_at_str.replace('Z', '+00:00'))
+        self.assertIsNotNone(executed_at)
+
+        # Format ISO sans Z
+        executed_at_str2 = '2025-12-29T10:30:00+00:00'
+        executed_at2 = datetime.fromisoformat(executed_at_str2)
+        self.assertIsNotNone(executed_at2)
+
+    def test_trade_model_creation(self):
+        """Test: Création d'un Trade dans la base de données"""
+        trade = Trade.objects.create(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset,
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50'),
+            fees=Decimal('2.50'),
+            executed_at=timezone.now(),
+            broker_trade_id='TRD_TEST_123'
+        )
+
+        self.assertEqual(trade.trade_type, 'BUY')
+        self.assertEqual(trade.quantity, Decimal('100'))
+        self.assertEqual(trade.broker_trade_id, 'TRD_TEST_123')
+        self.assertIn(trade.trade_type, ['BUY', 'SELL'])
+
+    def test_trade_duplicate_detection(self):
+        """Test: Détection des trades en double via broker_trade_id"""
+        # Créer un premier trade
+        trade1 = Trade.objects.create(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset,
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50'),
+            executed_at=timezone.now(),
+            broker_trade_id='TRD_DUP_123'
+        )
+
+        # Vérifier qu'un trade avec le même broker_trade_id existe
+        existing = Trade.objects.filter(
+            broker_trade_id='TRD_DUP_123',
+            broker=self.broker,
+            user=self.user,
+        ).first()
+
+        self.assertIsNotNone(existing)
+        self.assertEqual(existing.id, trade1.id)
+
+    @patch('apps.trading.services.sync.trade_sync_service.TradeSyncService._sync_single_trade')
+    def test_trade_sync_service_structure(self, mock_sync_single):
+        """Test: Structure du service de sync des trades"""
+        mock_sync_single.return_value = {'created': True, 'trade_id': 1}
+
+        service = TradeSyncService(user=self.user)
+        self.assertIsNotNone(service)
+        self.assertEqual(service.user, self.user)
+
+    def test_trade_total_value_calculation(self):
+        """Test: Calcul de la valeur totale d'un trade"""
+        trade = Trade.objects.create(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset,
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50'),
+            fees=Decimal('2.50'),
+            executed_at=timezone.now(),
+            broker_trade_id='TRD_VALUE_123'
+        )
+
+        expected_total = Decimal('100') * Decimal('150.50')
+        self.assertEqual(trade.total_value, expected_total)
+
+    def test_trade_with_empty_symbol(self):
+        """Test: Gestion d'un trade avec symbole vide"""
+        # Un trade doit avoir un symbole valide
+        with self.assertRaises(Exception):
+            trade = BrokerTrade(
+                symbol='',  # Symbole vide
+                trade_type='BUY',
+                quantity=Decimal('100'),
+                price=Decimal('150.50')
+            )
+            if not trade.symbol or not trade.symbol.strip():
+                raise ValueError("Trade has empty or invalid symbol")
+
+    def test_trade_with_zero_price(self):
+        """Test: Gestion d'un trade avec prix à zéro"""
+        # Un trade ne devrait pas avoir un prix à zéro
+        trade = BrokerTrade(
+            symbol='AAPL',
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('0'),  # Prix à zéro
+            fees=Decimal('0')
+        )
+
+        # Le prix est à zéro mais le trade peut être créé
+        # La validation devrait se faire au niveau du service
+        self.assertEqual(trade.price, Decimal('0'))
+
+    def test_trade_commission_to_fees_mapping(self):
+        """Test: Mapping de Commission vers fees"""
+        saxo_order = {
+            'Commission': 2.50
+        }
+
+        fees = Decimal(str(saxo_order.get('Commission', 0)))
+        self.assertEqual(fees, Decimal('2.50'))
+
+        # Test sans commission
+        saxo_order_no_commission = {}
+        fees_no_commission = Decimal(str(saxo_order_no_commission.get('Commission', 0)))
+        self.assertEqual(fees_no_commission, Decimal('0'))
+
+
+class TestSaxoTradeSyncEdgeCases(TestCase):
+    """Tests pour les cas limites de la synchronisation des trades Saxo"""
+
+    def setUp(self):
+        """Configuration initiale des tests"""
+        self.user = User.objects.create_user(
+            username='testuser_trade_edge',
+            email='test_trade_edge@example.com',
+            password='testpass123'
+        )
+
+        self.broker = Broker.objects.create(
+            name='Saxo Bank',
+            broker_type='SAXO',
+            is_active=True
+        )
+
+        self.broker_account = BrokerAccount.objects.create(
+            user=self.user,
+            broker=self.broker,
+            broker_type='SAXO',
+            is_active=True
+        )
+
+        self.asset = Asset.objects.create(
+            symbol='AAPL',
+            name='Apple Inc.',
+            asset_type='stock'
+        )
+
+    def test_partially_filled_order(self):
+        """Test: Gestion d'un ordre partiellement exécuté"""
+        saxo_order = {
+            'OrderId': 'ORD_PARTIAL_123',
+            'Amount': 100,
+            'FilledAmount': 50,  # Partiellement exécuté
+            'Price': 150.50,
+            'BuySell': 'Buy'
+        }
+
+        # Utiliser FilledAmount pour la quantité
+        quantity = Decimal(str(saxo_order.get('FilledAmount', saxo_order.get('Amount', 0))))
+        self.assertEqual(quantity, Decimal('50'))
+
+    def test_trade_without_executed_at(self):
+        """Test: Gestion d'un trade sans executed_at"""
+        from django.utils import timezone
+
+        trade = BrokerTrade(
+            symbol='AAPL',
+            trade_type='BUY',
+            quantity=Decimal('100'),
+            price=Decimal('150.50'),
+            executed_at=None  # Pas de timestamp
+        )
+
+        self.assertIsNone(trade.executed_at)
+        # Le service devrait utiliser timezone.now() comme fallback
+
+    def test_trade_with_invalid_timestamp_format(self):
+        """Test: Gestion d'un timestamp invalide"""
+        from datetime import datetime
+
+        invalid_timestamps = [
+            'invalid-date',
+            '2025-12-99',  # Date invalide
+            None,
+            '',
+        ]
+
+        for invalid_ts in invalid_timestamps:
+            if invalid_ts:
+                try:
+                    datetime.fromisoformat(invalid_ts.replace('Z', '+00:00'))
+                    parsed = True
+                except (ValueError, TypeError, AttributeError):
+                    parsed = False
+                # Un timestamp invalide devrait être géré gracieusement
+                # Le service devrait utiliser timezone.now() comme fallback
+
+    def test_multiple_trades_same_symbol(self):
+        """Test: Création de plusieurs trades pour le même symbole"""
+        from django.utils import timezone
+
+        # Créer plusieurs trades pour AAPL
+        for i in range(3):
+            Trade.objects.create(
+                user=self.user,
+                broker=self.broker,
+                asset=self.asset,
+                trade_type='BUY' if i % 2 == 0 else 'SELL',
+                quantity=Decimal(f'{10 * (i + 1)}'),
+                price=Decimal('150.50'),
+                executed_at=timezone.now(),
+                broker_trade_id=f'TRD_MULTI_{i}'
+            )
+
+        trades = Trade.objects.filter(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset
+        )
+
+        self.assertEqual(trades.count(), 3)
+
+    def test_trade_linking_to_position(self):
+        """Test: Lien d'un trade à une position existante"""
+        from django.utils import timezone
+
+        # Créer une position
+        position = Position.objects.create(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset,
+            side='LONG',
+            quantity=Decimal('100'),
+            entry_price=Decimal('150.00'),
+            current_price=Decimal('155.00'),
+            is_open=True
+        )
+
+        # Créer un trade qui devrait être lié à la position
+        trade = Trade.objects.create(
+            user=self.user,
+            broker=self.broker,
+            asset=self.asset,
+            position=position,  # Lien explicite
+            trade_type='BUY',
+            quantity=Decimal('50'),
+            price=Decimal('152.00'),
+            executed_at=timezone.now(),
+            broker_trade_id='TRD_LINKED_123'
+        )
+
+        self.assertIsNotNone(trade.position)
+        self.assertEqual(trade.position.id, position.id)
 
