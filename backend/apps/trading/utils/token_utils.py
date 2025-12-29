@@ -3,6 +3,7 @@ Utilitaires pour la gestion des tokens OAuth2 et d'authentification.
 """
 from datetime import datetime
 from typing import Optional, Union
+from django.utils import timezone
 
 
 def parse_iso_datetime(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
@@ -47,7 +48,11 @@ def parse_iso_datetime(value: Optional[Union[str, datetime]]) -> Optional[dateti
         
         # Dernière tentative avec le format standard
         try:
-            return datetime.fromisoformat(value)
+            dt = datetime.fromisoformat(value)
+            # Si pas de timezone, utiliser timezone.now() comme référence
+            if dt.tzinfo is None:
+                dt = timezone.make_aware(dt)
+            return dt
         except ValueError as e:
             raise ValueError(f"Impossible de parser la date ISO: {value}") from e
     

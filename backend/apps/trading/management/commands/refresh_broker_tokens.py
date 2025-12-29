@@ -143,9 +143,12 @@ class Command(BaseCommand):
                     # Parser et sauvegarder la date d'expiration
                     if broker.token_expires_at:
                         try:
-                            account.saxo_token_expires_at = parse_iso_datetime(
-                                broker.token_expires_at
-                            )
+                            expires_at = parse_iso_datetime(broker.token_expires_at)
+                            if expires_at:
+                                # S'assurer que la date est timezone-aware
+                                if expires_at.tzinfo is None:
+                                    expires_at = timezone.make_aware(expires_at)
+                                account.saxo_token_expires_at = expires_at
                         except Exception as e:
                             logger.warning(
                                 f"Impossible de parser token_expires_at pour "

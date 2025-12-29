@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 from urllib.parse import urlencode, urlparse, urlunparse
+from django.utils import timezone
 
 from .base import (
     BrokerBase, 
@@ -218,7 +219,7 @@ class SaxoBroker(BrokerBase):
             self.refresh_token = token_data.get('refresh_token', self.refresh_token)
             
             expires_in = token_data.get('expires_in', 3600)
-            self.token_expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+            self.token_expires_at = (timezone.now() + timedelta(seconds=expires_in)).isoformat()
             
             self._authenticated = True
             logger.info("Saxo: Token refreshed successfully")
@@ -283,7 +284,7 @@ class SaxoBroker(BrokerBase):
             self.refresh_token = token_data.get('refresh_token')
             
             expires_in = token_data.get('expires_in', 3600)
-            self.token_expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+            self.token_expires_at = (timezone.now() + timedelta(seconds=expires_in)).isoformat()
             
             self._authenticated = True
             
