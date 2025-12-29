@@ -94,8 +94,11 @@ Connecté à **Supabase PostgreSQL** :
 
 ```
 docs/
-├── INDEX.md                    # Ce fichier
-├── phase_1/                    # Phase 1 - Backend
+├── INDEX.md                                    # Ce fichier
+├── fix-uic-extraction-and-optimization.md      # Correction UIC et optimisations (29/12/2025)
+├── debug-binance-balance-conversion.md         # Debug conversion balance Binance
+├── debug-yahoo-validation.md                   # Debug validation Yahoo Finance
+├── phase_1/                                    # Phase 1 - Backend
 │   ├── README.md
 │   ├── 01_STRUCTURE_DOSSIERS.md
 │   ├── 02_SETTINGS_DJANGO.md
@@ -104,7 +107,7 @@ docs/
 │   ├── 05_MIGRATIONS.md
 │   ├── 06_ADMIN_DJANGO.md
 │   └── 07_TESTS_MODELES.md
-└── phase_2/                    # Phase 2 - API REST
+└── phase_2/                                    # Phase 2 - API REST
     ├── README.md
     ├── 01_DRF_INSTALLATION.md
     ├── 02_SERIALIZERS.md
@@ -114,4 +117,16 @@ docs/
     ├── 06_AUTHENTIFICATION.md
     └── 07_TESTS_API.md
 ```
+
+## 🔧 Corrections et Optimisations
+
+### [Correction UIC Extraction et Optimisations](fix-uic-extraction-and-optimization.md)
+**Date :** 29 Décembre 2025
+
+Correction de l'extraction UIC Saxo et optimisations majeures :
+- ✅ Correction : utilisation de `'Identifier'` au lieu de `'Uic'` pour l'API `/ref/v1/instruments`
+- ✅ UIC sauvegardé à 100% (28 848/28 848 assets)
+- ✅ Optimisation : bulk operations au lieu de requêtes individuelles
+- ✅ Timeout frontend augmenté à 10 minutes pour synchronisations longues
+- ✅ Handler logging sécurisé pour Windows
 
