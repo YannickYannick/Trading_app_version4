@@ -32,8 +32,13 @@ def convert_binance_balances_to_eur(
     clean_balances = {}
     for key, value in balances.items():
         if not key.endswith('_free') and not key.endswith('_locked') and not key.endswith('_margin_available') and not key.endswith('_total'):
-            if value > 0:
-                clean_balances[key] = value
+            # Convertir en Decimal si nécessaire
+            try:
+                decimal_value = Decimal(str(value)) if not isinstance(value, Decimal) else value
+                if decimal_value > 0:
+                    clean_balances[key] = decimal_value
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Could not convert balance value for {key}: {value} (error: {e})")
     
     if not clean_balances:
         return {'EUR': Decimal('0')}
@@ -63,14 +68,19 @@ def convert_binance_balances_to_eur(
         'BNBEUR': Decimal('600'),  # Approximation BNB
     }
     
+    logger.info(f"Starting conversion of {len(clean_balances)} assets: {list(clean_balances.keys())}")
+    
     for asset, balance in clean_balances.items():
         asset_upper = asset.upper()
         converted_value = Decimal('0')
+        conversion_method = None
         
         # Cas 1: Asset est déjà EUR
         if asset_upper == 'EUR':
             converted_value = balance
             converted_balances[asset] = balance
+            conversion_method = 'EUR direct'
+            logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method})")
         
         # Cas 2: Essayer de trouver une paire de trading EUR
         elif broker_instance and hasattr(broker_instance, 'get_asset_price'):
@@ -78,10 +88,11 @@ def convert_binance_balances_to_eur(
             eur_pair = f"{asset_upper}EUR"
             try:
                 price = broker_instance.get_asset_price(eur_pair)
-                if price:
+                if price and price > 0:
                     converted_value = balance * price
                     converted_balances[asset] = balance
-                    logger.debug(f"Converted {asset_upper} via {eur_pair}: {balance} * {price} = {converted_value}")
+                    conversion_method = f'API direct {eur_pair}'
+                    logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR via {eur_pair} = {price}")
             except Exception as e:
                 logger.debug(f"Could not get price for {eur_pair}: {e}")
             
@@ -90,15 +101,18 @@ def convert_binance_balances_to_eur(
                 try:
                     usdt_pair = f"{asset_upper}USDT"
                     usdt_price = broker_instance.get_asset_price(usdt_pair)
-                    if usdt_price:
+                    if usdt_price and usdt_price > 0:
                         # Ensuite convertir USDT en EUR
-                        usdt_eur_price = broker_instance.get_asset_price('USDTEUR')
-                        if not usdt_eur_price:
+                        usdt_eur_pair = 'USDTEUR'
+                        usdt_eur_price = broker_instance.get_asset_price(usdt_eur_pair)
+                        if not usdt_eur_price or usdt_eur_price <= 0:
                             usdt_eur_price = default_rates.get('USDTEUR', Decimal('0.92'))
+                            logger.debug(f"Using default USDTEUR rate: {usdt_eur_price}")
                         
                         converted_value = balance * usdt_price * usdt_eur_price
                         converted_balances[asset] = balance
-                        logger.debug(f"Converted {asset_upper} via USDT: {balance} * {usdt_price} * {usdt_eur_price} = {converted_value}")
+                        conversion_method = f'API via USDT ({usdt_pair}={usdt_price}, {usdt_eur_pair}={usdt_eur_price})'
+                        logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method})")
                 except Exception as e:
                     logger.debug(f"Could not convert {asset_upper} via USDT: {e}")
             
@@ -110,7 +124,8 @@ def convert_binance_balances_to_eur(
                     rate = default_rates[eur_pair_key]
                     converted_value = balance * rate
                     converted_balances[asset] = balance
-                    logger.warning(f"Used default rate for {asset_upper} via {eur_pair_key}: {rate}")
+                    conversion_method = f'Default rate {eur_pair_key}'
+                    logger.warning(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
                 # Sinon chercher dans conversion_order
                 elif asset_upper in [base for base, _ in conversion_order]:
                     for base_asset, pair in conversion_order:
@@ -118,29 +133,56 @@ def convert_binance_balances_to_eur(
                             rate = default_rates[pair]
                             converted_value = balance * rate
                             converted_balances[asset] = balance
-                            logger.warning(f"Used default rate for {asset_upper} via {pair}: {rate}")
+                            conversion_method = f'Default rate {pair}'
+                            logger.warning(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
                             break
+            
+            # Dernier recours: Essayer via USDT avec taux par défaut
+            if converted_value == 0:
+                # Si l'asset n'est pas USDT, essayer de le convertir via USDT avec taux par défaut
+                if asset_upper != 'USDT':
+                    # Pour les stablecoins et autres cryptos, utiliser une estimation via USDT
+                    # On utilise un taux USDTEUR par défaut si disponible
+                    usdt_eur_default = default_rates.get('USDTEUR', Decimal('0.92'))
+                    # On suppose que la plupart des cryptos peuvent être approximées via USDT
+                    # Pour une meilleure précision, on pourrait chercher le prix USDT de l'asset
+                    # mais sans API, on ne peut que logger un warning
+                    logger.warning(
+                        f"[{asset_upper}] {balance} → 0 EUR (could not convert: no API price available and no default rate). "
+                        f"Asset value not included in total."
+                    )
         
         else:
             # Pas de broker_instance, utiliser les taux par défaut
             # Chercher une paire disponible
             for base_asset, pair in conversion_order:
                 if asset_upper == base_asset:
-                    if pair in default_rates:
-                        converted_value = balance * default_rates[pair]
+                    if pair and pair in default_rates:
+                        rate = default_rates[pair]
+                        converted_value = balance * rate
                         converted_balances[asset] = balance
-                        logger.debug(f"Converted {asset_upper} using default rate for {pair}: {converted_value}")
+                        conversion_method = f'Default rate {pair} (no broker instance)'
+                        logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
                         break
             
             # Si toujours pas trouvé, essayer directement le nom de l'asset comme clé (pour les paires EUR directes)
             if converted_value == 0:
                 eur_pair_key = f"{asset_upper}EUR"
                 if eur_pair_key in default_rates:
-                    converted_value = balance * default_rates[eur_pair_key]
+                    rate = default_rates[eur_pair_key]
+                    converted_value = balance * rate
                     converted_balances[asset] = balance
-                    logger.debug(f"Converted {asset_upper} using default rate for {eur_pair_key}: {converted_value}")
+                    conversion_method = f'Default rate {eur_pair_key} (no broker instance)'
+                    logger.info(f"[{asset_upper}] {balance} → {converted_value} EUR ({conversion_method}: {rate})")
+                else:
+                    logger.warning(
+                        f"[{asset_upper}] {balance} → 0 EUR (could not convert: no broker instance and no default rate). "
+                        f"Asset value not included in total."
+                    )
         
         total_eur += converted_value
+    
+    logger.info(f"Conversion complete: total EUR = {total_eur}")
     
     # Ajouter le total EUR
     converted_balances['EUR'] = total_eur

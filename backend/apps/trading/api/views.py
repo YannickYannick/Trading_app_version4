@@ -989,18 +989,51 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             else:
                 # Pour Binance, convertir toutes les balances crypto en EUR
                 from ..utils.binance_balance_converter import get_binance_eur_balance
+                
+                # Logger les balances brutes reçues
+                logger.info(
+                    f"Binance account {account.id}: Raw balances received: "
+                    f"{dict(balances)} (count: {len(balances)})"
+                )
+                
                 broker = service.get_broker_instance(account)
+                
                 # S'assurer que le broker est authentifié pour récupérer les prix
-                if broker and hasattr(broker, 'is_authenticated') and not broker.is_authenticated():
-                    broker.authenticate()
+                if broker:
+                    if hasattr(broker, 'is_authenticated'):
+                        is_auth = broker.is_authenticated()
+                        logger.debug(f"Binance account {account.id}: Broker authenticated: {is_auth}")
+                        if not is_auth:
+                            logger.info(f"Binance account {account.id}: Authenticating broker...")
+                            auth_result = broker.authenticate()
+                            logger.info(f"Binance account {account.id}: Authentication result: {auth_result}")
+                    else:
+                        logger.warning(f"Binance account {account.id}: Broker has no is_authenticated method")
+                else:
+                    logger.warning(f"Binance account {account.id}: No broker instance available")
+                
                 eur_balance = get_binance_eur_balance(balances, broker_instance=broker)
                 currency = 'EUR'
                 
                 # Logger pour déboguer
                 logger.info(
-                    f"Binance balance conversion for account {account.id}: "
-                    f"raw balances={dict(balances)}, eur_balance={eur_balance}"
+                    f"Binance account {account.id}: Balance conversion result: "
+                    f"eur_balance={eur_balance} (type: {type(eur_balance)})"
                 )
+                
+                # Vérifier si le solde est 0 alors qu'on a des balances
+                if eur_balance == 0 and balances:
+                    clean_count = len([
+                        k for k in balances.keys()
+                        if not k.endswith('_free') and not k.endswith('_locked')
+                        and not k.endswith('_margin_available') and not k.endswith('_total')
+                        and balances[k] > 0
+                    ])
+                    if clean_count > 0:
+                        logger.warning(
+                            f"Binance account {account.id}: WARNING - eur_balance is 0 but we have {clean_count} "
+                            f"non-zero balances! This suggests a conversion problem."
+                        )
             
             # Formater les balances (exclure les clés _free, _locked, _margin_available, _total)
             all_balances = {
