@@ -40,6 +40,63 @@ class BrokerServiceError(Exception):
     pass
 
 
+# ============================================
+# STATUS MAPPING FUNCTIONS
+# ============================================
+
+def map_broker_status_to_order_status(broker_status: str, broker_type: str) -> str:
+    """
+    Map broker-specific order status to internal Order status.
+    
+    Args:
+        broker_status: Status from broker API
+        broker_type: Broker type ('BINANCE', 'SAXO', etc.)
+        
+    Returns:
+        Internal order status string (e.g., 'OPEN', 'FILLED', etc.)
+    """
+    broker_status_upper = broker_status.upper()
+    
+    if broker_type == 'BINANCE':
+        # Binance status mapping
+        mapping = {
+            'NEW': 'OPEN',
+            'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+            'FILLED': 'FILLED',
+            'CANCELED': 'CANCELLED',
+            'PENDING_CANCEL': 'OPEN',
+            'REJECTED': 'REJECTED',
+            'EXPIRED': 'EXPIRED',
+        }
+        return mapping.get(broker_status_upper, 'PENDING')
+    
+    elif broker_type == 'SAXO':
+        # Saxo status mapping
+        mapping = {
+            'SUBMITTED': 'OPEN',
+            'ACCEPTED': 'OPEN',
+            'PARTIALLYFILLED': 'PARTIALLY_FILLED',
+            'FILLED': 'FILLED',
+            'CANCELLED': 'CANCELLED',
+            'REJECTED': 'REJECTED',
+            'EXPIRED': 'EXPIRED',
+        }
+        return mapping.get(broker_status_upper, 'PENDING')
+    
+    # Default: try to match common statuses
+    common_mapping = {
+        'OPEN': 'OPEN',
+        'PENDING': 'PENDING',
+        'FILLED': 'FILLED',
+        'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+        'CANCELLED': 'CANCELLED',
+        'CANCELED': 'CANCELLED',
+        'REJECTED': 'REJECTED',
+        'EXPIRED': 'EXPIRED',
+    }
+    return common_mapping.get(broker_status_upper, 'PENDING')
+
+
 class BrokerService:
     """
     High-level service for broker operations.
@@ -541,6 +598,197 @@ class BrokerService:
                 success=False,
                 error=str(e)
             )
+    
+    def sync_pending_orders_from_broker(
+        self,
+        broker_account: BrokerAccount,
+        status: Optional[str] = 'OPEN',
+        symbol: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Synchronize pending orders from broker to local database.
+        
+        Args:
+            broker_account: BrokerAccount model instance
+            status: Filter by status (default: 'OPEN' to get active orders)
+            symbol: Filter by symbol (optional)
+            
+        Returns:
+            Dictionary with sync summary:
+            {
+                'success': bool,
+                'message': str,
+                'created': int,
+                'updated': int,
+                'errors': list
+            }
+        """
+        created = 0
+        updated = 0
+        errors = []
+        
+        try:
+            # Get orders from broker
+            broker_orders = self.get_orders(
+                broker_account=broker_account,
+                status=status,
+                symbol=symbol,
+                limit=100
+            )
+            
+            if not broker_orders:
+                return {
+                    'success': True,
+                    'message': 'No orders found to sync',
+                    'created': 0,
+                    'updated': 0,
+                    'errors': []
+                }
+            
+            # Get or create broker
+            broker = broker_account.broker
+            
+            # Process each broker order
+            for broker_order in broker_orders:
+                try:
+                    # Find asset by symbol
+                    asset = None
+                    try:
+                        # Try to find asset by symbol
+                        asset = Asset.objects.filter(
+                            symbol__iexact=broker_order.symbol
+                        ).first()
+                        
+                        # If not found, try to find via AllAssets
+                        if not asset:
+                            all_asset = AllAssets.objects.filter(
+                                symbol__iexact=broker_order.symbol,
+                                platform=broker.broker_type
+                            ).first()
+                            if all_asset:
+                                asset, _ = Asset.objects.get_or_create(
+                                    all_asset=all_asset,
+                                    defaults={
+                                        'symbol': all_asset.symbol,
+                                        'name': all_asset.name,
+                                        'asset_type': all_asset.asset_type,
+                                        'currency': all_asset.currency,
+                                    }
+                                )
+                    except Exception as e:
+                        logger.warning(f"Could not find asset for symbol {broker_order.symbol}: {e}")
+                        errors.append(f"Asset not found for {broker_order.symbol}")
+                        continue
+                    
+                    if not asset:
+                        errors.append(f"Asset not found for {broker_order.symbol}")
+                        continue
+                    
+                    # Map broker status to internal status
+                    internal_status = map_broker_status_to_order_status(
+                        broker_order.status,
+                        broker.broker_type
+                    )
+                    
+                    # Try to find existing order by broker_order_id
+                    order = None
+                    if broker_order.broker_order_id:
+                        order = Order.objects.filter(
+                            user=self.user,
+                            broker_order_id=broker_order.broker_order_id,
+                            broker=broker
+                        ).first()
+                    
+                    # Map order type
+                    order_type = broker_order.order_type.upper()
+                    if order_type not in [choice[0] for choice in Order.OrderType.choices]:
+                        # Try to map common variations
+                        type_mapping = {
+                            'MARKET': Order.OrderType.MARKET,
+                            'LIMIT': Order.OrderType.LIMIT,
+                            'STOP': Order.OrderType.STOP,
+                            'STOP_LIMIT': Order.OrderType.STOP_LIMIT,
+                            'STOPLOSS': Order.OrderType.STOP,
+                            'STOP_LOSS': Order.OrderType.STOP,
+                        }
+                        order_type = type_mapping.get(order_type, Order.OrderType.MARKET)
+                    
+                    # Map side
+                    side = broker_order.side.upper()
+                    if side not in [choice[0] for choice in Order.OrderSide.choices]:
+                        side = Order.OrderSide.BUY if 'BUY' in side.upper() else Order.OrderSide.SELL
+                    
+                    if order:
+                        # Update existing order
+                        order.status = internal_status
+                        order.filled_quantity = broker_order.filled_quantity
+                        order.price = broker_order.price
+                        order.quantity = broker_order.quantity
+                        order.save()
+                        updated += 1
+                    else:
+                        # Create new order
+                        Order.objects.create(
+                            user=self.user,
+                            asset=asset,
+                            broker=broker,
+                            order_type=order_type,
+                            side=side,
+                            status=internal_status,
+                            quantity=broker_order.quantity,
+                            filled_quantity=broker_order.filled_quantity,
+                            price=broker_order.price,
+                            broker_order_id=broker_order.broker_order_id or '',
+                        )
+                        created += 1
+                        
+                except Exception as e:
+                    error_msg = f"Error syncing order {broker_order.broker_order_id}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+            
+            # Log the sync
+            self._log_sync(
+                broker_account=broker_account,
+                sync_type='orders_sync',
+                status='success' if not errors else 'partial',
+                records_synced=created + updated,
+                details={
+                    'created': created,
+                    'updated': updated,
+                    'total_orders': len(broker_orders),
+                    'errors_count': len(errors)
+                },
+                error_message='; '.join(errors) if errors else '',
+            )
+            
+            message = f'Synced {created + updated} orders ({created} created, {updated} updated)'
+            if errors:
+                message += f', {len(errors)} errors'
+            
+            return {
+                'success': True,
+                'message': message,
+                'created': created,
+                'updated': updated,
+                'errors': errors
+            }
+            
+        except Exception as e:
+            logger.exception(f"Error syncing orders from broker: {e}")
+            self._log_sync(
+                broker_account=broker_account,
+                sync_type='orders_sync',
+                status='error',
+                error_message=str(e),
+            )
+            return {
+                'success': False,
+                'message': str(e),
+                'created': 0,
+                'updated': 0,
+                'errors': [str(e)]
+            }
     
     # ============================================
     # ACCOUNT

@@ -116,10 +116,39 @@ export interface Strategy {
   id: number
   name: string
   description: string
-  strategy_type: string
+  strategy_type?: string
+  algorithm_type?: string
+  algorithm_type_display?: string
+  risk_level?: 'LOW' | 'MEDIUM' | 'HIGH'
   is_active: boolean
+  status?: string
+  status_display?: string
+  is_automated?: boolean
   created_at: string
+  updated_at?: string
   user: number
+  // Champs optionnels de la doc v3
+  asset?: { id: number; symbol: string; name: string }
+  asset_id?: number
+  asset_name?: string
+  portfolio_quantity?: number
+  target_min_quantity?: number
+  target_max_quantity?: number
+  broker_account?: { id: number; name: string }
+  broker_account_id?: number
+  broker_name?: string
+  execution_mode?: string
+  execution_mode_display?: string
+  check_frequency?: number
+  total_trades?: number
+  successful_trades?: number
+  total_pnl?: number
+  last_execution?: string
+  parameters?: {
+    price_min?: number
+    price_max?: number
+    [key: string]: any
+  }
 }
 
 export interface StrategyPerformance {

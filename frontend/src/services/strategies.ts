@@ -15,8 +15,13 @@ export interface StrategyFilters {
 export interface StrategyCreateData {
   name: string
   description?: string
-  strategy_type: string
+  risk_level?: 'LOW' | 'MEDIUM' | 'HIGH'
+  max_position_size?: number
+  max_daily_loss?: number
+  parameters?: Record<string, any>
   is_active?: boolean
+  is_automated?: boolean
+  strategy_type?: string
 }
 
 export const strategyService = {

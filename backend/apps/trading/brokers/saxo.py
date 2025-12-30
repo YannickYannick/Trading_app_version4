@@ -1303,6 +1303,7 @@ class SaxoBroker(BrokerBase):
         side: str, 
         quantity: Decimal, 
         price: Optional[Decimal] = None,
+        stop_price: Optional[Decimal] = None,
         order_type: str = None,
         uic: int = None,
         asset_type: str = "Stock",
@@ -1330,7 +1331,7 @@ class SaxoBroker(BrokerBase):
                 if uic is None:
                     return OrderResult(
                         success=False,
-                        error_message=f"Could not find UIC for {symbol}"
+                        error=f"Could not find UIC for {symbol}"
                     )
             
             # Déterminer le type d'ordre
@@ -1350,6 +1351,7 @@ class SaxoBroker(BrokerBase):
                 "Amount": float(quantity),
                 "BuySell": "Buy" if side.lower() == 'buy' else "Sell",
                 "OrderType": order_type,
+                "ManualOrder": kwargs.get('manual_order', False),  # Required by Saxo API
             }
             
             # Ajouter le compte si disponible
@@ -1359,6 +1361,11 @@ class SaxoBroker(BrokerBase):
             # Ajouter le prix pour les ordres limite
             if price and order_type in ['Limit', 'StopLimit']:
                 order_data["OrderPrice"] = float(price)
+            
+            # Ajouter le prix stop pour les ordres stop (peut venir du paramètre direct ou de kwargs)
+            stop_price_param = stop_price or kwargs.get('stop_price') or kwargs.get('stopPrice')
+            if stop_price_param and order_type in ['Stop', 'StopLimit']:
+                order_data["StopPrice"] = float(stop_price_param)
             
             # Durée de l'ordre
             duration = kwargs.get('duration', 'DayOrder')
@@ -1374,9 +1381,7 @@ class SaxoBroker(BrokerBase):
             return OrderResult(
                 success=True,
                 order_id=str(order_id) if order_id else None,
-                broker_order_id=str(order_id) if order_id else None,
-                status=data.get('Status', 'Submitted'),
-                filled_quantity=Decimal('0'),
+                message=f"Order placed successfully: {data.get('Status', 'Submitted')}",
                 raw_data=data
             )
             
@@ -1384,16 +1389,16 @@ class SaxoBroker(BrokerBase):
             logger.error(f"Saxo place_order broker error: {e}")
             return OrderResult(
                 success=False,
-                error_message=str(e)
+                error=str(e)
             )
         except Exception as e:
             logger.error(f"Saxo place_order error: {e}")
             return OrderResult(
                 success=False,
-                error_message=f"Order placement failed: {e}"
+                error=f"Order placement failed: {e}"
             )
     
-    def cancel_order(self, order_id: str, **kwargs) -> bool:
+    def cancel_order(self, order_id: str, **kwargs) -> OrderResult:
         """
         Annuler un ordre
         
@@ -1401,7 +1406,7 @@ class SaxoBroker(BrokerBase):
             order_id: ID de l'ordre à annuler
             
         Returns:
-            True si l'annulation a réussi
+            OrderResult avec success=True si l'annulation a réussi
         """
         try:
             params = {}
@@ -1415,11 +1420,37 @@ class SaxoBroker(BrokerBase):
             )
             
             logger.info(f"Saxo: Order {order_id} cancelled")
-            return True
+            return OrderResult(
+                success=True,
+                message=f"Order {order_id} cancelled successfully"
+            )
             
+        except BrokerAPIError as e:
+            # Gérer le cas où l'ordre n'existe pas (404) ou a déjà été annulé
+            error_str = str(e)
+            if '404' in error_str or 'Not Found' in error_str:
+                logger.warning(f"Saxo: Order {order_id} not found (may already be cancelled)")
+                return OrderResult(
+                    success=False,
+                    error=f"Order {order_id} not found. It may have already been cancelled or does not exist."
+                )
+            logger.error(f"Saxo cancel_order API error: {e}")
+            return OrderResult(
+                success=False,
+                error=str(e)
+            )
+        except BrokerError as e:
+            logger.error(f"Saxo cancel_order broker error: {e}")
+            return OrderResult(
+                success=False,
+                error=str(e)
+            )
         except Exception as e:
             logger.error(f"Saxo cancel_order error: {e}")
-            return False
+            return OrderResult(
+                success=False,
+                error=f"Failed to cancel order: {str(e)}"
+            )
     
     def modify_order(
         self, 

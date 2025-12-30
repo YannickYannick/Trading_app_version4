@@ -17,12 +17,14 @@ from django.db import models
 from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
 from datetime import timedelta
+import logging
 
 from apps.trading.models import (
     AllAssets, Asset, AssetPrice, Position, Trade, Order,
     Strategy, StrategyPerformance, Broker, BrokerAccount, BrokerSyncLog,
     ScheduledTask, TaskExecutionLog
 )
+from apps.trading.services.broker_service import BrokerService
 from .serializers import (
     AllAssetsSerializer, AssetSerializer, AssetNestedSerializer, AssetPriceSerializer,
     PositionSerializer, TradeSerializer, OrderSerializer,
@@ -46,6 +48,9 @@ class LargePagination(PageNumberPagination):
     page_size = 100
     page_size_query_param = 'page_size'
     max_page_size = 500
+
+# Logger pour ce module
+logger = logging.getLogger('trading.api.orders')
 
 
 # ============================================
@@ -151,6 +156,51 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             'count': len(serializer.data),
             'results': serializer.data
         })
+    
+    @action(detail=False, methods=['get'], url_path='autocomplete')
+    def autocomplete(self, request):
+        """
+        GET /api/all-assets/autocomplete/?q=AAPL&platform=SAXO
+        Autocomplétion pour le placement d'ordres.
+        Retourne une liste simplifiée d'AllAssets pour l'autocomplétion.
+        """
+        query = request.query_params.get('q', '').strip()
+        platform = request.query_params.get('platform')  # Optionnel : filtrer par plateforme
+        
+        if len(query) < 2:
+            return Response({'results': []})
+        
+        # Nettoyer le symbole de recherche
+        query_clean = query.split(':')[0].strip().upper()
+        query_clean = query_clean.split('_')[0].strip()
+        
+        queryset = self.get_queryset().filter(
+            Q(symbol__icontains=query_clean) | Q(name__icontains=query),
+            is_tradable=True
+        )
+        
+        # Filtrer par plateforme si fournie
+        if platform:
+            queryset = queryset.filter(platform=platform.upper())
+        
+        # Limiter à 10 résultats et trier par symbole
+        assets = queryset.order_by('symbol')[:10]
+        
+        results = []
+        for asset in assets:
+            results.append({
+                'id': asset.id,  # ID AllAssets
+                'symbol': asset.symbol,
+                'name': asset.name,
+                'platform': asset.platform,
+                'asset_type': asset.asset_type,
+                'currency': asset.currency,
+                'market': asset.market,
+                'text': f"{asset.symbol} - {asset.name} ({asset.platform})",
+                'saxo_uic': getattr(asset, 'saxo_uic', None),  # Pour info
+            })
+        
+        return Response({'results': results})
     
     @action(detail=False, methods=['post'], url_path='validate-yahoo-symbols')
     def validate_yahoo_symbols(self, request):
@@ -715,7 +765,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     def cancel(self, request, pk=None):
         """
         POST /api/orders/1/cancel/
-        Annule un ordre en attente.
+        Annule un ordre en attente (localement).
+        Si l'ordre a un broker_order_id, essaie aussi d'annuler chez le broker.
         """
         order = self.get_object()
         
@@ -725,12 +776,693 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Si l'ordre a un broker_order_id, essayer d'annuler chez le broker
+        if order.broker_order_id:
+            try:
+                broker_account = BrokerAccount.objects.filter(
+                    user=request.user,
+                    broker=order.broker
+                ).first()
+                
+                if broker_account:
+                    service = BrokerService(request.user)
+                    result = service.cancel_order(
+                        broker_account=broker_account,
+                        order_id=order.broker_order_id,
+                        symbol=order.asset.symbol if order.asset else None
+                    )
+                    
+                    if not result.success:
+                        # Si l'ordre n'existe pas chez le broker (404), considérer qu'il est déjà annulé
+                        error_msg = result.error or ''
+                        if 'not found' in error_msg.lower() or '404' in error_msg or 'does not exist' in error_msg.lower():
+                            logger.info(f"Order {order.broker_order_id} not found at broker, considering it already cancelled")
+                            # On continue avec l'annulation locale
+                        else:
+                            # Pour les autres erreurs, on retourne l'erreur
+                            return Response(
+                                {'error': f'Failed to cancel order at broker: {result.error}'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+            except Exception as e:
+                logger.warning(f"Error cancelling order at broker: {e}")
+                # Continue avec l'annulation locale même si le broker échoue
+        
         order.status = 'CANCELLED'
         order.save()
         
         return Response({
             'status': 'Order cancelled',
             'order': OrderSerializer(order).data
+        })
+    
+    @action(detail=False, methods=['post'])
+    def place(self, request):
+        """
+        POST /api/orders/place/
+        Place un ordre directement via le broker.
+        
+        Flux basé sur AllAssets comme source de vérité :
+        1. Chercher dans AllAssets (par symbole et plateforme)
+        2. Créer/find Asset depuis AllAssets
+        3. Pour Saxo : utiliser saxo_uic depuis AllAssets
+        4. Pour Binance : utiliser symbole depuis AllAssets
+        
+        Body:
+        {
+            "broker_account_id": 1,
+            "symbol": "AAPL" ou "AAPL:xnas",  // Accepte les variantes
+            "all_asset_id": 123,  // optionnel, si fourni utilise directement
+            "side": "BUY",
+            "quantity": "10",
+            "order_type": "MARKET",
+            "price": "150.25",  // optionnel pour LIMIT
+            "stop_price": "145.00"  // optionnel pour STOP
+        }
+        """
+        broker_account_id = request.data.get('broker_account_id')
+        symbol_raw = request.data.get('symbol', '').strip()
+        all_asset_id = request.data.get('all_asset_id')  # Optionnel : ID AllAssets direct
+        side = request.data.get('side')
+        quantity = request.data.get('quantity')
+        order_type = request.data.get('order_type', 'MARKET')
+        price = request.data.get('price')
+        stop_price = request.data.get('stop_price')
+        
+        # Nettoyer le symbole (enlever les suffixes comme :xnas, :nasdaq, etc.)
+        symbol_clean = symbol_raw.split(':')[0].strip().upper()
+        symbol_clean = symbol_clean.split('_')[0].strip()  # Enlever _0, _1, etc.
+        
+        # Validation
+        if not all([broker_account_id, symbol_clean if not all_asset_id else True, side, quantity]):
+            return Response(
+                {'error': 'Missing required fields: broker_account_id, symbol (or all_asset_id), side, quantity'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get broker account
+            broker_account = BrokerAccount.objects.get(
+                id=broker_account_id,
+                user=request.user
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response(
+                {'error': 'Broker account not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # ✅ CRITIQUE: Chercher AllAssets d'abord (source de vérité)
+        all_asset = None
+        broker_type = broker_account.broker.broker_type
+        
+        if all_asset_id:
+            # Utiliser directement l'ID AllAssets fourni
+            try:
+                all_asset = AllAssets.objects.get(id=all_asset_id)
+            except AllAssets.DoesNotExist:
+                return Response(
+                    {'error': f'AllAssets with id {all_asset_id} not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            # Rechercher dans AllAssets par symbole et plateforme
+            # Recherche exacte d'abord
+            all_asset = AllAssets.objects.filter(
+                symbol__iexact=symbol_clean,
+                platform=broker_type,
+                is_tradable=True
+            ).first()
+            
+            # Si pas trouvé, recherche partielle
+            if not all_asset:
+                all_asset = AllAssets.objects.filter(
+                    Q(symbol__icontains=symbol_clean) | Q(name__icontains=symbol_clean),
+                    platform=broker_type,
+                    is_tradable=True
+                ).order_by('symbol').first()
+        
+        if not all_asset:
+            return Response(
+                {
+                    'error': f'Asset not found for symbol "{symbol_clean}" on platform {broker_type}. Please sync assets from broker first.'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # ✅ Pour Saxo : vérifier que l'UIC existe
+        if broker_type == 'SAXO' and not all_asset.saxo_uic:
+            return Response(
+                {
+                    'error': f'UIC manquant pour {all_asset.symbol}. Veuillez synchroniser les assets depuis Saxo d\'abord.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # ✅ Créer ou trouver Asset depuis AllAssets
+        asset, asset_created = Asset.objects.get_or_create(
+            symbol=all_asset.symbol,
+            defaults={
+                'all_asset': all_asset,
+                'name': all_asset.name,
+                'asset_type': all_asset.asset_type,
+                'currency': all_asset.currency,
+                'exchange': all_asset.exchange or '',
+            }
+        )
+        
+        # Mettre à jour le lien all_asset si nécessaire
+        if not asset.all_asset:
+            asset.all_asset = all_asset
+            asset.save()
+        
+        # Convert quantity to Decimal
+        from decimal import Decimal
+        try:
+            quantity_decimal = Decimal(str(quantity))
+            price_decimal = Decimal(str(price)) if price else None
+            stop_price_decimal = Decimal(str(stop_price)) if stop_price else None
+        except (ValueError, TypeError) as e:
+            return Response(
+                {'error': f'Invalid numeric value: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # ✅ Préparer les paramètres spécifiques au broker
+        broker_kwargs = {}
+        
+        if broker_type == 'SAXO':
+            # Pour Saxo, passer l'UIC directement
+            broker_kwargs['uic'] = all_asset.saxo_uic
+            broker_kwargs['asset_type'] = all_asset.asset_type
+            # Utiliser le symbole exact depuis AllAssets
+            trading_symbol = all_asset.symbol
+        elif broker_type == 'BINANCE':
+            # Pour Binance, utiliser le symbole depuis AllAssets
+            trading_symbol = all_asset.symbol
+            # Ajouter suffixe si nécessaire (mais normalement AllAssets a déjà le bon format)
+            if not any(trading_symbol.endswith(suffix) for suffix in ['USDT', 'EUR', 'BTC', 'BNB', 'ETH']):
+                # Tenter d'ajouter USDT si pas de suffixe
+                trading_symbol = f"{trading_symbol}USDT"
+        else:
+            trading_symbol = all_asset.symbol
+        
+        # Place order via broker
+        service = BrokerService(request.user)
+        result = service.place_order(
+            broker_account=broker_account,
+            symbol=trading_symbol,  # Symbole depuis AllAssets
+            side=side.upper(),
+            quantity=quantity_decimal,
+            order_type=order_type.upper(),
+            price=price_decimal,
+            stop_price=stop_price_decimal,
+            **broker_kwargs  # Paramètres spécifiques (uic pour Saxo, etc.)
+        )
+        
+        if not result.success:
+            return Response(
+                {'error': result.error},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create or update order in database
+        order, created = Order.objects.update_or_create(
+            user=request.user,
+            broker=broker_account.broker,
+            asset=asset,
+            broker_order_id=result.order_id or '',
+            defaults={
+                'order_type': order_type.upper(),
+                'side': side.upper(),
+                'quantity': quantity_decimal,
+                'price': price_decimal,
+                'stop_price': stop_price_decimal,
+                'status': 'OPEN' if result.success else 'REJECTED',
+            }
+        )
+        
+        return Response({
+            'success': True,
+            'message': result.message,
+            'order': OrderSerializer(order).data,
+            'broker_result': {
+                'order_id': result.order_id,
+                'message': result.message
+            }
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def place_broker(self, request, pk=None):
+        """
+        POST /api/orders/{id}/place_broker/
+        Place un ordre existant (avec statut PENDING) via le broker.
+        """
+        order = self.get_object()
+        
+        if order.status != 'PENDING':
+            return Response(
+                {'error': f'Can only place orders with status PENDING, current status: {order.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get broker account
+        try:
+            broker_account = BrokerAccount.objects.get(
+                user=request.user,
+                broker=order.broker
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response(
+                {'error': 'Broker account not found for this broker'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Place order via broker
+        service = BrokerService(request.user)
+        result = service.place_order(
+            broker_account=broker_account,
+            symbol=order.asset.symbol,
+            side=order.side,
+            quantity=order.quantity,
+            order_type=order.order_type,
+            price=order.price,
+            stop_price=order.stop_price
+        )
+        
+        if not result.success:
+            order.status = 'REJECTED'
+            order.save()
+            return Response(
+                {'error': result.error},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update order with broker response
+        order.broker_order_id = result.order_id or order.broker_order_id
+        order.status = 'OPEN'
+        order.save()
+        
+        return Response({
+            'success': True,
+            'message': result.message,
+            'order': OrderSerializer(order).data,
+            'broker_result': {
+                'order_id': result.order_id,
+                'message': result.message
+            }
+        })
+    
+    @action(detail=True, methods=['post'])
+    def cancel_broker(self, request, pk=None):
+        """
+        POST /api/orders/{id}/cancel_broker/
+        Annule un ordre chez le broker (nécessite un broker_order_id).
+        """
+        order = self.get_object()
+        
+        if not order.broker_order_id:
+            return Response(
+                {'error': 'Order does not have a broker_order_id. Cannot cancel at broker.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if order.status in ['FILLED', 'CANCELLED', 'EXPIRED']:
+            return Response(
+                {'error': f'Cannot cancel order with status {order.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get broker account
+        try:
+            broker_account = BrokerAccount.objects.get(
+                user=request.user,
+                broker=order.broker
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response(
+                {'error': 'Broker account not found for this broker'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Cancel order at broker
+        service = BrokerService(request.user)
+        result = service.cancel_order(
+            broker_account=broker_account,
+            order_id=order.broker_order_id,
+            symbol=order.asset.symbol if order.asset else None
+        )
+        
+        if not result.success:
+            # Si l'ordre n'existe pas chez le broker (404), considérer qu'il est déjà annulé
+            error_msg = result.error or ''
+            if 'not found' in error_msg.lower() or '404' in error_msg or 'does not exist' in error_msg.lower() or 'already been cancelled' in error_msg.lower():
+                logger.info(f"Order {order.broker_order_id} not found at broker, marking as cancelled locally")
+                # Mettre à jour le statut local à CANCELLED même si l'ordre n'existe pas chez le broker
+                order.status = 'CANCELLED'
+                order.save()
+                
+                return Response({
+                    'success': True,
+                    'message': 'Order was already cancelled at broker, status updated locally',
+                    'order': OrderSerializer(order).data
+                })
+            else:
+                # Pour les autres erreurs, retourner l'erreur
+                return Response(
+                    {'error': result.error},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Update order status
+        order.status = 'CANCELLED'
+        order.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Order cancelled at broker',
+            'order': OrderSerializer(order).data
+        })
+    
+    @action(detail=False, methods=['post'])
+    def get_asset_price(self, request):
+        """
+        POST /api/orders/get_asset_price/
+        Récupère le prix actuel d'un actif depuis le broker ET Yahoo Finance (en parallèle).
+        
+        Body:
+        {
+            "broker_account_id": 1,
+            "symbol": "AAPL",
+            "all_asset_id": 123  // optionnel
+        }
+        
+        Returns:
+        {
+            "success": true,
+            "broker_price": {
+                "price": 150.25,
+                "currency": "USD",
+                "source": "SAXO"
+            },
+            "yahoo_data": {
+                "price": 150.30,
+                "symbol": "AAPL",
+                "available": true
+            }
+        }
+        """
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+        from ..services.data_providers.yahoo_finance import YahooFinanceService
+        from decimal import Decimal
+        
+        broker_account_id = request.data.get('broker_account_id')
+        symbol = request.data.get('symbol', '').strip().upper()
+        all_asset_id = request.data.get('all_asset_id')
+        
+        if not broker_account_id or not symbol:
+            return Response(
+                {'error': 'broker_account_id and symbol are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            broker_account = BrokerAccount.objects.get(
+                id=broker_account_id,
+                user=request.user
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response(
+                {'error': 'Broker account not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Récupérer AllAssets
+        all_asset = None
+        if all_asset_id:
+            try:
+                all_asset = AllAssets.objects.get(id=all_asset_id)
+            except AllAssets.DoesNotExist:
+                pass
+        
+        if not all_asset and symbol:
+            all_asset = AllAssets.objects.filter(
+                symbol__iexact=symbol,
+                platform=broker_account.broker.broker_type,
+                is_tradable=True
+            ).first()
+        
+        # Fonction pour récupérer le prix broker
+        def get_broker_price():
+            try:
+                service = BrokerService(request.user)
+                broker_instance = service.get_broker_instance(broker_account)
+                
+                if not broker_instance.authenticate():
+                    logger.warning(f"Failed to authenticate with {broker_account.broker.broker_type}")
+                    return {'error': 'Failed to authenticate with broker'}
+                
+                price_params = {}
+                
+                # Pour Saxo, utiliser UIC et asset_type si disponibles
+                if broker_account.broker.broker_type == 'SAXO':
+                    if all_asset and all_asset.saxo_uic:
+                        price_params['uic'] = all_asset.saxo_uic
+                        price_params['asset_type'] = all_asset.asset_type or 'Stock'
+                        logger.debug(f"Using UIC {all_asset.saxo_uic} and asset_type {price_params['asset_type']} for {symbol}")
+                    else:
+                        # Essayer de trouver l'UIC depuis le symbole
+                        logger.debug(f"No UIC found for {symbol}, will try to find it via symbol")
+                        price_params['asset_type'] = all_asset.asset_type if all_asset else 'Stock'
+                
+                logger.debug(f"Fetching price from {broker_account.broker.broker_type} for symbol {symbol} with params: {price_params}")
+                
+                price_data = broker_instance.get_asset_price(
+                    symbol=symbol,
+                    **price_params
+                )
+                
+                logger.debug(f"Price data returned from broker: {type(price_data)}, value: {price_data}")
+                
+                if price_data is not None:
+                    # Extraire le prix selon le format retourné par le broker
+                    price_value = None
+                    if isinstance(price_data, (Decimal, int, float)):
+                        price_value = float(price_data)
+                        logger.debug(f"Extracted price value (numeric): {price_value}")
+                    elif isinstance(price_data, dict):
+                        # Chercher le prix dans différentes clés possibles
+                        logger.debug(f"Price data is dict with keys: {list(price_data.keys())}")
+                        price_value = (
+                            price_data.get('price') or 
+                            price_data.get('last') or 
+                            price_data.get('close') or
+                            price_data.get('lastPrice')
+                        )
+                        if price_value:
+                            price_value = float(price_value)
+                            logger.debug(f"Extracted price value (from dict): {price_value}")
+                    
+                    if price_value and price_value > 0:
+                        logger.info(f"Successfully retrieved price {price_value} from {broker_account.broker.broker_type} for {symbol}")
+                        return {
+                            'price': price_value,
+                            'currency': all_asset.currency if all_asset else 'USD',
+                            'source': broker_account.broker.broker_type
+                        }
+                    else:
+                        logger.warning(f"Invalid price value: {price_value} for {symbol}")
+                
+                error_msg = f'Could not retrieve price from {broker_account.broker.broker_type} for {symbol}'
+                if broker_account.broker.broker_type == 'SAXO' and not all_asset:
+                    error_msg += ' (asset not found in AllAssets)'
+                elif broker_account.broker.broker_type == 'SAXO' and all_asset and not all_asset.saxo_uic:
+                    error_msg += f' (UIC missing for {symbol})'
+                logger.warning(error_msg)
+                return {'error': error_msg}
+                
+            except Exception as e:
+                logger.exception(f"Error getting broker price for {symbol}: {e}")
+                return {'error': f'Error: {str(e)}'}
+        
+        # Fonction pour récupérer le prix Yahoo
+        def get_yahoo_price_data():
+            try:
+                # Récupérer le symbole Yahoo depuis AllAssets
+                yahoo_symbol = None
+                if all_asset and all_asset.symbole_yahoo:
+                    if all_asset.symbole_yahoo not in ['Not_searched', 'not_found', 'manual']:
+                        yahoo_symbol = all_asset.symbole_yahoo
+                
+                # Si pas de symbole Yahoo validé, nettoyer le symbole original
+                if not yahoo_symbol:
+                    # Nettoyer le symbole (enlever :XNAS, etc.)
+                    yahoo_symbol = symbol.split(':')[0].strip().upper()
+                
+                # Nettoyer le symbole Yahoo si il contient des extensions
+                if yahoo_symbol and (':' in yahoo_symbol or '.' in yahoo_symbol):
+                    # Enlever les extensions de marché (:XNAS, .PA, etc.)
+                    parts = yahoo_symbol.replace('.', ':').split(':')
+                    yahoo_symbol = parts[0].strip().upper()
+                
+                logger.debug(f"Yahoo symbol to try: {yahoo_symbol} (original: {symbol})")
+                
+                # Utiliser YahooFinanceService
+                yahoo_service = YahooFinanceService()
+                if not yahoo_service.is_available:
+                    return {'available': False, 'error': 'Yahoo Finance service not available'}
+                
+                # Essayer plusieurs variantes de symboles
+                symbols_to_try = []
+                
+                # D'abord le symbole nettoyé
+                if yahoo_symbol:
+                    symbols_to_try.append(yahoo_symbol)
+                
+                # Ajouter des variantes si c'est un symbole simple
+                if yahoo_symbol and len(yahoo_symbol) <= 5 and yahoo_symbol.isalpha():
+                    # Pour les actions US, essayer juste le symbole de base
+                    # Pour les cryptos, ajouter le suffixe USD
+                    if broker_account.broker.broker_type == 'BINANCE':
+                        if not any(yahoo_symbol.endswith(s) for s in ['USD', 'EUR', 'USDT']):
+                            symbols_to_try.append(f"{yahoo_symbol}-USD")
+                
+                # Si le symbole original était différent, l'essayer aussi
+                clean_original = symbol.split(':')[0].strip().upper()
+                if clean_original != yahoo_symbol and clean_original not in symbols_to_try:
+                    symbols_to_try.append(clean_original)
+                
+                logger.debug(f"Trying Yahoo symbols: {symbols_to_try}")
+                
+                # Essayer chaque symbole jusqu'à en trouver un qui fonctionne
+                for sym in symbols_to_try:
+                    try:
+                        price = yahoo_service.get_current_price(sym)
+                        if price is not None:
+                            logger.info(f"Yahoo price found for {sym}: {price}")
+                            return {
+                                'price': float(price),
+                                'symbol': sym,
+                                'available': True
+                            }
+                    except Exception as e:
+                        logger.debug(f"Yahoo price error for {sym}: {e}")
+                        continue
+                
+                logger.warning(f"Yahoo price not found for any symbol: {symbols_to_try}")
+                return {
+                    'available': False,
+                    'error': f'Price not found for symbols: {", ".join(symbols_to_try)}',
+                    'tried_symbols': symbols_to_try
+                }
+                
+            except Exception as e:
+                logger.exception(f"Error getting Yahoo price: {e}")
+                return {
+                    'available': False,
+                    'error': str(e)
+                }
+        
+        # Exécuter les deux requêtes en parallèle
+        broker_result = {'error': 'Timeout'}
+        yahoo_result = {'available': False, 'error': 'Timeout'}
+        
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                broker_future = executor.submit(get_broker_price)
+                yahoo_future = executor.submit(get_yahoo_price_data)
+                
+                broker_result = broker_future.result(timeout=10)
+                yahoo_result = yahoo_future.result(timeout=10)
+        except FutureTimeoutError:
+            logger.warning("Timeout while fetching prices")
+        except Exception as e:
+            logger.error(f"Error in parallel price fetching: {e}")
+        
+        # Préparer la réponse
+        response_data = {
+            'success': 'error' not in broker_result,
+            'broker_price': broker_result,
+        }
+        
+        # Ajouter les données Yahoo
+        if yahoo_result.get('available'):
+            response_data['yahoo_data'] = {
+                'price': yahoo_result.get('price'),
+                'symbol': yahoo_result.get('symbol'),
+                'available': True
+            }
+        else:
+            response_data['yahoo_data'] = {
+                'available': False,
+                'error': yahoo_result.get('error', 'Price not available'),
+                'tried_symbols': yahoo_result.get('tried_symbols', [])
+            }
+        
+        # Ajouter le symbole Yahoo validé si disponible
+        if all_asset and all_asset.symbole_yahoo:
+            response_data['yahoo_data']['validated_symbol'] = (
+                all_asset.symbole_yahoo 
+                if all_asset.symbole_yahoo not in ['Not_searched', 'not_found', 'manual']
+                else None
+            )
+        
+        return Response(response_data)
+    
+    @action(detail=False, methods=['post'])
+    def sync(self, request):
+        """
+        POST /api/orders/sync/
+        Synchronise les ordres depuis un broker.
+        
+        Body:
+        {
+            "broker_account_id": 1,
+            "status": "OPEN",  // optionnel, défaut: "OPEN"
+            "symbol": "AAPL"   // optionnel, filtrer par symbole
+        }
+        """
+        broker_account_id = request.data.get('broker_account_id')
+        status = request.data.get('status', 'OPEN')
+        symbol = request.data.get('symbol')
+        
+        if not broker_account_id:
+            return Response(
+                {'error': 'broker_account_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            broker_account = BrokerAccount.objects.get(
+                id=broker_account_id,
+                user=request.user
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response(
+                {'error': 'Broker account not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Sync orders
+        service = BrokerService(request.user)
+        result = service.sync_pending_orders_from_broker(
+            broker_account=broker_account,
+            status=status,
+            symbol=symbol
+        )
+        
+        if not result.get('success'):
+            return Response(
+                {'error': result.get('message', 'Sync failed')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return Response({
+            'success': True,
+            'message': result.get('message'),
+            'created': result.get('created', 0),
+            'updated': result.get('updated', 0),
+            'errors': result.get('errors', [])
         })
 
 

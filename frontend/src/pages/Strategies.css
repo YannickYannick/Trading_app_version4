@@ -1,0 +1,100 @@
+.strategies-page {
+  padding: 2rem;
+}
+
+.strategies-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.strategies-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+}
+
+.empty-state p {
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  padding: 1rem;
+}
+
+.error-message p {
+  margin: 0.5rem 0;
+}
+
+.text-muted {
+  color: var(--text-secondary, #6b7280);
+}
+
+.text-success {
+  color: var(--success-color, #22c55e);
+}
+
+.text-danger {
+  color: var(--error-color, #ef4444);
+}
+
+.text-info {
+  color: var(--info-color, #3b82f6);
+}
+
+.text-warning {
+  color: var(--warning-color, #f59e0b);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.fw-bold {
+  font-weight: 600;
+}
+
+.strategy-actions-inline {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.strategy-actions-inline button {
+  flex-shrink: 0;
+  min-width: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.strategy-actions-inline button:first-child {
+  font-weight: 500;
+}
+
+.strategies-page .table-wrapper {
+  position: relative;
+}
+
+.strategies-hint {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--info-color, #3b82f6);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.strategies-hint strong {
+  font-weight: 600;
+}
+

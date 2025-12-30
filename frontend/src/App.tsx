@@ -10,6 +10,8 @@ import Trades from '@pages/Trades'
 import TradeDetail from '@pages/TradeDetail'
 import Assets from '@pages/Assets'
 import AssetDetail from '@pages/AssetDetail'
+import Orders from '@pages/Orders'
+import Strategies from '@pages/Strategies'
 import Brokers from '@pages/Brokers'
 import Settings from '@pages/Settings'
 
@@ -45,6 +47,12 @@ function App() {
         {/* Assets */}
         <Route path="assets" element={<Assets />} />
         <Route path="assets/:id" element={<AssetDetail />} />
+
+        {/* Orders */}
+        <Route path="orders" element={<Orders />} />
+
+        {/* Strategies */}
+        <Route path="strategies" element={<Strategies />} />
 
         {/* Brokers */}
         <Route path="brokers" element={<Brokers />} />

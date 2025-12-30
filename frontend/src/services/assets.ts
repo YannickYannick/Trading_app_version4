@@ -127,6 +127,30 @@ export const assetService = {
     })
     return response.data
   },
+
+  /**
+   * Autocomplétion pour AllAssets (placement d'ordres)
+   */
+  async autocompleteAllAssets(query: string, platform?: string): Promise<{
+    id: number
+    symbol: string
+    name: string
+    platform: string
+    asset_type: string
+    currency: string
+    market: string
+    text: string
+    saxo_uic?: number
+  }[]> {
+    const params: any = { q: query }
+    if (platform) {
+      params.platform = platform
+    }
+    const response = await apiClient.get<{ results: any[] }>('/all-assets/autocomplete/', {
+      params,
+    })
+    return response.data.results
+  },
 }
 
 export default assetService

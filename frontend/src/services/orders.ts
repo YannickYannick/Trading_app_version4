@@ -24,6 +24,42 @@ export interface OrderCreateData {
   broker_id?: number
 }
 
+export interface PlaceOrderData {
+  broker_account_id: number
+  symbol: string
+  side: 'BUY' | 'SELL'
+  quantity: string
+  order_type?: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
+  price?: string
+  stop_price?: string
+  asset_id?: number
+  all_asset_id?: number  // ID AllAssets (prioritaire sur symbol pour la recherche)
+}
+
+export interface SyncOrdersData {
+  broker_account_id: number
+  status?: string
+  symbol?: string
+}
+
+export interface AssetPriceResponse {
+  success: boolean
+  broker_price: {
+    price: number
+    currency: string
+    source: string
+    error?: string
+  }
+  yahoo_data: {
+    price?: number
+    symbol?: string
+    available: boolean
+    error?: string
+    tried_symbols?: string[]
+    validated_symbol?: string | null
+  }
+}
+
 export const orderService = {
   /**
    * Récupérer tous les ordres
@@ -82,6 +118,102 @@ export const orderService = {
    */
   async delete(id: number): Promise<void> {
     await apiClient.delete(`/orders/${id}/`)
+  },
+
+  /**
+   * Placer un ordre directement via le broker
+   */
+  async placeOrder(data: PlaceOrderData): Promise<{
+    success: boolean
+    message: string
+    order: Order
+    broker_result?: {
+      order_id: string
+      message: string
+    }
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      order: Order
+      broker_result?: {
+        order_id: string
+        message: string
+      }
+    }>('/orders/place/', data)
+    return response.data
+  },
+
+  /**
+   * Placer un ordre existant (PENDING) via le broker
+   */
+  async placeBrokerOrder(id: number): Promise<{
+    success: boolean
+    message: string
+    order: Order
+    broker_result?: {
+      order_id: string
+      message: string
+    }
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      order: Order
+      broker_result?: {
+        order_id: string
+        message: string
+      }
+    }>(`/orders/${id}/place_broker/`)
+    return response.data
+  },
+
+  /**
+   * Annuler un ordre chez le broker
+   */
+  async cancelBrokerOrder(id: number): Promise<{
+    success: boolean
+    message: string
+    order: Order
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      order: Order
+    }>(`/orders/${id}/cancel_broker/`)
+    return response.data
+  },
+
+  /**
+   * Synchroniser les ordres depuis un broker
+   */
+  async syncOrders(data: SyncOrdersData): Promise<{
+    success: boolean
+    message: string
+    created: number
+    updated: number
+    errors: string[]
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      created: number
+      updated: number
+      errors: string[]
+    }>('/orders/sync/', data)
+    return response.data
+  },
+
+  /**
+   * Récupérer le prix d'un actif depuis le broker ET Yahoo (en parallèle)
+   */
+  async getAssetPrice(data: {
+    broker_account_id: number
+    symbol: string
+    all_asset_id?: number
+  }): Promise<AssetPriceResponse> {
+    const response = await apiClient.post<AssetPriceResponse>('/orders/get_asset_price/', data)
+    return response.data
   },
 }
 
