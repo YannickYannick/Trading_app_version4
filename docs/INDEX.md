@@ -56,6 +56,13 @@ Trading_app_version4/
 - Binance API
 - Synchronisation des données
 
+### [Phase 7 : Système de Stratégies](phase_7/README.md)
+- Modèles de stratégies et exécution
+- Algorithmes de trading (Threshold, RSI, MA Crossover, etc.)
+- API REST pour gestion des stratégies
+- Interface React avec React Table
+- Exécution automatique et manuelle
+
 ## 🔧 Stack technique
 
 | Composant | Technologie |
@@ -117,6 +124,16 @@ docs/
     ├── 05_CORS.md
     ├── 06_AUTHENTIFICATION.md
     └── 07_TESTS_API.md
+└── phase_7/                                    # Phase 7 - Système de Stratégies
+    ├── README.md
+    ├── STRATEGIES_OVERVIEW.md
+    ├── STRATEGIES_MODELS.md
+    ├── STRATEGIES_ALGORITHMS.md
+    ├── STRATEGIES_API.md
+    ├── STRATEGIES_SERVICES.md
+    ├── STRATEGIES_FRONTEND.md
+    ├── STRATEGIES_EXECUTION.md
+    └── STRATEGIES_EXAMPLES.md
 ```
 
 ## 🔧 Corrections et Optimisations
