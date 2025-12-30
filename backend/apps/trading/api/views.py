@@ -224,44 +224,46 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             stats = ValidationStats()
             stats.total = assets_count
             
+            # ✅ OPTIMISATION: Créer l'instance broker une seule fois avant la boucle
+            # Récupérer le broker config si disponible (pour Saxo)
+            broker_config = {}
+            if assets_list and assets_list[0].platform == 'SAXO':
+                # Essayer de récupérer un access token valide d'un compte Saxo actif
+                # Utiliser le service broker pour obtenir un token valide (avec refresh automatique)
+                from ..models import BrokerAccount
+                from ..services.broker_service import BrokerService
+                saxo_account = BrokerAccount.objects.filter(
+                    broker_type='SAXO',
+                    user=request.user
+                ).first()
+                if saxo_account:
+                    try:
+                        # ✅ OPTIMISATION: Créer l'instance broker une seule fois et la réutiliser
+                        broker_service = BrokerService(request.user)
+                        broker = broker_service.get_broker_instance(saxo_account, use_cache=True)  # Utiliser le cache
+                        
+                        # Authentifier (cela va rafraîchir le token si nécessaire)
+                        if broker.authenticate():
+                            broker_config['access_token'] = broker.access_token
+                            broker_config['base_url'] = broker.base_url
+                            logger.debug(f"Using valid Saxo token for validation (account {saxo_account.id}) - instance réutilisée")
+                        else:
+                            logger.warning(f"Could not authenticate Saxo broker for validation: {broker.last_error}")
+                    except Exception as e:
+                        logger.warning(f"Error getting valid Saxo token: {e}")
+                        # Fallback: utiliser le token stocké directement (peut être expiré)
+                        if saxo_account.saxo_access_token:
+                            broker_config['access_token'] = saxo_account.saxo_access_token
+                            # ✅ MIGRATION: Fallback changé de SIM vers LIVE
+                            broker_config['base_url'] = 'https://gateway.saxobank.com/openapi'
+                            logger.debug(f"Using stored Saxo token (may be expired)")
+            
             # Valider chaque asset avec suivi du progrès
             processed_count = 0
             for asset in assets_list:
                 processed_count += 1
                 logger.debug(f"Traitement asset {processed_count}/{assets_count}: {asset.symbol}")
                 try:
-                    # Récupérer le broker config si disponible (pour Saxo)
-                    broker_config = {}
-                    if asset.platform == 'SAXO':
-                        # Essayer de récupérer un access token valide d'un compte Saxo actif
-                        # Utiliser le service broker pour obtenir un token valide (avec refresh automatique)
-                        from ..models import BrokerAccount
-                        from ..services.broker_service import BrokerService
-                        saxo_account = BrokerAccount.objects.filter(
-                            broker_type='SAXO',
-                            user=request.user
-                        ).first()
-                        if saxo_account:
-                            try:
-                                # Utiliser le service broker pour obtenir un token valide avec refresh automatique
-                                broker_service = BrokerService(request.user)
-                                broker = broker_service.get_broker_instance(saxo_account, use_cache=False)
-                                
-                                # Authentifier (cela va rafraîchir le token si nécessaire)
-                                if broker.authenticate():
-                                    broker_config['access_token'] = broker.access_token
-                                    broker_config['base_url'] = broker.base_url
-                                    logger.debug(f"Using valid Saxo token for validation (account {saxo_account.id})")
-                                else:
-                                    logger.warning(f"Could not authenticate Saxo broker for validation: {broker.last_error}")
-                            except Exception as e:
-                                logger.warning(f"Error getting valid Saxo token: {e}")
-                                # Fallback: utiliser le token stocké directement (peut être expiré)
-                                if saxo_account.saxo_access_token:
-                                    broker_config['access_token'] = saxo_account.saxo_access_token
-                                    # ✅ MIGRATION: Fallback changé de SIM vers LIVE
-                                    broker_config['base_url'] = 'https://gateway.saxobank.com/openapi'
-                                    logger.debug(f"Using stored Saxo token (may be expired)")
                     
                     # Utiliser validate_single_asset
                     result = validate_single_asset(
