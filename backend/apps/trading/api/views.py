@@ -178,12 +178,22 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             reset = str(reset).lower() == 'true'
             limit = int(data.get('limit', request.query_params.get('limit', DEFAULT_VALIDATION_LIMIT)))
             platform = data.get('platform') or request.query_params.get('platform')
+            only_existing_assets = data.get('onlyExistingAssets', False) or data.get('only_existing_assets', False)
             
             # Construire le queryset
             queryset = AllAssets.objects.all()
             
             if platform:
                 queryset = queryset.filter(platform=platform)
+            
+            # ✅ NOUVELLE OPTION: Filtrer uniquement les assets qui existent dans le modèle Asset
+            if only_existing_assets:
+                from ..models import Asset
+                existing_all_asset_ids = Asset.objects.filter(
+                    all_asset__isnull=False
+                ).values_list('all_asset_id', flat=True).distinct()
+                queryset = queryset.filter(id__in=existing_all_asset_ids)
+                logger.info(f"Filtrage 'only-existing-assets': {queryset.count()} assets correspondent au modèle Asset")
             
             # Si reset, réinitialiser les symboles Yahoo
             if reset:

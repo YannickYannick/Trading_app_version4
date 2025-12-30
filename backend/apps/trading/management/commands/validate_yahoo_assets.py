@@ -8,13 +8,16 @@ Usage:
     python manage.py validate_yahoo_assets --broker=SAXO --asset-type=Stock
     python manage.py validate_yahoo_assets --broker=BINANCE --workers=2
     python manage.py validate_yahoo_assets --broker=SAXO --tolerance=3.0 --dry-run
+    python manage.py validate_yahoo_assets --broker=SAXO --limit=50  # Valider 50 assets
+    python manage.py validate_yahoo_assets --broker=SAXO --batch-size=50  # Alias pour --limit
+    python manage.py validate_yahoo_assets --broker=SAXO --only-existing-assets  # Uniquement les assets du modèle Asset
 """
 
 import sys
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 
-from apps.trading.models import AllAssets
+from apps.trading.models import AllAssets, Asset
 from apps.trading.services.yahoo_validator import (
     validate_assets,
     clear_yahoo_cache,
@@ -91,7 +94,14 @@ class Command(BaseCommand):
             '--limit',
             type=int,
             default=None,
-            help='Limiter le nombre d\'assets à traiter (pour les tests)'
+            help='Nombre d\'assets à valider dans ce batch (prend toujours les prochains non validés)'
+        )
+        
+        parser.add_argument(
+            '--batch-size',
+            type=int,
+            default=None,
+            help='Alias pour --limit (même fonctionnalité)'
         )
         
         parser.add_argument(
@@ -117,6 +127,12 @@ class Command(BaseCommand):
             action='store_true',
             help='Revalider les assets marqués "not_found"'
         )
+        
+        parser.add_argument(
+            '--only-existing-assets',
+            action='store_true',
+            help='Ne valider que les assets qui existent dans le modèle Asset (admin/trading/asset/)'
+        )
 
     def handle(self, *args, **options):
         broker = options['broker']
@@ -125,11 +141,12 @@ class Command(BaseCommand):
         tolerance = options['tolerance']
         access_token = options['access_token']
         saxo_env = options['saxo_env']
-        limit = options['limit']
+        limit = options.get('batch_size') or options['limit']  # batch-size a la priorité
         dry_run = options['dry_run']
         clear_cache = options['clear_cache']
         quiet = options['quiet']
         reset_not_found = options['reset_not_found']
+        only_existing_assets = options['only_existing_assets']
         
         # === Header ===
         if not quiet:
@@ -169,10 +186,43 @@ class Command(BaseCommand):
         # Exclure les manuels
         queryset = queryset.exclude(symbole_yahoo='manual')
         
+        # ✅ NOUVELLE OPTION: Filtrer uniquement les assets qui existent dans le modèle Asset
+        if only_existing_assets:
+            # Récupérer les IDs des AllAssets qui ont au moins un Asset associé
+            existing_all_asset_ids = Asset.objects.filter(
+                all_asset__isnull=False
+            ).values_list('all_asset_id', flat=True).distinct()
+            
+            # Filtrer le queryset pour ne garder que ceux-ci
+            queryset = queryset.filter(id__in=existing_all_asset_ids)
+            
+            if not quiet:
+                count = queryset.count()
+                self.stdout.write(self.style.SUCCESS(
+                    f"🎯 Mode 'only-existing-assets': {count} assets correspondant au modèle Asset"
+                ))
+        
+        # ✅ AMÉLIORATION: Ordre stable pour garantir la reproductibilité
+        # Ordre par ID pour que chaque batch prenne toujours les mêmes assets dans le même ordre
+        queryset = queryset.order_by('id')
+        
+        # Compter le total disponible AVANT de limiter (pour affichage)
+        total_available = queryset.count()
+        
         if limit:
             queryset = queryset[:limit]
             if not quiet:
-                self.stdout.write(self.style.WARNING(f"⚠️ Limité à {limit} assets"))
+                self.stdout.write(self.style.SUCCESS(
+                    f"📦 Batch de {limit} assets (sur {total_available} disponibles)"
+                ))
+                if limit < total_available:
+                    self.stdout.write(self.style.WARNING(
+                        f"   ⏭️  {total_available - limit} assets resteront pour les prochains batches"
+                    ))
+        elif not quiet and total_available > 0:
+            self.stdout.write(self.style.INFO(
+                f"ℹ️  {total_available} assets non validés disponibles"
+            ))
         
         assets = list(queryset)
         
@@ -189,10 +239,16 @@ class Command(BaseCommand):
             self.stdout.write(f"   Broker: {broker}")
             if asset_type:
                 self.stdout.write(f"   Type: {asset_type}")
-            self.stdout.write(f"   Assets à traiter: {len(assets)}")
+            self.stdout.write(f"   Assets à traiter dans ce batch: {len(assets)}")
+            if limit:
+                remaining = total_available - len(assets)
+                if remaining > 0:
+                    self.stdout.write(f"   Assets restants pour prochains batches: {remaining}")
             self.stdout.write(f"   Tolérance: ±{tolerance}%")
             self.stdout.write(f"   Workers: {max_workers}")
             self.stdout.write(f"   Dry run: {'Oui' if dry_run else 'Non'}")
+            if only_existing_assets:
+                self.stdout.write(f"   Mode: Uniquement assets existants dans Asset model")
             if broker == 'SAXO':
                 self.stdout.write(f"   Environnement Saxo: {saxo_env}")
         
@@ -221,6 +277,28 @@ class Command(BaseCommand):
             # === Résumé final ===
             if not quiet:
                 self._print_summary(stats, dry_run)
+                
+                # Afficher le nombre d'assets restants après ce batch
+                if limit and not dry_run:
+                    remaining_assets = AllAssets.objects.filter(
+                        platform=broker,
+                        symbole_yahoo='Not_searched'
+                    ).exclude(symbole_yahoo='manual').count()
+                    if asset_type:
+                        remaining_assets = AllAssets.objects.filter(
+                            platform=broker,
+                            asset_type=asset_type,
+                            symbole_yahoo='Not_searched'
+                        ).exclude(symbole_yahoo='manual').count()
+                    
+                    if remaining_assets > 0:
+                        self.stdout.write(f"\n📊 Assets restants: {remaining_assets}")
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"   💡 Pour valider {min(limit, remaining_assets)} de plus, "
+                                f"relancez avec: --limit {min(limit, remaining_assets)}"
+                            )
+                        )
                 
                 # Info cache
                 cache_info = get_cache_info()

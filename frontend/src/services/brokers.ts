@@ -511,6 +511,7 @@ export const brokerService = {
     reset?: boolean
     limit?: number
     platform?: string
+    onlyExistingAssets?: boolean
   }): Promise<{
     success: boolean
     message: string

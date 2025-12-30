@@ -192,6 +192,12 @@ def get_saxo_price(
     if not access_token or not uic:
         return None
     
+    # Détecter l'environnement depuis l'URL pour logging
+    environment = "LIVE" if "/sim/" not in base_url else "SIM"
+    token_preview = access_token[:20] + "..." if access_token else "None"
+    
+    logger.debug(f"🔍 Getting Saxo price for UIC {uic} ({asset_type}) - Environment: {environment}, URL: {base_url}, Token: {token_preview}")
+    
     try:
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -206,12 +212,17 @@ def get_saxo_price(
             "FieldGroups": "PriceInfo,Quote"  # Inclure PriceInfo pour LastTraded, Bid, Ask
         }
         
+        full_url = f"{base_url}/trade/v1/infoprices"
+        logger.debug(f"📡 Request URL: {full_url} with params: {params}")
+        
         response = requests.get(
-            f"{base_url}/trade/v1/infoprices",
+            full_url,
             params=params,
             headers=headers,
             timeout=REQUEST_TIMEOUT
         )
+        
+        logger.debug(f"📥 Response status: {response.status_code} for UIC {uic}")
         
         if response.status_code == 200:
             data = response.json()
@@ -246,9 +257,18 @@ def get_saxo_price(
             price_type_ask = quote.get("PriceTypeAsk", "")
             price_type_bid = quote.get("PriceTypeBid", "")
             if price_type_ask == "NoAccess" and price_type_bid == "NoAccess":
-                logger.warning(f"Price access denied for UIC {uic}: PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid}")
+                logger.warning(
+                    f"❌ {environment} MODE: Price access denied for UIC {uic} "
+                    f"(PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid}). "
+                    f"⚠️ Possible causes: "
+                    f"{'1) Token SIM used with LIVE URL' if environment == 'LIVE' else '1) Token LIVE used with SIM URL'}, "
+                    f"2) Market Data subscription not activated, "
+                    f"3) Instrument not available for this account. "
+                    f"URL used: {base_url}"
+                )
                 # En LIVE, NoAccess signifie généralement que les permissions Market Data ne sont pas activées
                 # ou que l'instrument n'est pas disponible
+                # Ou que le token n'est pas compatible avec l'environnement (SIM token avec LIVE URL)
                 return None
             
             # ✅ PRIORITÉ: Mid > Bid > Ask (format standard de l'API LIVE)
@@ -256,7 +276,7 @@ def get_saxo_price(
             price = quote.get("Mid") or quote.get("Bid") or quote.get("Ask")
             
             if price:
-                logger.debug(f"Saxo price found for UIC {uic}: {price} (Mid={quote.get('Mid')}, Bid={quote.get('Bid')}, Ask={quote.get('Ask')})")
+                logger.info(f"✅ {environment} MODE: Saxo price found for UIC {uic}: {price} (Mid={quote.get('Mid')}, Bid={quote.get('Bid')}, Ask={quote.get('Ask')})")
                 return float(price)
             
             # Format alternatif: Amount (pour certains types d'instruments)
@@ -282,9 +302,17 @@ def get_saxo_price(
                 f"Amount={quote.get('Amount')}, PriceTypeAsk={price_type_ask}, PriceTypeBid={price_type_bid})"
             )
             return None
+        elif response.status_code == 401:
+            error_text = response.text[:500] if hasattr(response, 'text') else 'No response text'
+            logger.error(
+                f"❌ {environment} MODE: Unauthorized (401) for UIC {uic}. "
+                f"⚠️ This usually means the token is not valid for this environment. "
+                f"Check if you're using a {'SIM token with LIVE URL' if environment == 'LIVE' else 'LIVE token with SIM URL'}. "
+                f"Error: {error_text}"
+            )
         else:
             error_text = response.text[:500] if hasattr(response, 'text') else 'No response text'
-            logger.warning(f"Saxo API error {response.status_code} for UIC {uic}, asset_type={asset_type}: {error_text}")
+            logger.warning(f"❌ {environment} MODE: Saxo API error {response.status_code} for UIC {uic}, asset_type={asset_type}: {error_text}")
             
     except requests.exceptions.Timeout:
         logger.warning(f"Saxo API timeout for UIC {uic}")

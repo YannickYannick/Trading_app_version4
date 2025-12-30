@@ -13,15 +13,20 @@ interface YahooValidationModalProps {
   onComplete?: (result: any) => void
   limit?: number
   reset?: boolean
+  onlyExistingAssets?: boolean
 }
 
 export default function YahooValidationModal({
   isOpen,
   onClose,
   onComplete,
-  limit = 100,
-  reset = false,
+  limit: initialLimit = 100,
+  reset: initialReset = false,
+  onlyExistingAssets: initialOnlyExistingAssets = false,
 }: YahooValidationModalProps) {
+  const [limit, setLimit] = useState(initialLimit)
+  const [reset, setReset] = useState(initialReset)
+  const [onlyExistingAssets, setOnlyExistingAssets] = useState(initialOnlyExistingAssets)
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState(0)
   const [current, setCurrent] = useState(0)
@@ -47,6 +52,7 @@ export default function YahooValidationModal({
       const validationPromise = brokerService.validateYahooSymbols({
         limit,
         reset,
+        onlyExistingAssets,
       })
 
       // Simuler le progrès pendant que la validation se fait
@@ -132,7 +138,7 @@ export default function YahooValidationModal({
     onClose()
   }
 
-  // Réinitialiser l'état quand le modal s'ouvre
+    // Réinitialiser l'état quand le modal s'ouvre
   useEffect(() => {
     if (isOpen && status !== 'running') {
       setStatus('idle')
@@ -143,8 +149,12 @@ export default function YahooValidationModal({
       setResult(null)
       setIsValidating(false)
       startTimeRef.current = null
+      // Réinitialiser les paramètres avec les valeurs initiales
+      setLimit(initialLimit)
+      setReset(initialReset)
+      setOnlyExistingAssets(initialOnlyExistingAssets)
     }
-  }, [isOpen]) // Se déclenche quand isOpen change
+  }, [isOpen, initialLimit, initialReset, initialOnlyExistingAssets]) // Se déclenche quand isOpen change
 
   useEffect(() => {
     return () => {
@@ -178,13 +188,49 @@ export default function YahooValidationModal({
             <p>
               Cette opération va valider les symboles Yahoo Finance pour les assets.
             </p>
-            <p>
-              <strong>Paramètres:</strong>
-            </p>
-            <ul>
-              <li>Limite: {limit} assets</li>
-              <li>Reset: {reset ? 'Oui' : 'Non'}</li>
-            </ul>
+            <div className="yahoo-validation-params">
+              <p>
+                <strong>Paramètres:</strong>
+              </p>
+              <div className="yahoo-validation-param-item">
+                <label htmlFor="limit-input">
+                  Limite (nombre d'assets à valider):
+                </label>
+                <input
+                  id="limit-input"
+                  type="number"
+                  min="1"
+                  value={limit}
+                  onChange={(e) => setLimit(parseInt(e.target.value) || 100)}
+                  disabled={isValidating}
+                  className="yahoo-validation-input"
+                />
+              </div>
+              <div className="yahoo-validation-param-item">
+                <label htmlFor="reset-checkbox">
+                  <input
+                    id="reset-checkbox"
+                    type="checkbox"
+                    checked={reset}
+                    onChange={(e) => setReset(e.target.checked)}
+                    disabled={isValidating}
+                  />
+                  {' '}Reset (revalider les assets marqués "not_found")
+                </label>
+              </div>
+              <div className="yahoo-validation-param-item">
+                <label htmlFor="only-existing-checkbox">
+                  <input
+                    id="only-existing-checkbox"
+                    type="checkbox"
+                    checked={onlyExistingAssets}
+                    onChange={(e) => setOnlyExistingAssets(e.target.checked)}
+                    disabled={isValidating}
+                  />
+                  {' '}Uniquement les assets existants (du modèle Asset)
+                </label>
+              </div>
+            </div>
             <div className="yahoo-validation-actions">
               <Button onClick={startValidation} variant="primary" disabled={isValidating}>
                 Démarrer la validation

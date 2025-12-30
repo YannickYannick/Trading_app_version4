@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.forms import Textarea
+from django.utils.translation import gettext_lazy as _
 from .models import (
     AllAssets, Asset, AssetPrice,
     Position, Trade, Order,
@@ -9,10 +11,40 @@ from .models import (
 
 # ============== ASSETS ==============
 
+class YahooValidationFilter(admin.SimpleListFilter):
+    """Filtre personnalisé pour les assets validés par Yahoo Finance."""
+    title = _('Validation Yahoo')
+    parameter_name = 'yahoo_validation'
+
+    def lookups(self, request, model_admin):
+        """Définit les options du filtre."""
+        return (
+            ('validated', _('✅ Validés')),
+            ('not_searched', _('⏳ Non recherchés')),
+            ('not_found', _('❌ Non trouvés')),
+            ('manual', _('✋ Validation manuelle')),
+        )
+
+    def queryset(self, request, queryset):
+        """Applique le filtre selon la sélection."""
+        if self.value() == 'validated':
+            # Assets validés : symbole_yahoo n'est pas 'Not_searched', 'not_found', ou 'manual'
+            return queryset.exclude(
+                symbole_yahoo__in=['Not_searched', 'not_found', 'manual']
+            ).exclude(symbole_yahoo='')
+        elif self.value() == 'not_searched':
+            return queryset.filter(symbole_yahoo='Not_searched')
+        elif self.value() == 'not_found':
+            return queryset.filter(symbole_yahoo='not_found')
+        elif self.value() == 'manual':
+            return queryset.filter(symbole_yahoo='manual')
+        return queryset
+
+
 @admin.register(AllAssets)
 class AllAssetsAdmin(admin.ModelAdmin):
-    list_display = ['symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'is_tradable', 'last_updated']
-    list_filter = ['platform', 'asset_type', 'market', 'is_tradable', 'currency']
+    list_display = ['symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'is_tradable', 'symbole_yahoo', 'last_updated']
+    list_filter = ['platform', 'asset_type', 'market', 'is_tradable', 'currency', YahooValidationFilter]
     search_fields = ['symbol', 'name', 'saxo_uic', 'symbole_yahoo']
     ordering = ['symbol']
     readonly_fields = ['last_updated', 'created_at', 'yahoo_validated_at']
@@ -110,9 +142,59 @@ class BrokerAdmin(admin.ModelAdmin):
 
 @admin.register(BrokerAccount)
 class BrokerAccountAdmin(admin.ModelAdmin):
-    list_display = ['user', 'broker', 'account_id', 'balance', 'currency', 'is_active', 'is_demo']
-    list_filter = ['broker', 'is_active', 'is_demo']
-    search_fields = ['user__username', 'account_id']
+    list_display = ['user', 'broker', 'account_id', 'balance', 'currency', 'is_active', 'is_demo', 'environment']
+    list_filter = ['broker', 'is_active', 'is_demo', 'environment']
+    search_fields = ['user__username', 'account_id', 'name']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Informations générales', {
+            'fields': ('user', 'broker', 'name', 'broker_type', 'account_id', 'environment', 'is_active', 'is_demo', 'is_sandbox')
+        }),
+        ('Balance', {
+            'fields': ('balance', 'currency', 'balance_updated_at', 'last_sync'),
+        }),
+        ('Credentials Saxo Bank', {
+            'fields': (
+                'saxo_client_id',
+                'saxo_client_secret',
+                'saxo_redirect_uri',
+                'saxo_environment',
+                'saxo_access_token',
+                'saxo_refresh_token',
+                'saxo_token_expires_at',
+            ),
+            'classes': ('collapse',)  # Collapsible par défaut pour la sécurité
+        }),
+        ('Credentials Binance', {
+            'fields': (
+                'binance_api_key',
+                'binance_api_secret',
+                'binance_testnet',
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Auto-refresh (Saxo)', {
+            'fields': ('auto_refresh_enabled', 'auto_refresh_frequency'),
+            'classes': ('collapse',)
+        }),
+        ('Métadonnées', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    # Permettre de voir les tokens complets en utilisant des widgets textarea
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # Rendre les champs de tokens éditables avec des textarea plus grands
+        if 'saxo_access_token' in form.base_fields:
+            form.base_fields['saxo_access_token'].widget = Textarea(attrs={'rows': 5, 'cols': 100, 'style': 'font-family: monospace; font-size: 11px;'})
+        if 'saxo_refresh_token' in form.base_fields:
+            form.base_fields['saxo_refresh_token'].widget = Textarea(attrs={'rows': 5, 'cols': 100, 'style': 'font-family: monospace; font-size: 11px;'})
+        if 'saxo_client_secret' in form.base_fields:
+            form.base_fields['saxo_client_secret'].widget = Textarea(attrs={'rows': 3, 'cols': 100, 'style': 'font-family: monospace; font-size: 11px;'})
+        return form
 
 
 @admin.register(BrokerSyncLog)

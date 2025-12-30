@@ -127,8 +127,23 @@ class SaxoBroker(BrokerBase):
             self.base_url = "https://gateway.saxobank.com/sim/openapi"
             self.auth_url = "https://sim.logonvalidation.net"
         
+        # Détecter automatiquement un mismatch Token/URL
+        # ⚠️ Si on utilise une URL LIVE mais que le token semble être SIM (ou vice versa)
+        # On log un avertissement
+        access_token = credentials.get('access_token')
+        if access_token:
+            # Les tokens SIM et LIVE ont souvent des préfixes différents dans leur structure
+            # Mais on ne peut pas vraiment les distinguer sans les décoder
+            # On log l'environnement utilisé pour faciliter le débogage
+            logger.debug(
+                f"SaxoBroker: environment={environment}, "
+                f"base_url={self.base_url}, "
+                f"auth_url={self.auth_url}, "
+                f"token_preview={access_token[:20]}...{access_token[-10:] if len(access_token) > 30 else ''}"
+            )
+        
         # Tokens
-        self.access_token = credentials.get('access_token')
+        self.access_token = access_token
         self.refresh_token = credentials.get('refresh_token')
         self.token_expires_at = credentials.get('token_expires_at')
         
@@ -139,7 +154,10 @@ class SaxoBroker(BrokerBase):
         # Session HTTP
         self._session = requests.Session()
         
-        logger.info(f"SaxoBroker initialized for environment: {environment}")
+        logger.info(
+            f"SaxoBroker initialized for environment: {environment} "
+            f"(URL: {self.base_url})"
+        )
     
     # ==================== Authentication ====================
     
