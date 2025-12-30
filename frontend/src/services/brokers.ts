@@ -467,14 +467,21 @@ export const brokerService = {
    * Timeout augmenté à 10 minutes pour les synchronisations longues (ex: 20k+ assets)
    */
   async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {
-    const response = await apiClient.post<BrokerSyncLog>(
+    const response = await apiClient.post<{
+      success: boolean
+      message: string
+      error?: string
+      sync_log: BrokerSyncLog
+      details?: any
+    }>(
       `/broker-accounts/${accountId}/sync/`,
       syncRequest,
       {
-        timeout: 180, // 10 minutes (600000 ms) pour les synchronisations longues
+        timeout: 600000, // 10 minutes (600000 ms) pour les synchronisations longues
       }
     )
-    return response.data
+    // Le backend retourne { success, message, sync_log, ... }, on retourne le sync_log
+    return response.data.sync_log
   },
 
   /**
