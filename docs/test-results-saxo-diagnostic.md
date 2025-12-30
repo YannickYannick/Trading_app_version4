@@ -68,25 +68,35 @@ D'après les logs précédents, les assets suivants échouent probablement à ca
 
 ## ✅ Solution
 
-### Étapes pour activer Market Data US
+### Étapes pour activer Market Data dans SaxoTraderGO (LIVE)
+
+#### 1. Activer l'accès OpenAPI
 
 1. **Connectez-vous à SaxoTraderGO**
    - Application desktop ou site web
    - URL : https://www.saxotrader.com
 
-2. **Accédez aux paramètres Market Data**
-   - Menu : Settings → Market Data
+2. **Accédez aux paramètres OpenAPI**
+   - Menu : **Settings** → **Other** → **OpenAPI Access**
+   - Acceptez le disclaimer pour activer l'accès OpenAPI
+
+#### 2. Activer Market Data
+
+1. **Accédez aux paramètres Market Data**
+   - Menu : **Settings** → **Market Data**
    - Ou : Account → Market Data Subscriptions
 
-3. **Activez les flux nécessaires**
+2. **Activez les flux nécessaires**
    - ✅ US Stocks (NYSE, NASDAQ)
    - ✅ Autres marchés selon vos besoins :
      - Europe (XETR, XPAR, XLON, etc.)
      - Asie (XHKG, XTKS, etc.)
 
-4. **Vérifiez l'activation**
+3. **Vérifiez l'activation**
    - Les flux peuvent prendre quelques minutes à s'activer
    - Vérifiez que les abonnements sont "Active" ou "Subscribed"
+
+**⚠️ Important :** L'activation de l'accès OpenAPI est nécessaire pour utiliser l'environnement LIVE. Sans cela, vous pourrez obtenir des erreurs `NoAccess` même avec un token valide.
 
 ### Test après activation
 

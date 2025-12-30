@@ -213,8 +213,27 @@ python manage.py validate_yahoo_assets \
 3. Vérifier si le problème vient d'un mismatch Token/URL ou des permissions Market Data
 
 **Solutions :**
-- Si erreur 401 : Token incompatible avec l'environnement (SIM vs LIVE)
-- Si NoAccess : Permissions Market Data non activées dans SaxoTraderGO
+
+#### Si erreur 401
+- Token incompatible avec l'environnement (SIM vs LIVE)
+- Vérifier que le token correspond à l'environnement utilisé
+
+#### Si NoAccess
+**Pour utiliser l'environnement LIVE, deux étapes sont nécessaires :**
+
+1. **Activer l'accès OpenAPI** (obligatoire pour LIVE)
+   - Connectez-vous à SaxoTraderGO
+   - Menu : **Settings** → **Other** → **OpenAPI Access**
+   - Acceptez le disclaimer pour activer l'accès OpenAPI
+   - ⚠️ Sans cette étape, vous obtiendrez des erreurs `NoAccess` même avec un token valide
+
+2. **Activer Market Data**
+   - Menu : **Settings** → **Market Data**
+   - Activez les flux nécessaires :
+     - US Stocks (NYSE, NASDAQ) pour les actions américaines
+     - Europe (XETR, XPAR, XLON, etc.) pour les marchés européens
+     - Asie (XHKG, XTKS, etc.) pour les marchés asiatiques
+   - Vérifiez que les abonnements sont "Active" ou "Subscribed"
 
 **Documentation :**
 - `docs/probleme-validation-yahoo.md` - Description du problème
