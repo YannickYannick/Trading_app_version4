@@ -5,6 +5,8 @@
   right: 0;
   bottom: 0;
   background: var(--bg-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,6 +35,8 @@
   flex-direction: column;
   animation: modal-slide-up var(--transition-base);
   overflow: hidden;
+  position: relative;
+  z-index: calc(var(--z-modal) + 1);
 }
 
 @keyframes modal-slide-up {

@@ -3,6 +3,8 @@
  */
 .saxo-oauth-modal {
   padding: 0;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
 }
 
 /* ============================================
