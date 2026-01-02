@@ -207,22 +207,35 @@ export default function AssetSelect({
             onClick={(e) => e.stopPropagation()}
           />
           <div className="asset-select-options">
-            {filteredOptions.length === 0 ? (
-              <div className="asset-select-no-results">Aucun résultat</div>
+            {loading ? (
+              <div className="asset-select-loading">Chargement...</div>
+            ) : autocompleteResults.length === 0 && filteredOptions.length === 0 ? (
+              <div className="asset-select-no-results">
+                {searchTerm ? 'Aucun résultat' : 'Tapez pour rechercher...'}
+              </div>
             ) : (
-              filteredOptions.slice(0, 100).map((asset) => (
-                <div
-                  key={asset.id}
-                  className={`asset-select-option ${value === asset.id ? 'selected' : ''}`}
-                  onClick={() => handleSelect(asset.id)}
-                >
-                  <div className="asset-select-option-symbol">{asset.symbol}</div>
-                  <div className="asset-select-option-name">{asset.name}</div>
-                  {asset.symbole_yahoo && asset.symbole_yahoo !== 'Not_searched' && asset.symbole_yahoo !== 'not_found' && (
-                    <div className="asset-select-option-yahoo">Yahoo: {asset.symbole_yahoo}</div>
-                  )}
-                </div>
-              ))
+              // Afficher les résultats d'autocomplétion si disponibles (même format que PlaceOrderModal)
+              (autocompleteResults.length > 0 ? autocompleteResults : filteredOptions).slice(0, 100).map((asset) => {
+                const assetId = 'id' in asset ? asset.id : asset.id
+                const assetSymbol = 'symbol' in asset ? asset.symbol : asset.symbol
+                const assetName = 'name' in asset ? asset.name : asset.name
+                const assetPlatform = 'platform' in asset ? asset.platform : (asset as AllAsset).platform || ''
+                
+                return (
+                  <div
+                    key={assetId}
+                    className={`asset-select-option autocomplete-item ${value === assetId ? 'selected' : ''}`}
+                    onClick={() => handleSelect(assetId)}
+                    onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
+                  >
+                    <div className="asset-select-option-symbol autocomplete-symbol">{assetSymbol}</div>
+                    <div className="asset-select-option-name autocomplete-name">{assetName}</div>
+                    {assetPlatform && (
+                      <div className="asset-select-option-platform autocomplete-platform">{assetPlatform}</div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
