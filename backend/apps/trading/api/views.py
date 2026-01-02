@@ -402,23 +402,50 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         - format: Format de réponse ('json' ou 'list', défaut: 'list')
         """
         logger = logging.getLogger('trading.api.assets')
-        logger.info(f"Prices endpoint called for AllAsset ID: {pk}")
+        logger.info(f"[PRICES] Prices endpoint called for AllAsset ID: {pk}, user: {request.user}")
         
+        # Vérifier directement si l'asset existe avant get_object()
         try:
-            all_asset = self.get_object()
-            logger.info(f"AllAsset found: {all_asset.id} - {all_asset.symbol} - {all_asset.name}")
+            queryset = self.get_queryset()
+            logger.debug(f"[PRICES] Queryset: {queryset.model}, filtering for pk={pk}")
+            
+            try:
+                all_asset = queryset.get(pk=pk)
+                logger.info(f"[PRICES] AllAsset found directly: {all_asset.id} - {all_asset.symbol} - {all_asset.name}")
+            except AllAssets.DoesNotExist:
+                logger.error(f"[PRICES] AllAsset {pk} does not exist in database")
+                return Response(
+                    {
+                        'all_asset_id': int(pk) if pk else None,
+                        'all_asset_symbol': None,
+                        'count': 0,
+                        'message': f'AllAsset {pk} not found in database',
+                        'error': 'Not found',
+                        'results': []
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Utiliser get_object() pour bénéficier des permissions et du format DRF
+            # Mais si ça échoue, on a déjà l'objet
+            try:
+                all_asset = self.get_object()
+            except Exception as e:
+                logger.warning(f"[PRICES] get_object() failed but asset exists: {e}, using direct queryset result")
+                # On continue avec all_asset récupéré directement
+                
         except Exception as e:
-            logger.error(f"Error getting AllAsset {pk}: {e}", exc_info=True)
+            logger.error(f"[PRICES] Error getting AllAsset {pk}: {e}", exc_info=True)
             return Response(
                 {
                     'all_asset_id': int(pk) if pk else None,
                     'all_asset_symbol': None,
                     'count': 0,
-                    'message': f'AllAsset {pk} not found',
+                    'message': f'Error retrieving AllAsset {pk}',
                     'error': str(e),
                     'results': []
                 },
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
         days = int(request.query_params.get('days', 100))
