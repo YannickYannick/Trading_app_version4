@@ -1,0 +1,45 @@
+.algorithm-parameters-modal {
+  padding: 1rem;
+}
+
+.parameters-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.parameter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.parameter-field label {
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.parameter-field input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.parameter-field input[type="number"],
+.parameter-field input[type="text"] {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.parameter-field input:disabled {
+  background-color: var(--bg-secondary, #f3f4f6);
+  cursor: not-allowed;
+}
+
+.modal-actions {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  padding-top: 1rem;
+}
+

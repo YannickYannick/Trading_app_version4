@@ -223,16 +223,65 @@ class StrategySerializer(serializers.ModelSerializer):
     all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
     all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
     algorithm_parameters = AlgorithmParameterSerializer(many=True, read_only=True)
+    algorithm_parameters_data = AlgorithmParameterSerializer(many=True, write_only=True, required=False)
     
     class Meta:
         model = Strategy
         fields = [
             'id', 'name', 'description', 'all_asset', 'all_asset_symbol', 'all_asset_name',
             'algorithm_type', 'risk_level', 'max_position_size', 'max_daily_loss',
-            'parameters', 'algorithm_parameters',
+            'parameters', 'algorithm_parameters', 'algorithm_parameters_data',
             'is_active', 'is_automated', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'all_asset_symbol', 'all_asset_name', 'algorithm_parameters']
+    
+    def update(self, instance, validated_data):
+        """Mise à jour avec gestion des algorithm_parameters."""
+        algorithm_parameters_data = validated_data.pop('algorithm_parameters_data', None)
+        
+        # Mise à jour standard
+        instance = super().update(instance, validated_data)
+        
+        # Mettre à jour les algorithm_parameters si fournis
+        if algorithm_parameters_data is not None:
+            from apps.trading.models import AlgorithmParameter
+            
+            # Supprimer les anciens paramètres
+            AlgorithmParameter.objects.filter(strategy=instance).delete()
+            
+            # Créer les nouveaux paramètres
+            for param_data in algorithm_parameters_data:
+                AlgorithmParameter.objects.create(
+                    strategy=instance,
+                    key=param_data['key'],
+                    value=param_data['value'],
+                    param_type=param_data['param_type'],
+                    description=param_data.get('description', '')
+                )
+        
+        return instance
+    
+    def create(self, validated_data):
+        """Création avec gestion des algorithm_parameters."""
+        algorithm_parameters_data = validated_data.pop('algorithm_parameters_data', None)
+        
+        # Création standard
+        instance = super().create(validated_data)
+        
+        # Créer les algorithm_parameters si fournis
+        if algorithm_parameters_data:
+            from apps.trading.models import AlgorithmParameter
+            
+            for param_data in algorithm_parameters_data:
+                AlgorithmParameter.objects.create(
+                    strategy=instance,
+                    key=param_data['key'],
+                    value=param_data['value'],
+                    param_type=param_data['param_type'],
+                    description=param_data.get('description', '')
+                )
+        
+        return instance
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

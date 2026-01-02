@@ -7,6 +7,7 @@ import { strategyService, brokerService } from '@services'
 import { assetService as assetServiceUtil } from '@services/assets'
 import { formatDate, formatCurrency } from '@utils/format'
 import type { Strategy, BrokerAccount, AllAsset } from '@types'
+import AlgorithmParametersModal from '@components/strategies/AlgorithmParametersModal'
 import './Strategies.css'
 
 // Algorithmes disponibles
@@ -872,6 +873,19 @@ export default function Strategies() {
           )}
         </Card>
       )}
+      
+      {/* Modal pour éditer les paramètres d'algorithme */}
+      <AlgorithmParametersModal
+        isOpen={algorithmParamsModalOpen}
+        onClose={() => {
+          setAlgorithmParamsModalOpen(false)
+          setSelectedStrategyForParams(null)
+        }}
+        strategy={selectedStrategyForParams}
+        onSuccess={() => {
+          loadStrategies()
+        }}
+      />
     </div>
   )
 }
