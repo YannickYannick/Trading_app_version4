@@ -1,11 +1,12 @@
 /**
  * Page Positions - Liste et gestion des positions
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, Button, Table, Badge, Loading, Modal, Input } from '@components/common'
+import { Card, Button, Table, Badge, Loading, Modal, Input, YahooActions } from '@components/common'
 import { usePositions } from '@hooks/usePositions'
 import { positionService } from '@services'
+import { assetService } from '@services/assets'
 import { formatCurrency, formatPercent, formatDate } from '@utils/format'
 import type { Position } from '@types'
 import './Positions.css'
@@ -16,10 +17,48 @@ export default function Positions() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [closePrice, setClosePrice] = useState('')
   const [isClosing, setIsClosing] = useState(false)
+  const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
 
   const { positions, loading, error, summary, refetch } = usePositions({
     status: statusFilter,
   })
+
+  // Charger les prix Yahoo actuels pour tous les AllAssets
+  useEffect(() => {
+    if (positions.length > 0) {
+      const loadYahooPrices = async () => {
+        const priceMap: Record<number, number | null> = {}
+        const allAssetIds = positions
+          .map(p => p.all_asset?.id || (typeof p.all_asset === 'number' ? p.all_asset : null))
+          .filter((id): id is number => id !== null && id !== undefined)
+        
+        // Charger les prix en parallèle (limité à 10 à la fois pour éviter de surcharger)
+        const batches = []
+        for (let i = 0; i < allAssetIds.length; i += 10) {
+          batches.push(allAssetIds.slice(i, i + 10))
+        }
+        
+        for (const batch of batches) {
+          const results = await Promise.allSettled(
+            batch.map(async (id) => {
+              const price = await assetService.getYahooCurrentPrice(id)
+              return { id, price }
+            })
+          )
+          
+          results.forEach((result) => {
+            if (result.status === 'fulfilled') {
+              priceMap[result.value.id] = result.value.price
+            }
+          })
+        }
+        
+        setYahooPrices(priceMap)
+      }
+      
+      loadYahooPrices()
+    }
+  }, [positions])
 
   const handleClosePosition = async (id: number) => {
     try {
@@ -38,6 +77,36 @@ export default function Positions() {
   }
 
   const columns = [
+    {
+      key: 'all_asset_symbol',
+      label: 'Symbole AllAsset',
+      align: 'center' as const,
+      render: (_value: any, row: Position) => (
+        <span className="all-asset-symbol">
+          {row?.all_asset_symbol || row?.all_asset?.symbol || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'yahoo_symbol',
+      label: 'Symbole Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Position) => (
+        <span className="yahoo-symbol">
+          {row?.all_asset_yahoo_symbol || row?.all_asset?.symbole_yahoo || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'yahoo_price',
+      label: 'Prix Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Position) => {
+        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const price = allAssetId ? yahooPrices[allAssetId] : null
+        return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
+      },
+    },
     {
       key: 'symbol',
       label: 'Symbole',
@@ -142,6 +211,30 @@ export default function Positions() {
           )}
         </div>
       ),
+    },
+    {
+      key: 'yahoo_actions',
+      label: 'Actions Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Position) => {
+        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        return (
+          <YahooActions
+            allAssetId={allAssetId}
+            allAssetSymbol={row?.all_asset_symbol || row?.all_asset?.symbol}
+            onSuccess={() => {
+              refetch()
+              // Recharger le prix Yahoo après succès
+              if (allAssetId) {
+                assetService.getYahooCurrentPrice(allAssetId).then(price => {
+                  setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
+                })
+              }
+            }}
+            compact
+          />
+        )
+      },
     },
   ]
 

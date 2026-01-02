@@ -1,0 +1,100 @@
+.yahoo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #dee2e6);
+  min-width: 250px;
+}
+
+.yahoo-actions-compact {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.yahoo-actions-header {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary, #6c757d);
+  margin-bottom: 5px;
+}
+
+.yahoo-asset-symbol {
+  font-family: monospace;
+}
+
+.yahoo-actions-buttons,
+.yahoo-actions-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yahoo-sync-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.yahoo-select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 4px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #000);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.yahoo-select:focus {
+  outline: none;
+  border-color: var(--primary-color, #417690);
+}
+
+.yahoo-message {
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.yahoo-message-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.yahoo-message-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.yahoo-message-info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+.yahoo-actions-empty {
+  color: var(--text-muted, #999);
+  font-style: italic;
+}
+
+/* Mode compact dans les tables */
+.yahoo-actions-compact button {
+  min-width: auto;
+  padding: 4px 8px;
+}
+
+.yahoo-actions-compact .yahoo-message {
+  position: absolute;
+  z-index: 1000;
+  margin-top: 30px;
+  white-space: nowrap;
+  max-width: 300px;
+}
+

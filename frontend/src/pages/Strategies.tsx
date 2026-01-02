@@ -2,8 +2,9 @@
  * Page Strategies - Liste et gestion des stratégies de trading
  */
 import { useState, useEffect } from 'react'
-import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption } from '@components/common'
-import { strategyService, brokerService, assetService } from '@services'
+import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
+import { strategyService, brokerService } from '@services'
+import { assetService as assetServiceUtil } from '@services/assets'
 import { formatDate, formatCurrency } from '@utils/format'
 import type { Strategy, BrokerAccount, AllAsset } from '@types'
 import './Strategies.css'
@@ -36,6 +37,7 @@ export default function Strategies() {
   
   // Colonnes visibles
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
+  const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
 
   const loadStrategies = async () => {
     try {
@@ -57,7 +59,7 @@ export default function Strategies() {
   const loadOptions = async () => {
     try {
       setLoadingOptions(true)
-      const assetsResponse = await assetService.getAllAssets({ page_size: 1000 })
+      const assetsResponse = await assetServiceUtil.getAllAssets({ page_size: 1000 })
       setAssets(assetsResponse.results || [])
       const brokersResponse = await brokerService.getAccounts()
       setBrokerAccounts(brokersResponse.results || [])
@@ -72,6 +74,51 @@ export default function Strategies() {
     loadStrategies()
     loadOptions()
   }, [])
+
+  // Charger les prix Yahoo actuels pour tous les AllAssets
+  useEffect(() => {
+    if (strategies.length > 0) {
+      const loadYahooPrices = async () => {
+        const priceMap: Record<number, number | null> = {}
+        const allAssetIds = strategies
+          .map(s => {
+            const allAsset = s.all_asset
+            if (typeof allAsset === 'object' && allAsset?.id) {
+              return allAsset.id
+            } else if (typeof allAsset === 'number') {
+              return allAsset
+            }
+            return null
+          })
+          .filter((id): id is number => id !== null && id !== undefined)
+        
+        // Charger les prix en parallèle (limité à 10 à la fois)
+        const batches = []
+        for (let i = 0; i < allAssetIds.length; i += 10) {
+          batches.push(allAssetIds.slice(i, i + 10))
+        }
+        
+        for (const batch of batches) {
+          const results = await Promise.allSettled(
+            batch.map(async (id) => {
+              const price = await assetServiceUtil.getYahooCurrentPrice(id)
+              return { id, price }
+            })
+          )
+          
+          results.forEach((result) => {
+            if (result.status === 'fulfilled') {
+              priceMap[result.value.id] = result.value.price
+            }
+          })
+        }
+        
+        setYahooPrices(priceMap)
+      }
+      
+      loadYahooPrices()
+    }
+  }, [strategies])
 
   const handleCellEdit = async (newValue: any, row: Strategy, key: string) => {
     try {
@@ -239,6 +286,9 @@ export default function Strategies() {
   const allColumnsData: ColumnOption[] = [
     { key: 'name', label: 'Nom', defaultVisible: true },
     { key: 'description', label: 'Description', defaultVisible: true },
+    { key: 'all_asset_symbol', label: 'Symbole AllAsset', defaultVisible: true },
+    { key: 'yahoo_symbol', label: 'Symbole Yahoo', defaultVisible: true },
+    { key: 'yahoo_price', label: 'Prix Yahoo', defaultVisible: true },
     { key: 'asset_id', label: 'Asset', defaultVisible: true },
     { key: 'algorithm_type', label: 'Algorithme', defaultVisible: true },
     { key: 'broker_account_id', label: 'Broker', defaultVisible: true },
@@ -253,6 +303,7 @@ export default function Strategies() {
     { key: 'is_active', label: 'Statut', defaultVisible: true },
     { key: 'is_automated', label: 'Auto', defaultVisible: true },
     { key: 'total_trades', label: 'Performance', defaultVisible: true },
+    { key: 'yahoo_actions', label: 'Actions Yahoo', defaultVisible: true },
     { key: 'actions', label: 'Actions', defaultVisible: true },
   ]
 
@@ -297,6 +348,38 @@ export default function Strategies() {
       align: 'center' as const,
       onCellEdit: handleCellEdit,
       render: (value: string) => <span className="text-muted small">{value || '-'}</span>,
+    },
+    {
+      key: 'all_asset_symbol',
+      label: 'Symbole AllAsset',
+      align: 'center' as const,
+      render: (_value: any, row: Strategy) => (
+        <span className="all-asset-symbol">
+          {row?.all_asset_symbol || (typeof row.all_asset === 'object' && row.all_asset?.symbol) || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'yahoo_symbol',
+      label: 'Symbole Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Strategy) => {
+        const allAsset = typeof row.all_asset === 'object' ? row.all_asset : null
+        const yahooSymbol = row.all_asset_yahoo_symbol || allAsset?.symbole_yahoo
+        return <span className="yahoo-symbol">{yahooSymbol || 'N/A'}</span>
+      },
+    },
+    {
+      key: 'yahoo_price',
+      label: 'Prix Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Strategy) => {
+        const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id 
+          ? row.all_asset.id 
+          : (typeof row.all_asset === 'number' ? row.all_asset : null)
+        const price = allAssetId ? yahooPrices[allAssetId] : null
+        return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
+      },
     },
     {
       key: 'asset_id',
@@ -545,6 +628,32 @@ export default function Strategies() {
             <br />
             <span className={`${pnlColor} fw-bold`}>{pnl.toFixed(2)} €</span>
           </div>
+        )
+      },
+    },
+    {
+      key: 'yahoo_actions',
+      label: 'Actions Yahoo',
+      align: 'center' as const,
+      render: (_value: any, row: Strategy) => {
+        const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id
+          ? row.all_asset.id
+          : (typeof row.all_asset === 'number' ? row.all_asset : null)
+        return (
+          <YahooActions
+            allAssetId={allAssetId}
+            allAssetSymbol={row?.all_asset_symbol || (typeof row.all_asset === 'object' && row.all_asset?.symbol)}
+            onSuccess={() => {
+              loadStrategies()
+              // Recharger le prix Yahoo après succès
+              if (allAssetId) {
+                assetServiceUtil.getYahooCurrentPrice(allAssetId).then(price => {
+                  setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
+                })
+              }
+            }}
+            compact
+          />
         )
       },
     },

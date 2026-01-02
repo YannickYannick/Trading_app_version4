@@ -7,9 +7,10 @@ import {
   Search, Filter, RefreshCw, Plus, Eye, Copy, XCircle, Trash2, 
   Save, X, Clock, TrendingUp, CheckCircle 
 } from 'lucide-react'
-import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption } from '@components/common'
+import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
 import PlaceOrderModal from '@components/orders/PlaceOrderModal'
 import { orderService, brokerService, positionService } from '@services'
+import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
 import type { Order, BrokerAccount, Position } from '@types'
 import './Orders.css'
@@ -51,11 +52,15 @@ export default function Orders() {
   
   // Colonnes visibles
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
+  const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
   
   // Métadonnées des colonnes pour ColumnSelector
   const allColumnsData: ColumnOption[] = [
     { key: 'modified', label: 'Modifié', defaultVisible: true },
     { key: 'broker_name', label: 'Broker', defaultVisible: true },
+    { key: 'all_asset_symbol', label: 'Symbole AllAsset', defaultVisible: true },
+    { key: 'yahoo_symbol', label: 'Symbole Yahoo', defaultVisible: true },
+    { key: 'yahoo_price', label: 'Prix Yahoo', defaultVisible: true },
     { key: 'symbol', label: 'Asset', defaultVisible: true },
     { key: 'order_type', label: 'Type', defaultVisible: true },
     { key: 'side', label: 'Côté', defaultVisible: true },
@@ -65,6 +70,7 @@ export default function Orders() {
     { key: 'total_value', label: 'Valeur Totale', defaultVisible: true },
     { key: 'status', label: 'Statut', defaultVisible: true },
     { key: 'created_at', label: 'Créé le', defaultVisible: true },
+    { key: 'yahoo_actions', label: 'Actions Yahoo', defaultVisible: true },
     { key: 'actions', label: 'Actions', defaultVisible: true },
   ]
   
@@ -218,6 +224,43 @@ export default function Orders() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Charger les prix Yahoo actuels pour tous les AllAssets
+  useEffect(() => {
+    if (orders.length > 0) {
+      const loadYahooPrices = async () => {
+        const priceMap: Record<number, number | null> = {}
+        const allAssetIds = orders
+          .map(o => o.all_asset?.id || (typeof o.all_asset === 'number' ? o.all_asset : null))
+          .filter((id): id is number => id !== null && id !== undefined)
+        
+        // Charger les prix en parallèle (limité à 10 à la fois)
+        const batches = []
+        for (let i = 0; i < allAssetIds.length; i += 10) {
+          batches.push(allAssetIds.slice(i, i + 10))
+        }
+        
+        for (const batch of batches) {
+          const results = await Promise.allSettled(
+            batch.map(async (id) => {
+              const price = await assetService.getYahooCurrentPrice(id)
+              return { id, price }
+            })
+          )
+          
+          results.forEach((result) => {
+            if (result.status === 'fulfilled') {
+              priceMap[result.value.id] = result.value.price
+            }
+          })
+        }
+        
+        setYahooPrices(priceMap)
+      }
+      
+      loadYahooPrices()
+    }
+  }, [orders])
   
   // Vérifier si un ordre a été modifié
   const isOrderModified = useCallback((orderId: number): boolean => {
@@ -528,6 +571,42 @@ export default function Orders() {
       ),
     },
     {
+      key: 'all_asset_symbol',
+      label: 'Symbole AllAsset',
+      minWidth: '120px',
+      width: '140px',
+      align: 'center' as const,
+      render: (_value: any, row: Order) => (
+        <span className="all-asset-symbol">
+          {row?.all_asset_symbol || row?.all_asset?.symbol || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'yahoo_symbol',
+      label: 'Symbole Yahoo',
+      minWidth: '120px',
+      width: '140px',
+      align: 'center' as const,
+      render: (_value: any, row: Order) => (
+        <span className="yahoo-symbol">
+          {row?.all_asset_yahoo_symbol || row?.all_asset?.symbole_yahoo || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'yahoo_price',
+      label: 'Prix Yahoo',
+      minWidth: '100px',
+      width: '120px',
+      align: 'center' as const,
+      render: (_value: any, row: Order) => {
+        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const price = allAssetId ? yahooPrices[allAssetId] : null
+        return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
+      },
+    },
+    {
       key: 'symbol',
       label: 'Asset',
       minWidth: '140px',
@@ -670,6 +749,32 @@ export default function Orders() {
       width: '130px',
       align: 'center' as const,
       render: (value: string) => formatDate(value),
+    },
+    {
+      key: 'yahoo_actions',
+      label: 'Actions Yahoo',
+      minWidth: '120px',
+      width: '140px',
+      align: 'center' as const,
+      render: (_value: any, row: Order) => {
+        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        return (
+          <YahooActions
+            allAssetId={allAssetId}
+            allAssetSymbol={row?.all_asset_symbol || row?.all_asset?.symbol}
+            onSuccess={() => {
+              loadOrders()
+              // Recharger le prix Yahoo après succès
+              if (allAssetId) {
+                assetService.getYahooCurrentPrice(allAssetId).then(price => {
+                  setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
+                })
+              }
+            }}
+            compact
+          />
+        )
+      },
     },
     {
       key: 'actions',

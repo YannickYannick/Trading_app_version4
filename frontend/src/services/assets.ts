@@ -178,6 +178,57 @@ export const assetService = {
   async getAssetsOverviewActive(): Promise<AssetWithChildren[]> {
     return this.getAssetsOverview(false)
   },
+
+  /**
+   * Valider le symbole Yahoo pour un AllAsset
+   */
+  async validateYahoo(allAssetId: number): Promise<{ success: boolean; message?: string; yahoo_symbol?: string; error?: string }> {
+    const response = await apiClient.post<{ success: boolean; message?: string; yahoo_symbol?: string; error?: string }>(
+      `/all-assets/${allAssetId}/validate_single_yahoo/`,
+      {}
+    )
+    return response.data
+  },
+
+  /**
+   * Synchroniser l'historique des prix pour un AllAsset
+   */
+  async syncPriceHistory(
+    allAssetId: number,
+    days: number = 365,
+    interval: string = '1d'
+  ): Promise<{ success: boolean; records?: number; message?: string; error?: string }> {
+    const response = await apiClient.post<{ success: boolean; records?: number; message?: string; error?: string }>(
+      `/all-assets/${allAssetId}/sync_price_history/`,
+      { days, interval }
+    )
+    return response.data
+  },
+
+  /**
+   * Récupérer le prix Yahoo actuel (dernier prix disponible)
+   */
+  async getYahooCurrentPrice(allAssetId: number): Promise<number | null> {
+    try {
+      const response = await apiClient.get<{
+        all_asset_id: number
+        all_asset_symbol: string
+        count: number
+        results: Array<{ date: string; close_price: number; open_price: number; high_price: number; low_price: number; volume: number }>
+      }>(`/all-assets/${allAssetId}/prices/`, {
+        params: { days: 1, format: 'list' },
+      })
+      
+      // Prendre le premier résultat (le plus récent)
+      if (response.data.results && response.data.results.length > 0) {
+        return response.data.results[0].close_price || null
+      }
+      return null
+    } catch (error) {
+      console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
+      return null
+    }
+  },
 }
 
 export default assetService

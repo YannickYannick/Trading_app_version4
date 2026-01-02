@@ -56,6 +56,11 @@ export interface AllAsset {
 export interface Position {
   id: number
   asset: Asset
+  all_asset?: AllAsset
+  all_asset_symbol?: string
+  all_asset_name?: string
+  all_asset_platform?: string
+  all_asset_yahoo_symbol?: string
   size: number
   entry_price: number
   current_price: number | null
@@ -75,6 +80,11 @@ export interface Position {
 export interface Trade {
   id: number
   asset: Asset
+  all_asset?: AllAsset
+  all_asset_symbol?: string
+  all_asset_name?: string
+  all_asset_platform?: string
+  all_asset_yahoo_symbol?: string
   size: number // Alias pour quantity dans le serializer
   quantity?: number // Nom réel du champ backend
   price: number
@@ -98,6 +108,11 @@ export interface Trade {
 export interface Order {
   id: number
   asset: Asset
+  all_asset?: AllAsset
+  all_asset_symbol?: string
+  all_asset_name?: string
+  all_asset_platform?: string
+  all_asset_yahoo_symbol?: string
   order_type: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
   side: 'BUY' | 'SELL'
   quantity: number
@@ -136,6 +151,10 @@ export interface Strategy {
   created_at: string
   updated_at?: string
   user: number
+  // AllAsset (source de vérité)
+  all_asset?: AllAsset | number
+  all_asset_symbol?: string
+  all_asset_name?: string
   // Champs optionnels de la doc v3
   asset?: { id: number; symbol: string; name: string }
   asset_id?: number

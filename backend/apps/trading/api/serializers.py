@@ -395,14 +395,23 @@ class OrderSerializer(serializers.ModelSerializer):
     """
     Serializer pour les ordres.
     
-    Inclut les infos de l'asset et le statut.
+    Utilise AllAssets comme source de vérité principale.
+    Asset est optionnel (pour compatibilité et enrichissement futur).
     """
-    # Relations imbriquées (lecture)
-    asset = AssetNestedSerializer(read_only=True)
+    # Champs depuis AllAssets (source de vérité)
+    all_asset = AllAssetsSerializer(read_only=True)
+    all_asset_id = serializers.IntegerField(write_only=True, required=False)
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    all_asset_platform = serializers.CharField(source='all_asset.platform', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+    
+    # Relations imbriquées (lecture) - Asset optionnel pour compatibilité
+    asset = AssetNestedSerializer(read_only=True, allow_null=True)
     broker_name = serializers.CharField(source='broker.name', read_only=True)
     
-    # IDs pour création
-    asset_id = serializers.IntegerField(write_only=True, required=False)
+    # IDs pour création/modification
+    asset_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     broker_id = serializers.IntegerField(write_only=True, required=False)
     
     # Champs calculés
@@ -413,6 +422,8 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id',
+            'all_asset', 'all_asset_id', 'all_asset_symbol', 'all_asset_name', 
+            'all_asset_platform', 'all_asset_yahoo_symbol',
             'asset', 'asset_id',
             'broker_name', 'broker_id',
             'order_type', 'side', 'status',
@@ -421,7 +432,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'broker_order_id', 'created_at', 'updated_at',
             'total_value'
         ]
-        read_only_fields = ['id', 'filled_quantity', 'created_at', 'updated_at', 'total_value']
+        read_only_fields = ['id', 'filled_quantity', 'created_at', 'updated_at', 'total_value', 
+                           'all_asset_symbol', 'all_asset_name', 'all_asset_platform', 'all_asset_yahoo_symbol']
     
     def get_fill_percentage(self, obj):
         """Calcule le % de remplissage de l'ordre."""
