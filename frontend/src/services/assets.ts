@@ -353,6 +353,17 @@ export const assetService = {
       
       return response.data
     } catch (error: any) {
+      // Gérer les erreurs d'authentification (401) - ne pas logger, l'intercepteur gère le refresh
+      if (error?.response?.status === 401) {
+        // L'intercepteur axios devrait gérer le refresh du token automatiquement
+        // Si on arrive ici, c'est que le refresh a échoué ou que l'utilisateur n'est pas connecté
+        return {
+          all_asset_id: allAssetId,
+          all_asset_symbol: '',
+          count: 0,
+          results: [],
+        }
+      }
       // Ne pas logger les erreurs si c'est juste qu'il n'y a pas d'historique (404 ou message explicite)
       if (error?.response?.status === 404 || error?.response?.data?.message?.includes('No price history')) {
         console.warn(`[getPriceHistory] No price history for asset ${allAssetId} (expected)`)
