@@ -399,16 +399,22 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
     // Comparer avec la valeur précédente pour éviter les rechargements inutiles
     if (prevSelectedAssetsRef.current === assetsKey) {
-      console.log('[TradesChart] Selected assets unchanged, skipping reload:', assetsKey)
+      console.log('[TradesChart] Selected assets unchanged, skipping reload. Current key:', assetsKey)
       return
     }
 
-    // Mettre à jour la référence AVANT de charger (pour éviter les doubles appels)
+    console.log('[TradesChart] Selected assets changed. Previous:', prevSelectedAssetsRef.current, 'New:', assetsKey)
+    
+    // Mettre à jour la référence AVANT de charger (pour éviter les doubles appels pendant le chargement)
     prevSelectedAssetsRef.current = assetsKey
-    console.log('[TradesChart] Selected assets changed, loading price history for:', selectedAssets, 'key:', assetsKey)
 
     if (selectedAssets.length > 0) {
-      loadPriceHistory(selectedAssets)
+      // Charger l'historique pour les nouveaux assets sélectionnés
+      loadPriceHistory(selectedAssets).catch((err) => {
+        console.error('[TradesChart] Error in loadPriceHistory:', err)
+        // En cas d'erreur, réinitialiser la référence pour permettre une nouvelle tentative
+        prevSelectedAssetsRef.current = ''
+      })
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
       if (chartRef.current) {
