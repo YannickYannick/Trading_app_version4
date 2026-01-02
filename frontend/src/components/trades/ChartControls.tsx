@@ -39,16 +39,13 @@ const ChartControls: React.FC<ChartControlsProps> = ({
     // Utiliser directement la valeur newChecked de l'event pour éviter les problèmes de closure
     if (newChecked) {
       // Sélectionner (checkbox vient d'être cochée)
-      onSelectedAssetsChange((prev) => {
-        // Vérifier qu'il n'est pas déjà dans la liste pour éviter les doublons
-        if (prev.includes(assetId)) {
-          return prev
-        }
-        return [...prev, assetId]
-      })
+      // Vérifier qu'il n'est pas déjà dans la liste pour éviter les doublons
+      if (!selectedAssets.includes(assetId)) {
+        onSelectedAssetsChange([...selectedAssets, assetId])
+      }
     } else {
       // Désélectionner (checkbox vient d'être décochée)
-      onSelectedAssetsChange((prev) => prev.filter((id) => id !== assetId))
+      onSelectedAssetsChange(selectedAssets.filter((id) => id !== assetId))
     }
   }
 
