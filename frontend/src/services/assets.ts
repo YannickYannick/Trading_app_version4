@@ -341,7 +341,7 @@ export const assetService = {
           low_price?: number
         }>
       }>(`/all-assets/${allAssetId}/prices/`, {
-        params: { days, format },
+        params: { days, output_format: format }, // Utiliser output_format pour éviter conflit avec DRF
       })
       
       // Log pour debug

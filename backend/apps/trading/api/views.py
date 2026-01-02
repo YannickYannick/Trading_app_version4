@@ -399,7 +399,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         Query params:
         - days: Nombre de jours à récupérer (défaut: 100)
         - source: Filtrer par source (YAHOO, SAXO, BINANCE, etc.) - optionnel
-        - format: Format de réponse ('json' ou 'list', défaut: 'list')
+            - output_format: Format de réponse ('json' ou 'list', défaut: 'list') - utilisez 'output_format' au lieu de 'format' pour éviter conflit avec DRF
         
         Avec detail=True, DRF gère automatiquement le routing vers {pk}
         On récupère directement l'objet pour éviter les problèmes avec filter_queryset().
@@ -454,7 +454,8 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             days = 100
         
         source = query_params.get('source')
-        format_type = query_params.get('format', 'list')
+        # Utiliser 'output_format' au lieu de 'format' pour éviter conflit avec DRF format suffix
+        format_type = query_params.get('output_format') or query_params.get('format', 'list')
         
         # Utiliser la même logique que show_last_saxo_trade.py
         # Vérifier si l'historique existe
