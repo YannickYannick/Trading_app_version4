@@ -393,7 +393,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
             return null
           }
           
-          const isBuy = trade.side === 'BUY'
+          // Utiliser trade_type si side n'est pas disponible (compatibilité)
+          const tradeSide = trade.side || trade.trade_type || 'UNKNOWN'
+          const isBuy = tradeSide === 'BUY'
           // Convertir explicitement en nombres pour éviter l'erreur toFixed
           const quantity = Number(trade.quantity || trade.size || 0)
           const price = Number(trade.price || 0)
@@ -422,14 +424,16 @@ const TradesChart: React.FC<TradesChartProps> = ({
             return null
           }
           
-          console.log(`[TradesChart] Creating marker for trade ${trade.id} (${trade.side}) on ${dateStr} for asset ${assetId}`)
+          // Utiliser trade_type si side n'est pas disponible (compatibilité)
+          const tradeSide = trade.side || trade.trade_type || 'UNKNOWN'
+          console.log(`[TradesChart] Creating marker for trade ${trade.id} (${tradeSide}) on ${dateStr} for asset ${assetId}`)
 
           return {
             time: dateStr as Time,
             position: isBuy ? ('belowBar' as const) : ('aboveBar' as const),
             color: isBuy ? '#3b82f6' : '#ef4444', // BUY = bleu, SELL = rouge
             shape: isBuy ? ('arrowUp' as const) : ('arrowDown' as const),
-            text: `${trade.side} ${quantity.toFixed(2)} @ ${price.toFixed(2)}`,
+            text: `${tradeSide} ${quantity.toFixed(2)} @ ${price.toFixed(2)}`,
           }
         })
         .filter((marker): marker is MarkerData => marker !== null) // Filtrer les marqueurs null

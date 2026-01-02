@@ -382,6 +382,12 @@ class TradeSerializer(serializers.ModelSerializer):
     # Champ symbol pour compatibilité (utilise all_asset en priorité)
     symbol = serializers.SerializerMethodField()
     
+    # Champ side pour compatibilité frontend (mappe trade_type)
+    side = serializers.CharField(source='trade_type', read_only=True)
+    
+    # Champ timestamp pour compatibilité frontend (mappe executed_at)
+    timestamp = serializers.DateTimeField(source='executed_at', read_only=True)
+    
     class Meta:
         model = Trade
         fields = [
@@ -394,12 +400,12 @@ class TradeSerializer(serializers.ModelSerializer):
             'broker_name', 'broker_id',
             'position',
             # Données
-            'trade_type', 'quantity', 'price', 'fees',
-            'executed_at', 'broker_trade_id',
+            'trade_type', 'side', 'quantity', 'price', 'fees',  # side ajouté pour compatibilité
+            'executed_at', 'timestamp', 'broker_trade_id',  # timestamp ajouté pour compatibilité
             # Calculés
             'symbol', 'total_value'
         ]
-        read_only_fields = ['id', 'total_value']
+        read_only_fields = ['id', 'total_value', 'side', 'timestamp']
     
     def get_symbol(self, obj):
         """Retourne le symbol depuis all_asset (ou asset en fallback)."""
