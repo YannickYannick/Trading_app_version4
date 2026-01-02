@@ -205,56 +205,98 @@ export const assetService = {
     return response.data
   },
 
+  // Cache pour éviter les appels multiples pour le même asset
+  private _priceCache = new Map<number, { price: number | null; timestamp: number }>()
+  private readonly _cacheTimeout = 5 * 60 * 1000 // 5 minutes
+  private _inFlightRequests = new Map<number, Promise<number | null>>()
+
   /**
    * Récupérer le prix Yahoo actuel (dernier prix disponible)
    * Récupère directement depuis Yahoo Finance, pas depuis l'historique stocké
+   * Utilise un cache et une déduplication pour éviter les requêtes multiples
    */
   async getYahooCurrentPrice(allAssetId: number): Promise<number | null> {
-    try {
-      // Essayer d'abord l'endpoint current_price qui récupère directement depuis Yahoo
-      const response = await apiClient.get<{
-        success: boolean
-        all_asset_id: number
-        all_asset_symbol: string
-        yahoo_symbol: string
-        price: number
-        currency: string
-        message?: string
-      }>(`/all-assets/${allAssetId}/current_price/`)
-      
-      if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
-        return response.data.price
-      }
-      
-      // Fallback: essayer depuis l'historique si current_price échoue
+    // Vérifier le cache
+    const cached = this._priceCache.get(allAssetId)
+    if (cached && Date.now() - cached.timestamp < this._cacheTimeout) {
+      return cached.price
+    }
+
+    // Vérifier si une requête est déjà en cours pour cet asset
+    const inFlight = this._inFlightRequests.get(allAssetId)
+    if (inFlight) {
+      return inFlight
+    }
+
+    // Créer une nouvelle promesse pour cette requête
+    const requestPromise = (async () => {
       try {
-        const historyResponse = await apiClient.get<{
+        // Essayer d'abord l'endpoint current_price qui récupère directement depuis Yahoo
+        const response = await apiClient.get<{
+          success: boolean
           all_asset_id: number
           all_asset_symbol: string
-          count: number
-          results: Array<{ date: string; close: number; open: number; high: number; low: number; volume: number }>
-        }>(`/all-assets/${allAssetId}/prices/`, {
-          params: { days: 1, format: 'list' },
-        })
+          yahoo_symbol: string
+          price: number
+          currency: string
+          message?: string
+        }>(`/all-assets/${allAssetId}/current_price/`)
         
-        // Prendre le premier résultat (le plus récent)
-        if (historyResponse.data.results && historyResponse.data.results.length > 0) {
-          return historyResponse.data.results[0].close || null
+        if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
+          const price = response.data.price
+          this._priceCache.set(allAssetId, { price, timestamp: Date.now() })
+          this._inFlightRequests.delete(allAssetId)
+          return price
         }
-      } catch (historyError) {
-        // Ignorer l'erreur de l'historique
-      }
-      
-      return null
-    } catch (error: any) {
-      // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
-      if (error?.response?.status === 404 || error?.response?.status === 400) {
+        
+        // Fallback: essayer depuis l'historique si current_price échoue
+        try {
+          const historyResponse = await apiClient.get<{
+            all_asset_id: number
+            all_asset_symbol: string
+            count: number
+            results: Array<{ date: string; close: number; open: number; high: number; low: number; volume: number }>
+          }>(`/all-assets/${allAssetId}/prices/`, {
+            params: { days: 1, format: 'list' },
+          })
+          
+          // Prendre le premier résultat (le plus récent)
+          if (historyResponse.data.results && historyResponse.data.results.length > 0) {
+            const price = historyResponse.data.results[0].close || null
+            this._priceCache.set(allAssetId, { price, timestamp: Date.now() })
+            this._inFlightRequests.delete(allAssetId)
+            return price
+          }
+        } catch (historyError) {
+          // Ignorer l'erreur de l'historique
+        }
+        
+        // Mettre en cache null pour éviter les requêtes répétées
+        this._priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
+        this._inFlightRequests.delete(allAssetId)
+        return null
+      } catch (error: any) {
+        // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
+        // NE PAS logger ces erreurs car elles sont attendues et polluent la console
+        if (error?.response?.status === 404 || error?.response?.status === 400) {
+          // Mettre en cache null pour éviter les requêtes répétées (cache court pour réessayer plus tard si le symbole est validé)
+          this._priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
+          this._inFlightRequests.delete(allAssetId)
+          return null
+        }
+        // Logger seulement les erreurs inattendues (500, 503, etc.)
+        if (error?.response?.status >= 500) {
+          console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
+        }
+        this._inFlightRequests.delete(allAssetId)
         return null
       }
-      // Logger les autres erreurs mais ne pas bloquer
-      console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
-      return null
-    }
+    })()
+
+    // Stocker la promesse pour déduplication
+    this._inFlightRequests.set(allAssetId, requestPromise)
+    
+    return requestPromise
   },
 
   /**
