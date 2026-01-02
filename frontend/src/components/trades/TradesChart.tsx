@@ -368,6 +368,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
   }, [filteredTrades, selectedAssets, viewMode])
 
   // Charger l'historique quand les assets sélectionnés changent
+  const prevSelectedAssetsRef = useRef<number[]>([])
   useEffect(() => {
     // Attendre que le graphique soit initialisé avant de charger les données
     if (!chartRef.current) {
@@ -375,7 +376,23 @@ const TradesChart: React.FC<TradesChartProps> = ({
       return
     }
 
+    // Comparer les assets sélectionnés pour éviter les rechargements inutiles
+    const prevAssets = prevSelectedAssetsRef.current
+    const assetsChanged = 
+      prevAssets.length !== selectedAssets.length ||
+      !prevAssets.every((id, index) => id === selectedAssets[index])
+
+    if (!assetsChanged && selectedAssets.length > 0) {
+      // Les assets n'ont pas changé, pas besoin de recharger
+      console.log('[TradesChart] Selected assets unchanged, skipping reload')
+      return
+    }
+
+    // Mettre à jour la référence
+    prevSelectedAssetsRef.current = [...selectedAssets]
+
     if (selectedAssets.length > 0) {
+      console.log('[TradesChart] Selected assets changed, loading price history for:', selectedAssets)
       loadPriceHistory(selectedAssets)
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
@@ -385,8 +402,13 @@ const TradesChart: React.FC<TradesChartProps> = ({
         })
       }
       priceSeriesRefs.current.clear()
+      markersRefs.current.forEach((markersPrimitive) => {
+        markersPrimitive.setMarkers([])
+      })
+      markersRefs.current.clear()
     }
-  }, [selectedAssets, loadPriceHistory])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAssets.join(',')]) // Utiliser join pour une comparaison stable
 
   if (!trades || trades.length === 0) {
     return (
