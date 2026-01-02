@@ -173,11 +173,6 @@ const TradesChart: React.FC<TradesChartProps> = ({
         // Vérifier si la série existe déjà (pour éviter de la recréer)
         let series = priceSeriesRefs.current.get(assetId)
 
-        // Si la série existe déjà, on peut juste mettre à jour ses données
-        if (series) {
-          console.log(`[TradesChart] Series already exists for asset ${assetId}, updating data`)
-        }
-
         // Créer la série si elle n'existe pas et que le graphique est disponible
         if (!series && chartRef.current) {
           // Dans lightweight-charts v5+, utiliser addSeries(LineSeries, options) selon la doc officielle
