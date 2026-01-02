@@ -286,6 +286,9 @@ class PositionSerializer(serializers.ModelSerializer):
     # Champ symbol pour compatibilité (utilise all_asset en priorité)
     symbol = serializers.SerializerMethodField()
     
+    # Prix actuel calculé depuis Yahoo Finance
+    yahoo_current_price = serializers.SerializerMethodField()
+    
     class Meta:
         model = Position
         fields = [
@@ -298,13 +301,13 @@ class PositionSerializer(serializers.ModelSerializer):
             'broker_name', 'broker_id',
             'strategy', 'strategy_id',
             # Données
-            'side', 'quantity', 'entry_price', 'current_price',
+            'side', 'quantity', 'entry_price', 'current_price', 'yahoo_current_price',
             'stop_loss', 'take_profit', 'is_open',
             'opened_at', 'closed_at',
             # Calculés
             'symbol', 'pnl', 'pnl_percent'
         ]
-        read_only_fields = ['id', 'opened_at', 'pnl', 'pnl_percent']
+        read_only_fields = ['id', 'opened_at', 'pnl', 'pnl_percent', 'yahoo_current_price']
     
     def get_symbol(self, obj):
         """Retourne le symbol depuis all_asset (ou asset en fallback)."""
@@ -313,6 +316,29 @@ class PositionSerializer(serializers.ModelSerializer):
         elif obj.asset:
             return obj.asset.symbol
         return None
+    
+    def get_yahoo_current_price(self, obj):
+        """
+        Récupère le prix actuel depuis Yahoo Finance pour l'AllAsset.
+        Retourne None si pas disponible.
+        """
+        if not obj.all_asset or not obj.all_asset.symbole_yahoo:
+            return None
+        
+        if obj.all_asset.symbole_yahoo in ['Not_searched', 'not_found', 'manual']:
+            return None
+        
+        try:
+            from ..services.data_providers.yahoo_finance import YahooFinanceService
+            yahoo_service = YahooFinanceService()
+            price = yahoo_service.get_current_price(obj.all_asset.symbole_yahoo)
+            
+            if price is not None:
+                return float(price)
+            return None
+        except Exception:
+            # En cas d'erreur, retourner None silencieusement
+            return None
     
     def validate_quantity(self, value):
         """Valider que la quantité est positive."""

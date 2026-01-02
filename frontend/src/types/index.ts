@@ -64,6 +64,7 @@ export interface Position {
   size: number
   entry_price: number
   current_price: number | null
+  yahoo_current_price?: number | null // Prix actuel depuis Yahoo Finance
   pnl: number
   pnl_percent: number
   side: 'BUY' | 'SELL'

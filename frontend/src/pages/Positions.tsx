@@ -143,7 +143,11 @@ export default function Positions() {
       key: 'current_price',
       label: 'Prix actuel',
       align: 'center' as const,
-      render: (_value: any, row: Position) => formatCurrency(row?.current_price || 0),
+      render: (_value: any, row: Position) => {
+        // Utiliser yahoo_current_price si disponible (prix en temps réel), sinon current_price stocké
+        const price = (row as any)?.yahoo_current_price ?? row?.current_price
+        return formatCurrency(price || 0)
+      },
     },
     {
       key: 'pnl',
