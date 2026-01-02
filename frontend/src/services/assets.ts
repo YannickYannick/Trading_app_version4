@@ -247,8 +247,8 @@ export const assetService = {
       
       return null
     } catch (error: any) {
-      // Ignorer silencieusement les 404 (AllAsset n'existe pas)
-      if (error?.response?.status === 404) {
+      // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
+      if (error?.response?.status === 404 || error?.response?.status === 400) {
         return null
       }
       // Logger les autres erreurs mais ne pas bloquer
