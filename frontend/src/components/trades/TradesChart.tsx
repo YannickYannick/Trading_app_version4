@@ -302,6 +302,17 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       // ✅ LA SOLUTION ROBUSTE : Appeler fitContent() UNE SEULE FOIS, à la toute fin
       // Après que TOUTES les séries ont reçu leurs données
+      // Le "Forced reflow" indique qu'on doit forcer un recalcul du layout
+      // Utiliser plusieurs requestAnimationFrame + forcer un reflow explicite
+      
+      // Forcer un reflow en lisant une propriété du DOM (offsetWidth/offsetHeight)
+      // Cela garantit que le navigateur a calculé le layout avant fitContent()
+      if (chartContainerRef.current) {
+        // Force reflow: lire les dimensions force le navigateur à recalculer le layout
+        void chartContainerRef.current.offsetWidth
+        void chartContainerRef.current.offsetHeight
+      }
+      
       // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -317,29 +328,38 @@ const TradesChart: React.FC<TradesChartProps> = ({
                   console.log('[TradesChart] Time scale reset')
                 }
                 
-                // 🔒 Étape 2 : Fit content UNE SEULE FOIS, après toutes les données
+                // 🔒 Étape 2 : Forcer un nouveau reflow avant fitContent
+                // Cela garantit que le navigateur a le layout à jour
+                if (chartContainerRef.current) {
+                  void chartContainerRef.current.offsetWidth
+                }
+                
+                // 🔒 Étape 3 : Fit content UNE SEULE FOIS, après toutes les données
                 timeScale.fitContent()
-                console.log('[TradesChart] Time scale fitContent() called after all data loaded')
+                console.log('[TradesChart] Time scale fitContent() called after all data loaded (with forced reflow)')
                 
                 // Ajouter les marqueurs APRÈS l'ajustement d'échelle
                 updateMarkersForSeries()
                 
-                // 🔒 Étape 3 : Un dernier ajustement après les marqueurs (juste pour être sûr)
-                setTimeout(() => {
-                  if (chartRef.current) {
+                // 🔒 Étape 4 : Un dernier ajustement après les marqueurs avec reflow forcé
+                requestAnimationFrame(() => {
+                  if (chartRef.current && chartContainerRef.current) {
+                    // Forcer un nouveau reflow
+                    void chartContainerRef.current.offsetWidth
+                    
                     try {
                       chartRef.current.timeScale().fitContent()
-                      console.log('[TradesChart] Time scale final adjustment after markers')
+                      console.log('[TradesChart] Time scale final adjustment after markers (with forced reflow)')
                     } catch (err) {
                       console.error('[TradesChart] Error in final fitContent after markers:', err)
                     }
                   }
-                }, 50)
+                })
               } catch (err) {
                 console.error('[TradesChart] Error fitting content:', err)
               }
             }
-          }, 100) // Petit délai pour laisser le rendu se terminer
+          }, 50) // Délai réduit car on force le reflow explicitement
         })
       })
       
