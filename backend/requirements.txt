@@ -25,3 +25,7 @@ PyYAML>=6.0.0
 
 # Données financières (Yahoo Finance)
 yfinance>=0.2.36
+
+# Calculs scientifiques pour algorithmes de trading
+numpy>=1.24.0
+pandas>=2.0.0

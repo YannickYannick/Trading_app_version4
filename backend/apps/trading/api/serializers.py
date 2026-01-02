@@ -8,7 +8,7 @@ Un Serializer convertit automatiquement :
 from rest_framework import serializers
 from apps.trading.models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
-    Strategy, StrategyPerformance, Broker, BrokerAccount
+    Strategy, StrategyPerformance, AlgorithmParameter, Broker, BrokerAccount
 )
 
 
@@ -202,19 +202,37 @@ class BrokerAccountSerializer(serializers.ModelSerializer):
 # SERIALIZERS STRATEGIES
 # ============================================
 
+class AlgorithmParameterSerializer(serializers.ModelSerializer):
+    """Serializer pour les paramètres d'algorithme."""
+    
+    class Meta:
+        model = AlgorithmParameter
+        fields = ['id', 'key', 'value', 'param_type', 'description']
+        read_only_fields = ['id']
+    
+    def to_representation(self, instance):
+        """Convertit la valeur selon le param_type pour l'API."""
+        data = super().to_representation(instance)
+        # La valeur est déjà convertie par get_value() si besoin
+        # On peut aussi exposer la valeur convertie ici
+        return data
+
+
 class StrategySerializer(serializers.ModelSerializer):
     """Serializer pour les stratégies."""
     all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
     all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    algorithm_parameters = AlgorithmParameterSerializer(many=True, read_only=True)
     
     class Meta:
         model = Strategy
         fields = [
             'id', 'name', 'description', 'all_asset', 'all_asset_symbol', 'all_asset_name',
-            'risk_level', 'max_position_size', 'max_daily_loss', 'parameters',
+            'algorithm_type', 'risk_level', 'max_position_size', 'max_daily_loss',
+            'parameters', 'algorithm_parameters',
             'is_active', 'is_automated', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'all_asset_symbol', 'all_asset_name']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'all_asset_symbol', 'all_asset_name', 'algorithm_parameters']
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

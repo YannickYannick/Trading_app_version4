@@ -8,6 +8,7 @@ from .models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory,
     Position, Trade, Order,
     Strategy, StrategyPerformance,
+    AlgorithmParameter, AlgorithmSchema, AlgorithmParameterDefinition,
     Broker, BrokerAccount, BrokerSyncLog,
     ScheduledTask, TaskExecutionLog
 )
@@ -547,19 +548,59 @@ class OrderAdmin(admin.ModelAdmin):
 
 # ============== STRATEGIES ==============
 
+class AlgorithmParameterInline(admin.TabularInline):
+    """Inline pour les paramètres d'algorithme."""
+    model = AlgorithmParameter
+    extra = 0
+    fields = ('key', 'value', 'param_type', 'description')
+    verbose_name = 'Paramètre d\'algorithme'
+    verbose_name_plural = 'Paramètres d\'algorithme'
+
+
+class AlgorithmParameterDefinitionInline(admin.TabularInline):
+    """Inline pour les définitions de paramètres."""
+    model = AlgorithmParameterDefinition
+    extra = 0
+    fields = ('key', 'param_type', 'default_value', 'required', 'description', 'min_value', 'max_value')
+    verbose_name = 'Définition de paramètre'
+    verbose_name_plural = 'Définitions de paramètres'
+
+
+@admin.register(AlgorithmSchema)
+class AlgorithmSchemaAdmin(admin.ModelAdmin):
+    """Admin pour les schémas d'algorithmes."""
+    list_display = ['algorithm_type', 'name']
+    search_fields = ['algorithm_type', 'name', 'description']
+    ordering = ['algorithm_type']
+    inlines = [AlgorithmParameterDefinitionInline]
+
+
+@admin.register(AlgorithmParameter)
+class AlgorithmParameterAdmin(admin.ModelAdmin):
+    """Admin pour les paramètres d'algorithme."""
+    list_display = ['strategy', 'key', 'value', 'param_type']
+    list_filter = ['param_type', 'strategy']
+    search_fields = ['strategy__name', 'key', 'description']
+    ordering = ['strategy', 'key']
+
+
 @admin.register(Strategy)
 class StrategyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'user', 'all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'risk_level', 'is_active', 'is_automated', 'created_at']
-    list_filter = ['risk_level', 'is_active', 'is_automated', 'all_asset__platform']
+    list_display = ['name', 'user', 'all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'algorithm_type', 'risk_level', 'is_active', 'is_automated', 'created_at']
+    list_filter = ['risk_level', 'algorithm_type', 'is_active', 'is_automated', 'all_asset__platform']
     search_fields = ['name', 'user__username', 'all_asset__symbol', 'all_asset__name', 'all_asset__symbole_yahoo']
     ordering = ['name']
     autocomplete_fields = ['all_asset']
     change_form_template = 'admin/trading/strategy/change_form.html'
     actions = ['validate_yahoo_bulk', 'sync_history_bulk']
+    inlines = [AlgorithmParameterInline]
     
     fieldsets = (
         ('Informations générales', {
             'fields': ('name', 'user', 'all_asset', 'description')
+        }),
+        ('Algorithme', {
+            'fields': ('algorithm_type',)
         }),
         ('Configuration', {
             'fields': ('risk_level', 'max_position_size', 'max_daily_loss', 'parameters')
