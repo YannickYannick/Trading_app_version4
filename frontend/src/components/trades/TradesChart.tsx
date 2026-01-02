@@ -74,6 +74,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
         borderColor: '#e0e0e0',
         timeVisible: true,
         secondsVisible: false,
+        fitContent: true, // Activer le fit automatique
       },
       crosshair: {
         mode: 1, // Normal mode
@@ -230,11 +231,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
           if (priceData.length > 0) {
             console.log(`Setting ${priceData.length} price points for asset ${assetId}`)
             series.setData(priceData)
-            
-            // Ajuster l'échelle de temps pour afficher toutes les données
-            if (priceData.length > 0) {
-              chartRef.current.timeScale().fitContent()
-            }
+            // Ne pas appeler fitContent ici, on le fait après toutes les séries
           } else {
             console.warn(`No valid price data for asset ${assetId} after filtering`)
           }
@@ -242,8 +239,18 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
+      // Utiliser setTimeout pour s'assurer que toutes les données sont rendues
       if (chartRef.current && priceSeriesRefs.current.size > 0) {
-        chartRef.current.timeScale().fitContent()
+        setTimeout(() => {
+          if (chartRef.current) {
+            try {
+              chartRef.current.timeScale().fitContent()
+              console.log('[TradesChart] Time scale adjusted to fit content')
+            } catch (err) {
+              console.error('[TradesChart] Error fitting content:', err)
+            }
+          }
+        }, 100)
       }
       
       // Si aucune série n'a été créée, afficher un message d'erreur avec détails

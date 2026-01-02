@@ -58,6 +58,8 @@ const ChartControls: React.FC<ChartControlsProps> = ({
   }, [allAssetsInTrades])
 
   const handleAssetToggle = (assetId: number) => {
+    // Prévenir tout comportement par défaut (comme le submit de formulaire)
+    // ... (pas besoin de event ici, mais on peut ajouter preventDefault si nécessaire)
     if (selectedAssets.includes(assetId)) {
       onSelectedAssetsChange(selectedAssets.filter((id) => id !== assetId))
     } else {
@@ -115,7 +117,11 @@ const ChartControls: React.FC<ChartControlsProps> = ({
                 <input
                   type="checkbox"
                   checked={selectedAssets.includes(asset.id)}
-                  onChange={() => handleAssetToggle(asset.id)}
+                  onChange={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleAssetToggle(asset.id)
+                  }}
                 />
                 <span className="asset-label">
                   <strong>{asset.symbol}</strong>
