@@ -45,6 +45,21 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<ApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     
+    // Masquer les erreurs 400/404 attendues pour les requêtes current_price
+    // (pas de symbole Yahoo valide - c'est normal et ne doit pas polluer la console)
+    if (
+      originalRequest.url?.includes('/current_price/') &&
+      (error.response?.status === 400 || error.response?.status === 404)
+    ) {
+      // Ne pas logger cette erreur - elle est attendue et gérée par le service
+      // On retourne une erreur silencieuse qui sera catchée par getYahooCurrentPrice
+      return Promise.reject({
+        ...error,
+        silent: true, // Flag pour indiquer que c'est une erreur silencieuse
+        response: error.response,
+      } as any)
+    }
+
     // Gérer les erreurs 401 (non authentifié)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
