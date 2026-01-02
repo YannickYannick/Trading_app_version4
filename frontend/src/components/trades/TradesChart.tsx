@@ -570,7 +570,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
       />
       <div className="trades-chart-legend">
         <div className="legend-item">
-          <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
+          <span className="legend-color" style={{ backgroundColor: '#3b82f6' }}></span>
           <span>Achat (BUY)</span>
         </div>
         <div className="legend-item">
