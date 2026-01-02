@@ -394,7 +394,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
           }
           
           // Utiliser trade_type si side n'est pas disponible (compatibilité)
-          const tradeSide = trade.side || trade.trade_type || 'UNKNOWN'
+          const tradeSide = trade.side || (trade as any).trade_type || 'UNKNOWN'
           const isBuy = tradeSide === 'BUY'
           // Convertir explicitement en nombres pour éviter l'erreur toFixed
           const quantity = Number(trade.quantity || trade.size || 0)
@@ -424,8 +424,6 @@ const TradesChart: React.FC<TradesChartProps> = ({
             return null
           }
           
-          // Utiliser trade_type si side n'est pas disponible (compatibilité)
-          const tradeSide = trade.side || trade.trade_type || 'UNKNOWN'
           console.log(`[TradesChart] Creating marker for trade ${trade.id} (${tradeSide}) on ${dateStr} for asset ${assetId}`)
 
           return {
