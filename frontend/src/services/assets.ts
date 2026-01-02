@@ -278,7 +278,12 @@ export const assetService = {
       } catch (error: any) {
         // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
         // NE PAS logger ces erreurs car elles sont attendues et polluent la console
-        if (error?.response?.status === 404 || error?.response?.status === 400) {
+        // L'intercepteur axios marque ces erreurs avec silent: true
+        if (
+          error?.silent ||
+          error?.response?.status === 404 ||
+          error?.response?.status === 400
+        ) {
           // Mettre en cache null pour éviter les requêtes répétées (cache court pour réessayer plus tard si le symbole est validé)
           this._priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
           this._inFlightRequests.delete(allAssetId)
