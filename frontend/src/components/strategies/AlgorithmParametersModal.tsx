@@ -150,11 +150,10 @@ export default function AlgorithmParametersModal({
       })
 
       // Envoyer les paramètres via l'API
-      // Pour l'instant, on utilise l'endpoint update standard
-      // L'API devrait gérer algorithm_parameters automatiquement
+      // Utiliser algorithm_parameters_data pour l'écriture (le serializer gère la conversion)
       await strategyService.update(strategy.id, {
-        algorithm_parameters: algorithmParameters
-      })
+        algorithm_parameters_data: algorithmParameters
+      } as any)
 
       onSuccess()
       onClose()

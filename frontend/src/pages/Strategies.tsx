@@ -39,6 +39,10 @@ export default function Strategies() {
   // Colonnes visibles
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
+  
+  // Modal pour éditer les paramètres d'algorithme
+  const [algorithmParamsModalOpen, setAlgorithmParamsModalOpen] = useState(false)
+  const [selectedStrategyForParams, setSelectedStrategyForParams] = useState<Strategy | null>(null)
 
   const loadStrategies = async () => {
     try {
@@ -470,9 +474,16 @@ export default function Strategies() {
               textOverflow: 'ellipsis',
               maxWidth: '300px',
               display: 'inline-block',
-              cursor: 'help'
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textDecorationStyle: 'dotted'
             }}
-            title={formatted}
+            title={`Cliquer pour éditer: ${formatted}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedStrategyForParams(row)
+              setAlgorithmParamsModalOpen(true)
+            }}
           >
             {formatted}
           </span>

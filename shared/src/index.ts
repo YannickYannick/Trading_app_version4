@@ -7,7 +7,7 @@ export * from './types'
 export * from './types/index'
 export * from './types/errors'
 
-// Export services (will be created next)
+// Export services factories
 export * from './services/auth'
 export * from './services/brokers'
 export * from './services/assets'
