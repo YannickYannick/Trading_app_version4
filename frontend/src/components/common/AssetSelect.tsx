@@ -101,8 +101,25 @@ export default function AssetSelect({
     }
   }, [options, useApiAutocomplete, searchTerm])
 
-  // Trouver l'asset sélectionné
-  const selectedAsset = options.find(a => a.id === value)
+  // Trouver l'asset sélectionné (dans options ou filteredOptions)
+  const selectedAsset = options.find(a => a.id === value) || filteredOptions.find(a => a.id === value)
+  
+  // Charger l'asset sélectionné depuis l'API si nécessaire
+  useEffect(() => {
+    if (value && !selectedAsset && useApiAutocomplete) {
+      assetService.getAllAssetById(value).then(asset => {
+        setFilteredOptions(prev => {
+          // Ajouter l'asset à la liste s'il n'y est pas déjà
+          if (!prev.find(a => a.id === asset.id)) {
+            return [asset, ...prev]
+          }
+          return prev
+        })
+      }).catch(err => {
+        console.error('Erreur lors du chargement de l\'asset:', err)
+      })
+    }
+  }, [value, selectedAsset, useApiAutocomplete])
 
   // Fermer quand on clique en dehors
   useEffect(() => {
@@ -172,7 +189,7 @@ export default function AssetSelect({
                 >
                   <div className="asset-select-option-symbol">{asset.symbol}</div>
                   <div className="asset-select-option-name">{asset.name}</div>
-                  {asset.symbole_yahoo && (
+                  {asset.symbole_yahoo && asset.symbole_yahoo !== 'Not_searched' && asset.symbole_yahoo !== 'not_found' && (
                     <div className="asset-select-option-yahoo">Yahoo: {asset.symbole_yahoo}</div>
                   )}
                 </div>
