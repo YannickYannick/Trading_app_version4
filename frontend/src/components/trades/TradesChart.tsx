@@ -102,15 +102,18 @@ const TradesChart: React.FC<TradesChartProps> = ({
       // Charger les historiques en parallèle
       const historyPromises = assetIds.map(async (assetId) => {
         try {
+          console.log(`[TradesChart] Loading price history for asset ${assetId}...`)
           const history = await assetService.getPriceHistory(assetId, 365, 'list')
+          console.log(`[TradesChart] Loaded price history for asset ${assetId}: ${history.count} records`, history)
           return { assetId, history }
         } catch (err) {
-          console.error(`Error loading history for asset ${assetId}:`, err)
+          console.error(`[TradesChart] Error loading history for asset ${assetId}:`, err)
           return { assetId, history: null }
         }
       })
 
       const histories = await Promise.all(historyPromises)
+      console.log(`[TradesChart] All histories loaded:`, histories)
 
       // Créer ou récupérer les séries pour chaque asset
       histories.forEach(({ assetId, history }, index) => {
@@ -180,7 +183,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
       
       // Si aucune série n'a été créée, afficher un message d'erreur
       if (priceSeriesRefs.current.size === 0) {
+        console.warn(`[TradesChart] No series created. Histories:`, histories)
         setError('Aucun historique de prix disponible pour les assets sélectionnés')
+      } else {
+        console.log(`[TradesChart] Created ${priceSeriesRefs.current.size} series`)
       }
 
       // Supprimer les séries pour les assets non sélectionnés
