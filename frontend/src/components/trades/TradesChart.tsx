@@ -31,6 +31,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const priceSeriesRefs = useRef<Map<number, ISeriesApi<'Line'>>>(new Map())
+  const markersRefs = useRef<Map<number, ReturnType<typeof createSeriesMarkers>>>(new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
