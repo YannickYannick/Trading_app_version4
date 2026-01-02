@@ -7,6 +7,7 @@ import { assetService } from '@services/assets'
 import { tradeService } from '@services'
 import { calculateRSI, calculateMA, calculateBollingerBands, calculateMACD, calculateEMA } from '@utils/technicalIndicators'
 import { calculateStrategySignals, type StrategyParameters, type Signal } from '@utils/strategySignals'
+import { simulateTradesFromSignals, calculatePerformanceMetrics, type TradeSimulation } from '@utils/strategyPerformance'
 import type { Strategy, Trade } from '@types'
 import './StrategyVisualizationChart.css'
 
@@ -40,6 +41,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
+  const [simulatedTrades, setSimulatedTrades] = useState<TradeSimulation[]>([])
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
 
   // Initialiser le graphique
   useEffect(() => {
@@ -336,17 +339,40 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Calculer les signaux
     const signals = calculateStrategySignals(algorithmType, prices, dates, strategyParams)
     
+    // Simuler les trades basés sur les signaux
+    const orderSize = strategyParams.order_size || 1.0
+    const stopLoss = strategyParams.stop_loss
+    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss)
+    setSimulatedTrades(simulated)
+    
+    // Calculer les métriques de performance
+    const metrics = calculatePerformanceMetrics(simulated)
+    setPerformanceMetrics(metrics)
+    
     // Filtrer seulement les signaux BUY/SELL (pas HOLD)
     const buySellSignals = signals.filter(s => s.signal !== 'HOLD')
     
-    // Créer des marqueurs pour les signaux
-    const signalMarkers: MarkerData[] = buySellSignals.map(signal => ({
-      time: signal.time as Time,
-      position: signal.signal === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
-      color: signal.signal === 'BUY' ? '#10b981' : '#ef4444',
-      shape: signal.signal === 'BUY' ? ('arrowUp' as const) : ('arrowDown' as const),
-      text: `${signal.signal} @ ${signal.price.toFixed(2)}`,
-    }))
+    // Créer des marqueurs pour les signaux avec plus d'informations
+    const signalMarkers: MarkerData[] = buySellSignals.map(signal => {
+      // Trouver le trade simulé correspondant si disponible
+      const relatedTrade = simulated.find(t => 
+        t.entryTime === signal.time && t.side === signal.signal
+      )
+      
+      let text = `${signal.signal} @ ${signal.price.toFixed(2)}`
+      if (relatedTrade && relatedTrade.status === 'CLOSED' && relatedTrade.pnl !== null) {
+        const pnlSign = relatedTrade.pnl >= 0 ? '+' : ''
+        text = `${signal.signal} @ ${signal.price.toFixed(2)} (${pnlSign}${relatedTrade.pnl.toFixed(2)})`
+      }
+      
+      return {
+        time: signal.time as Time,
+        position: signal.signal === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
+        color: signal.signal === 'BUY' ? '#10b981' : '#ef4444',
+        shape: signal.signal === 'BUY' ? ('arrowUp' as const) : ('arrowDown' as const),
+        text,
+      }
+    })
 
     // Ajouter les marqueurs des trades réels
     const tradeMarkers: MarkerData[] = trades
@@ -382,13 +408,16 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Combiner les marqueurs de signaux et de trades
     const allMarkers = [...signalMarkers, ...tradeMarkers]
 
-    // Mettre à jour les marqueurs
-    if (allMarkers.length > 0) {
-      if (!markersRef.current && priceSeriesRef.current) {
+    // Mettre à jour les marqueurs (uniquement si la série de prix existe)
+    if (allMarkers.length > 0 && priceSeriesRef.current) {
+      if (!markersRef.current) {
         markersRef.current = createSeriesMarkers(priceSeriesRef.current, allMarkers)
-      } else if (markersRef.current) {
+      } else {
         markersRef.current.setMarkers(allMarkers)
       }
+    } else if (markersRef.current) {
+      // Supprimer les marqueurs si pas de données
+      markersRef.current.setMarkers([])
     }
 
     // Ajuster l'échelle après toutes les données
@@ -405,7 +434,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     })
   }, [priceHistory, strategy, parameters, trades])
 
-  // Créer la série de prix
+  // Créer la série de prix et réajouter les marqueurs après
   useEffect(() => {
     if (!chartRef.current || priceHistory.length === 0) return
 
@@ -436,6 +465,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
     priceSeries.setData(priceData)
     priceSeriesRef.current = priceSeries
+
+    // Réajouter les marqueurs après création de la série
+    // Cela sera géré par l'useEffect des indicateurs qui se déclenchera après
   }, [priceHistory, strategy])
 
   if (!strategy) {
