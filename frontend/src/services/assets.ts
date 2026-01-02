@@ -43,6 +43,14 @@ export const assetService = {
   },
 
   /**
+   * Mettre à jour un AllAsset
+   */
+  async updateAllAsset(id: number, data: Partial<AllAsset>): Promise<AllAsset> {
+    const response = await apiClient.patch<AllAsset>(`/all-assets/${id}/`, data)
+    return response.data
+  },
+
+  /**
    * Rechercher des AllAssets
    */
   async searchAllAssets(query: string): Promise<AllAsset[]> {

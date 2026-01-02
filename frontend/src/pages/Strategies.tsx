@@ -422,7 +422,9 @@ export default function Strategies() {
     {
       key: 'yahoo_symbol',
       label: 'Symbole Yahoo',
+      editable: true,
       align: 'center' as const,
+      onCellEdit: handleCellEdit,
       render: (_value: any, row: Strategy) => {
         const allAsset = typeof row.all_asset === 'object' ? row.all_asset : null
         const yahooSymbol = row.all_asset_yahoo_symbol || allAsset?.symbole_yahoo
