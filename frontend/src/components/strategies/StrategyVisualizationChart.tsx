@@ -342,7 +342,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Simuler les trades basés sur les signaux
     const orderSize = strategyParams.order_size || 1.0
     const stopLoss = strategyParams.stop_loss
-    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss)
+    const minQuantity = strategyParams.min_quantity || 0
+    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity)
     setSimulatedTrades(simulated)
     
     // Calculer les métriques de performance
