@@ -184,7 +184,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
             return
           }
 
-          const color = priceColors[index % priceColors.length]
+          // Utiliser la taille actuelle de priceSeriesRefs pour l'index de couleur (pas l'index de la boucle)
+          const colorIndex = priceSeriesRefs.current.size
+          const color = priceColors[colorIndex % priceColors.length]
           const assetSymbol = allAssetsMap?.get(assetId)?.symbol || `Asset ${assetId}`
           
           try {
@@ -393,7 +395,6 @@ const TradesChart: React.FC<TradesChartProps> = ({
   }, [selectedAssets])
 
   // Charger l'historique quand les assets sélectionnés changent
-  const loadingRef = useRef<boolean>(false)
   const prevSelectedAssetsRef = useRef<string>('')
   
   useEffect(() => {
@@ -403,37 +404,25 @@ const TradesChart: React.FC<TradesChartProps> = ({
       return
     }
 
-    // Si un chargement est déjà en cours, attendre qu'il se termine
-    if (loadingRef.current) {
-      console.log('[TradesChart] Load already in progress, skipping')
-      return
-    }
-
     // Comparer avec la valeur précédente pour éviter les rechargements inutiles
     if (prevSelectedAssetsRef.current === assetsKey) {
       console.log('[TradesChart] Selected assets unchanged, skipping reload. Current key:', assetsKey)
       return
     }
 
-    console.log('[TradesChart] Selected assets changed. Previous:', prevSelectedAssetsRef.current, 'New:', assetsKey)
+    console.log('[TradesChart] Selected assets changed from', prevSelectedAssetsRef.current, 'to', assetsKey)
+    
+    // ✅ METTRE À JOUR LA RÉFÉRENCE IMMÉDIATEMENT pour éviter les doubles appels
+    const previousKey = prevSelectedAssetsRef.current
+    prevSelectedAssetsRef.current = assetsKey
 
     if (selectedAssets.length > 0) {
-      // Marquer qu'un chargement est en cours
-      loadingRef.current = true
-      
       // Charger l'historique pour les nouveaux assets sélectionnés
-      // Passer une copie de selectedAssets pour éviter les problèmes de référence
       loadPriceHistory([...selectedAssets])
-        .then(() => {
-          // Mettre à jour la référence APRÈS le chargement réussi
-          prevSelectedAssetsRef.current = assetsKey
-          loadingRef.current = false
-          console.log('[TradesChart] Price history loaded successfully for:', assetsKey)
-        })
         .catch((err) => {
           console.error('[TradesChart] Error in loadPriceHistory:', err)
-          // En cas d'erreur, ne pas mettre à jour la référence pour permettre une nouvelle tentative
-          loadingRef.current = false
+          // En cas d'erreur, restaurer la valeur précédente pour permettre une nouvelle tentative
+          prevSelectedAssetsRef.current = previousKey
         })
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
@@ -447,11 +436,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
         markersPrimitive.setMarkers([])
       })
       markersRefs.current.clear()
-      // Mettre à jour la référence immédiatement pour les désélections
-      prevSelectedAssetsRef.current = assetsKey
-      loadingRef.current = false
     }
-    // Utiliser assetsKey comme dépendance (calculé avec useMemo)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetsKey]) // Dépendance basée sur la clé triée
 
