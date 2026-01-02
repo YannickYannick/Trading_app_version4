@@ -168,17 +168,19 @@ const TradesChart: React.FC<TradesChartProps> = ({
         // Ajuster l'échelle même si pas de nouveaux assets (notamment après suppression de séries)
         if (hasRemovedSeries || priceSeriesRefs.current.size > 0) {
           requestAnimationFrame(() => {
-            setTimeout(() => {
-              if (chartRef.current) {
-                try {
-                  const timeScale = chartRef.current.timeScale()
-                  timeScale.fitContent()
-                  console.log('[TradesChart] Time scale adjusted after series removal')
-                } catch (err) {
-                  console.error('[TradesChart] Error fitting content after removal:', err)
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                if (chartRef.current && priceSeriesRefs.current.size > 0) {
+                  try {
+                    const timeScale = chartRef.current.timeScale()
+                    timeScale.fitContent()
+                    console.log('[TradesChart] Time scale adjusted after series removal')
+                  } catch (err) {
+                    console.error('[TradesChart] Error fitting content after removal:', err)
+                  }
                 }
-              }
-            }, 50)
+              }, 100)
+            })
           })
         }
         return
@@ -299,20 +301,34 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
-      // Utiliser requestAnimationFrame + setTimeout pour s'assurer que toutes les données sont rendues
-      // Toujours ajuster l'échelle, même s'il n'y a pas de nouvelles séries (au cas où des séries ont été supprimées)
+      // Utiliser plusieurs requestAnimationFrame en cascade pour s'assurer que toutes les données sont rendues
+      // Cela garantit que le graphique a bien affiché toutes les séries avant d'ajuster l'échelle
       requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (chartRef.current) {
-            try {
-              const timeScale = chartRef.current.timeScale()
-              timeScale.fitContent()
-              console.log('[TradesChart] Time scale adjusted to fit content')
-            } catch (err) {
-              console.error('[TradesChart] Error fitting content:', err)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (chartRef.current && priceSeriesRefs.current.size > 0) {
+              try {
+                const timeScale = chartRef.current.timeScale()
+                timeScale.fitContent()
+                console.log('[TradesChart] Time scale adjusted to fit content after data loaded')
+                
+                // Forcer un nouveau recalcul après un court délai supplémentaire pour être sûr
+                setTimeout(() => {
+                  if (chartRef.current) {
+                    try {
+                      chartRef.current.timeScale().fitContent()
+                      console.log('[TradesChart] Time scale re-adjusted (second pass)')
+                    } catch (err) {
+                      console.error('[TradesChart] Error in second fitContent pass:', err)
+                    }
+                  }
+                }, 100)
+              } catch (err) {
+                console.error('[TradesChart] Error fitting content:', err)
+              }
             }
-          }
-        }, 50)
+          }, 100) // Augmenter le délai à 100ms
+        })
       })
       
       // Si aucune série n'a été créée, afficher un message d'erreur avec détails
@@ -433,17 +449,19 @@ const TradesChart: React.FC<TradesChartProps> = ({
     // Réajuster l'échelle après avoir ajouté/mis à jour les marqueurs
     if (chartRef.current && priceSeriesRefs.current.size > 0) {
       requestAnimationFrame(() => {
-        setTimeout(() => {
-          if (chartRef.current) {
-            try {
-              const timeScale = chartRef.current.timeScale()
-              timeScale.fitContent()
-              console.log('[TradesChart] Time scale adjusted after markers update')
-            } catch (err) {
-              console.error('[TradesChart] Error fitting content after markers:', err)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (chartRef.current) {
+              try {
+                const timeScale = chartRef.current.timeScale()
+                timeScale.fitContent()
+                console.log('[TradesChart] Time scale adjusted after markers update')
+              } catch (err) {
+                console.error('[TradesChart] Error fitting content after markers:', err)
+              }
             }
-          }
-        }, 50)
+          }, 100)
+        })
       })
     }
   }, [filteredTrades, selectedAssets, viewMode])
