@@ -300,6 +300,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
         }
       })
 
+      // Ajouter les marqueurs immédiatement après la création des séries
+      // Cela évite le retard d'affichage des marqueurs
+      updateMarkersForSeries()
+
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
       // Utiliser plusieurs requestAnimationFrame en cascade pour s'assurer que toutes les données sont rendues
       // Cela garantit que le graphique a bien affiché toutes les séries avant d'ajuster l'échelle
@@ -464,6 +468,21 @@ const TradesChart: React.FC<TradesChartProps> = ({
         markersRefs.current.delete(assetId)
       }
     })
+  }, [filteredTrades, selectedAssets, viewMode])
+
+  // Ajouter les marqueurs de trades au graphique (via useEffect pour réactivité)
+  useEffect(() => {
+    // Attendre un peu que les séries soient créées si elles n'existent pas encore
+    if (priceSeriesRefs.current.size === 0) {
+      console.log('[TradesChart] No series available yet, waiting...')
+      // Réessayer après un court délai
+      const timeoutId = setTimeout(() => {
+        updateMarkersForSeries()
+      }, 200)
+      return () => clearTimeout(timeoutId)
+    }
+
+    updateMarkersForSeries()
 
     // Réajuster l'échelle après avoir ajouté/mis à jour les marqueurs
     if (chartRef.current && priceSeriesRefs.current.size > 0) {
@@ -483,7 +502,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
         })
       })
     }
-  }, [filteredTrades, selectedAssets, viewMode])
+  }, [filteredTrades, selectedAssets, viewMode, updateMarkersForSeries])
 
   // Créer une clé stable pour la comparaison (trier les IDs pour être indépendant de l'ordre)
   // Utiliser useMemo pour éviter de recalculer à chaque render
