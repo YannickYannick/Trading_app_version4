@@ -8,6 +8,8 @@ import { assetService as assetServiceUtil } from '@services/assets'
 import { formatDate, formatCurrency } from '@utils/format'
 import type { Strategy, BrokerAccount, AllAsset } from '@types'
 import AlgorithmParametersModal from '@components/strategies/AlgorithmParametersModal'
+import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
+import StrategyParametersPanel from '@components/strategies/StrategyParametersPanel'
 import './Strategies.css'
 
 // Algorithmes disponibles
@@ -43,6 +45,11 @@ export default function Strategies() {
   // Modal pour éditer les paramètres d'algorithme
   const [algorithmParamsModalOpen, setAlgorithmParamsModalOpen] = useState(false)
   const [selectedStrategyForParams, setSelectedStrategyForParams] = useState<Strategy | null>(null)
+  
+  // Graphique de visualisation de stratégie
+  const [selectedStrategyForVisualization, setSelectedStrategyForVisualization] = useState<Strategy | null>(null)
+  const [previewParameters, setPreviewParameters] = useState<Record<string, any>>({})
+  const [showVisualization, setShowVisualization] = useState(false)
 
   const loadStrategies = async () => {
     try {
@@ -897,6 +904,103 @@ export default function Strategies() {
           loadStrategies()
         }}
       />
+
+      {/* Section graphique de visualisation */}
+      {showVisualization && (
+        <Card style={{ marginTop: '2rem' }}>
+          <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <h2>Visualisation de la stratégie</h2>
+              <select
+                value={selectedStrategyForVisualization?.id || ''}
+                onChange={(e) => {
+                  const strategyId = parseInt(e.target.value, 10)
+                  const strategy = strategies.find(s => s.id === strategyId)
+                  setSelectedStrategyForVisualization(strategy || null)
+                  setPreviewParameters({})
+                  if (strategy) {
+                    // Charger les paramètres initiaux
+                    const params: Record<string, any> = {}
+                    if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
+                      strategy.algorithm_parameters.forEach(param => {
+                        let value: any = param.value
+                        if (param.param_type === 'int') {
+                          value = parseInt(value, 10)
+                        } else if (param.param_type === 'float') {
+                          value = parseFloat(value)
+                        } else if (param.param_type === 'bool') {
+                          value = value.toLowerCase() === 'true' || value === true || value === '1'
+                        }
+                        params[param.key] = value
+                      })
+                    }
+                    setPreviewParameters(params)
+                  }
+                }}
+                style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid #d1d5db' }}
+              >
+                <option value="">-- Sélectionner une stratégie --</option>
+                {strategies.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.algorithm_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowVisualization(false)
+                setSelectedStrategyForVisualization(null)
+                setPreviewParameters({})
+              }}
+            >
+              Masquer
+            </Button>
+          </div>
+
+          {selectedStrategyForVisualization ? (
+            <div style={{ display: 'flex', gap: '0', height: '600px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <StrategyVisualizationChart
+                  strategy={selectedStrategyForVisualization}
+                  parameters={previewParameters}
+                  onParametersChange={setPreviewParameters}
+                />
+              </div>
+              <StrategyParametersPanel
+                strategy={selectedStrategyForVisualization}
+                currentParameters={previewParameters}
+                onParameterChange={(key, value) => {
+                  setPreviewParameters(prev => ({ ...prev, [key]: value }))
+                }}
+                onSave={async () => {
+                  await loadStrategies()
+                  // Recharger la stratégie pour avoir les nouveaux paramètres
+                  const updatedStrategy = strategies.find(s => s.id === selectedStrategyForVisualization.id)
+                  if (updatedStrategy) {
+                    setSelectedStrategyForVisualization(updatedStrategy)
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+              <p>Sélectionnez une stratégie dans le menu déroulant pour voir son graphique</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Bouton pour afficher/masquer le graphique */}
+      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
+        <Button
+          variant={showVisualization ? 'outline' : 'primary'}
+          onClick={() => setShowVisualization(!showVisualization)}
+        >
+          {showVisualization ? 'Masquer le graphique' : 'Afficher le graphique de stratégie'}
+        </Button>
+      </div>
     </div>
   )
 }
