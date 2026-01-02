@@ -328,8 +328,15 @@ const TradesChart: React.FC<TradesChartProps> = ({
           if (!tradeDate) return null
           
           const isBuy = trade.side === 'BUY'
-          const quantity = trade.quantity || trade.size || 0
-          const price = trade.price || 0
+          // Convertir explicitement en nombres pour éviter l'erreur toFixed
+          const quantity = Number(trade.quantity || trade.size || 0)
+          const price = Number(trade.price || 0)
+
+          // Vérifier que les valeurs sont valides
+          if (isNaN(quantity) || isNaN(price)) {
+            console.warn(`[TradesChart] Invalid quantity or price for trade:`, trade)
+            return null
+          }
 
           // Convertir la date au format YYYY-MM-DD
           let dateStr = tradeDate
