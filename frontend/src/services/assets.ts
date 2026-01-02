@@ -303,6 +303,15 @@ export const assetService = {
       })
       return response.data
     } catch (error: any) {
+      // Ne pas logger les erreurs si c'est juste qu'il n'y a pas d'historique (404 ou message explicite)
+      if (error?.response?.status === 404 || error?.response?.data?.message?.includes('No price history')) {
+        return {
+          all_asset_id: allAssetId,
+          all_asset_symbol: '',
+          count: 0,
+          results: [],
+        }
+      }
       console.error(`Error fetching price history for AllAsset ${allAssetId}:`, error)
       return {
         all_asset_id: allAssetId,

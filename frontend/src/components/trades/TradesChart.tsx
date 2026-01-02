@@ -114,7 +114,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       // Créer ou récupérer les séries pour chaque asset
       histories.forEach(({ assetId, history }, index) => {
-        if (!history || history.results.length === 0) return
+        if (!history || history.results.length === 0) {
+          console.warn(`No price history for asset ${assetId}`)
+          return
+        }
 
         let series = priceSeriesRefs.current.get(assetId)
 
@@ -133,15 +136,41 @@ const TradesChart: React.FC<TradesChartProps> = ({
           priceSeriesRefs.current.set(assetId, series)
         }
 
-        if (series) {
+        if (series && chartRef.current) {
           // Convertir les données au format lightweight-charts
           const priceData: LineData[] = history.results
-            .map((point) => ({
-              time: point.date as Time,
-              value: point.close || point.close_price || 0,
-            }))
-            .filter((point) => point.value > 0) // Filtrer les valeurs invalides
-            .sort((a, b) => (a.time as string).localeCompare(b.time as string))
+            .map((point) => {
+              // Convertir la date au format YYYY-MM-DD si nécessaire
+              let dateStr = point.date
+              if (dateStr.includes('T')) {
+                dateStr = dateStr.split('T')[0]
+              }
+              
+              return {
+                time: dateStr as Time,
+                value: point.close || point.close_price || point.close || 0,
+              }
+            })
+            .filter((point) => point.value > 0 && point.time) // Filtrer les valeurs invalides
+            .sort((a, b) => {
+              // Trier chronologiquement
+              const timeA = a.time as string
+              const timeB = b.time as string
+              return timeA.localeCompare(timeB)
+            })
+
+          if (priceData.length > 0) {
+            console.log(`Setting ${priceData.length} price points for asset ${assetId}`)
+            series.setData(priceData)
+            
+            // Ajuster l'échelle de temps pour afficher toutes les données
+            if (priceData.length > 0) {
+              chartRef.current.timeScale().fitContent()
+            }
+          } else {
+            console.warn(`No valid price data for asset ${assetId} after filtering`)
+          }
+        }
 
           if (priceData.length > 0) {
             series.setData(priceData)
@@ -176,40 +205,47 @@ const TradesChart: React.FC<TradesChartProps> = ({
   useEffect(() => {
     if (!chartRef.current || filteredTrades.length === 0) return
 
-    // Obtenir la première série active (ou créer une série par défaut)
-    const firstSeries = priceSeriesRefs.current.values().next().value
+    // Ajouter les marqueurs à toutes les séries concernées
+    priceSeriesRefs.current.forEach((series, assetId) => {
+      // Filtrer les trades pour cet asset
+      const assetTrades = filteredTrades.filter((trade) => {
+        const tradeAssetId = trade.all_asset?.id || (typeof trade.all_asset === 'number' ? trade.all_asset : null)
+        return tradeAssetId === assetId
+      })
 
-    if (firstSeries) {
+      if (assetTrades.length === 0) return
+
       // Convertir les trades en marqueurs
-      const markers: MarkerData[] = filteredTrades
-        .filter((trade) => {
-          // Vérifier que le trade correspond aux assets sélectionnés
-          if (viewMode === 'per_asset' && selectedAssets.length > 0) {
-            const tradeAssetId = trade.all_asset?.id || (typeof trade.all_asset === 'number' ? trade.all_asset : null)
-            return selectedAssets.includes(tradeAssetId || -1)
-          }
-          return selectedAssets.length === 0 || (trade.all_asset?.id && selectedAssets.includes(trade.all_asset.id))
-        })
+      const markers: MarkerData[] = assetTrades
         .map((trade) => {
           const tradeDate = trade.executed_at || trade.timestamp
+          if (!tradeDate) return null
+          
           const isBuy = trade.side === 'BUY'
           const quantity = trade.quantity || trade.size || 0
           const price = trade.price || 0
 
+          // Convertir la date au format YYYY-MM-DD
+          let dateStr = tradeDate
+          if (dateStr.includes('T')) {
+            dateStr = dateStr.split('T')[0]
+          }
+
           return {
-            time: tradeDate.split('T')[0] as Time, // Prendre seulement la date (YYYY-MM-DD)
+            time: dateStr as Time,
             position: isBuy ? ('belowBar' as const) : ('aboveBar' as const),
             color: isBuy ? '#10b981' : '#ef4444',
             shape: isBuy ? ('arrowUp' as const) : ('arrowDown' as const),
             text: `${trade.side} ${quantity.toFixed(2)} @ ${price.toFixed(2)}`,
           }
         })
-        .filter((marker) => marker.time) // Filtrer les marqueurs sans date valide
+        .filter((marker): marker is MarkerData => marker !== null) // Filtrer les marqueurs null
 
       if (markers.length > 0) {
-        firstSeries.setMarkers(markers)
+        console.log(`Adding ${markers.length} markers to series for asset ${assetId}`)
+        series.setMarkers(markers)
       }
-    }
+    })
   }, [filteredTrades, selectedAssets, viewMode])
 
   // Charger l'historique quand les assets sélectionnés changent
