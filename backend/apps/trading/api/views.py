@@ -390,7 +390,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=False, methods=['get'], url_path='(?P<pk>[^/.]+)/prices')
+    @action(detail=True, methods=['get'], url_path='prices')
     def prices(self, request, pk=None):
         """
         GET /api/all-assets/{id}/prices/
@@ -400,44 +400,30 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         - days: Nombre de jours à récupérer (défaut: 100)
         - source: Filtrer par source (YAHOO, SAXO, BINANCE, etc.) - optionnel
         - format: Format de réponse ('json' ou 'list', défaut: 'list')
+        
+        Avec detail=True, DRF gère automatiquement le routing vers {pk}
+        et appelle get_object() pour récupérer l'instance.
         """
         logger = logging.getLogger('trading.api.assets')
         logger.info(f"[PRICES] Prices endpoint called for AllAsset ID: {pk}, user: {request.user}")
         
-        # Vérifier directement si l'asset existe avant get_object()
+        # Récupérer l'objet via la méthode standard de DRF
         try:
-            queryset = self.get_queryset()
-            logger.debug(f"[PRICES] Queryset: {queryset.model}, filtering for pk={pk}")
-            
-            try:
-                all_asset = queryset.get(pk=pk)
-                logger.info(f"[PRICES] AllAsset found directly: {all_asset.id} - {all_asset.symbol} - {all_asset.name}")
-            except AllAssets.DoesNotExist:
-                logger.error(f"[PRICES] AllAsset {pk} does not exist in queryset")
-                # Vérifier si l'asset existe quand même dans la base (peut-être filtré)
-                try:
-                    direct_asset = AllAssets.objects.get(pk=pk)
-                    logger.warning(f"[PRICES] AllAsset {pk} exists in database but not in queryset (maybe filtered): {direct_asset.symbol}")
-                    # Utiliser l'asset direct si trouvé
-                    all_asset = direct_asset
-                except AllAssets.DoesNotExist:
-                    logger.error(f"[PRICES] AllAsset {pk} does not exist in database at all")
-                    return Response(
-                        {
-                            'all_asset_id': int(pk) if pk else None,
-                            'all_asset_symbol': None,
-                            'count': 0,
-                            'message': f'AllAsset {pk} not found in database',
-                            'error': 'Not found',
-                            'results': []
-                        },
-                        status=status.HTTP_404_NOT_FOUND
-                    )
-            
-            # Ne pas utiliser get_object() car il peut retourner 404 même si l'objet existe
-            # On utilise directement l'objet récupéré depuis le queryset
-            logger.debug(f"[PRICES] Using asset directly from queryset: {all_asset.id}")
-                
+            all_asset = self.get_object()
+            logger.info(f"[PRICES] Found AllAsset: {all_asset.symbol} (ID: {all_asset.pk})")
+        except AllAssets.DoesNotExist:
+            logger.error(f"[PRICES] AllAsset {pk} not found")
+            return Response(
+                {
+                    'all_asset_id': int(pk) if pk else None,
+                    'all_asset_symbol': None,
+                    'count': 0,
+                    'message': f'AllAsset {pk} not found',
+                    'error': 'Not found',
+                    'results': []
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             logger.error(f"[PRICES] Error getting AllAsset {pk}: {e}", exc_info=True)
             return Response(
@@ -452,23 +438,24 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-        days = int(request.query_params.get('days', 100))
-        source = request.query_params.get('source')
-        format_type = request.query_params.get('format', 'list')  # 'json' ou 'list'
+        # Récupérer les paramètres de requête
+        days_param = request.query_params.get('days', '100')
+        try:
+            days = int(days_param)
+            if days <= 0:
+                raise ValueError("Days must be positive")
+        except ValueError:
+            logger.warning(f"[PRICES] Invalid days parameter: {days_param}, using default 100")
+            days = 100
         
-        # Récupérer l'historique depuis le champ JSONB
+        source = request.query_params.get('source')
+        format_type = request.query_params.get('format', 'list')
+        
+        # Récupérer l'historique depuis le champ JSONB (c'est un dict, pas une liste!)
         price_history = all_asset.price_history_json or {}
         
-        # Vérifier si l'historique existe réellement (double vérification)
-        # has_price_history peut être False si price_history_json est {} ou None
-        # mais on vérifie directement ici pour être sûr
         if not price_history or len(price_history) == 0:
-            logger = logging.getLogger('trading.api.assets')
-            logger.debug(
-                f"AllAsset {all_asset.id} ({all_asset.symbol}): "
-                f"No price history - has_price_history={all_asset.has_price_history}, "
-                f"price_history_json type={type(price_history)}, length={len(price_history) if price_history else 0}"
-            )
+            logger.debug(f"[PRICES] No price history for AllAsset {all_asset.id}")
             return Response({
                 'all_asset_id': all_asset.id,
                 'all_asset_symbol': all_asset.symbol,
@@ -477,20 +464,11 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'results': []
             })
         
-        # Debug: logger le contenu de price_history_json
-        logger = logging.getLogger('trading.api.assets')
-        logger.debug(
-            f"AllAsset {all_asset.id} ({all_asset.symbol}): "
-            f"price_history_json type={type(price_history)}, "
-            f"length={len(price_history) if price_history else 0}, "
-            f"has_price_history={all_asset.has_price_history}"
-        )
-        
-        # Convertir en liste et filtrer par source si nécessaire
+        # Convertir le dict en liste et filtrer
         prices_list = []
-        sorted_dates = sorted(price_history.keys(), reverse=True)[:days] if price_history else []
+        sorted_dates = sorted(price_history.keys(), reverse=True)[:days]
         
-        logger.debug(f"Sorted dates count: {len(sorted_dates)}, days requested: {days}")
+        logger.debug(f"[PRICES] Total history dates: {len(price_history)}, Requested days: {days}, Returning: {len(sorted_dates)}")
         
         for date_str in sorted_dates:
             price_data = price_history[date_str]
@@ -502,7 +480,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             # Vérifier que les prix ne sont pas None/NaN
             close_price = price_data.get('close')
             if close_price is None:
-                logger.debug(f"Skipping {date_str} for {all_asset.symbol}: close price is None")
+                logger.debug(f"[PRICES] Skipping {date_str}: close price is None")
                 continue
             
             prices_list.append({
@@ -512,14 +490,14 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'low': price_data.get('low'),
                 'close': close_price,
                 'close_price': close_price,  # Alias pour compatibilité frontend
-                'open_price': price_data.get('open'),    # Alias pour compatibilité frontend
-                'high_price': price_data.get('high'),    # Alias pour compatibilité frontend
-                'low_price': price_data.get('low'),      # Alias pour compatibilité frontend
+                'open_price': price_data.get('open'),
+                'high_price': price_data.get('high'),
+                'low_price': price_data.get('low'),
                 'volume': price_data.get('volume', 0),
                 'source': price_data.get('source', 'YAHOO')
             })
         
-        logger.debug(f"Final prices_list count: {len(prices_list)}")
+        logger.debug(f"[PRICES] Final prices_list count: {len(prices_list)}")
         
         # Retourner selon le format demandé
         if format_type == 'json':
@@ -532,14 +510,14 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'data': price_history
             })
         else:
-            # Retourner en format liste (compatible avec l'ancien format)
+            # Format liste (compatible avec le frontend)
             return Response({
                 'all_asset_id': all_asset.id,
                 'all_asset_symbol': all_asset.symbol,
                 'count': len(prices_list),
                 'format': 'list',
                 'total_days_available': len(price_history),
-                'results': prices_list  # Contient déjà les alias close_price, open_price, etc.
+                'results': prices_list
             })
     
     @action(detail=True, methods=['get'])
