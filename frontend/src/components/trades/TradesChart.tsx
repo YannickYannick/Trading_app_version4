@@ -393,11 +393,19 @@ const TradesChart: React.FC<TradesChartProps> = ({
   }, [selectedAssets])
 
   // Charger l'historique quand les assets sélectionnés changent
+  const loadingRef = useRef<boolean>(false)
   const prevSelectedAssetsRef = useRef<string>('')
+  
   useEffect(() => {
     // Attendre que le graphique soit initialisé avant de charger les données
     if (!chartRef.current) {
       console.log('[TradesChart] Waiting for chart to be initialized...')
+      return
+    }
+
+    // Si un chargement est déjà en cours, attendre qu'il se termine
+    if (loadingRef.current) {
+      console.log('[TradesChart] Load already in progress, skipping')
       return
     }
 
@@ -408,18 +416,25 @@ const TradesChart: React.FC<TradesChartProps> = ({
     }
 
     console.log('[TradesChart] Selected assets changed. Previous:', prevSelectedAssetsRef.current, 'New:', assetsKey)
-    
-    // Mettre à jour la référence AVANT de charger (pour éviter les doubles appels pendant le chargement)
-    prevSelectedAssetsRef.current = assetsKey
 
     if (selectedAssets.length > 0) {
+      // Marquer qu'un chargement est en cours
+      loadingRef.current = true
+      
       // Charger l'historique pour les nouveaux assets sélectionnés
       // Passer une copie de selectedAssets pour éviter les problèmes de référence
-      loadPriceHistory([...selectedAssets]).catch((err) => {
-        console.error('[TradesChart] Error in loadPriceHistory:', err)
-        // En cas d'erreur, réinitialiser la référence pour permettre une nouvelle tentative
-        prevSelectedAssetsRef.current = ''
-      })
+      loadPriceHistory([...selectedAssets])
+        .then(() => {
+          // Mettre à jour la référence APRÈS le chargement réussi
+          prevSelectedAssetsRef.current = assetsKey
+          loadingRef.current = false
+          console.log('[TradesChart] Price history loaded successfully for:', assetsKey)
+        })
+        .catch((err) => {
+          console.error('[TradesChart] Error in loadPriceHistory:', err)
+          // En cas d'erreur, ne pas mettre à jour la référence pour permettre une nouvelle tentative
+          loadingRef.current = false
+        })
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
       if (chartRef.current) {
@@ -432,6 +447,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
         markersPrimitive.setMarkers([])
       })
       markersRefs.current.clear()
+      // Mettre à jour la référence immédiatement pour les désélections
+      prevSelectedAssetsRef.current = assetsKey
+      loadingRef.current = false
     }
     // Utiliser assetsKey comme dépendance (calculé avec useMemo)
     // eslint-disable-next-line react-hooks/exhaustive-deps
