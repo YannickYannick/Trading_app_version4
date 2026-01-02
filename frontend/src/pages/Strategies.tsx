@@ -282,6 +282,48 @@ export default function Strategies() {
     }
   }
 
+  // Fonction pour formater les paramètres selon l'algorithme
+  const formatAlgorithmParameters = (strategy: Strategy): string => {
+    if (!strategy.algorithm_type) return '-'
+    
+    // Utiliser algorithm_parameters si disponible (nouveau système)
+    if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
+      const params = strategy.algorithm_parameters
+        .map(param => {
+          let displayValue = param.value
+          
+          // Convertir selon le type
+          if (param.param_type === 'float' || param.param_type === 'int') {
+            const numValue = parseFloat(param.value)
+            if (!isNaN(numValue)) {
+              displayValue = param.param_type === 'int' 
+                ? numValue.toString() 
+                : numValue.toFixed(2)
+            }
+          } else if (param.param_type === 'bool') {
+            displayValue = param.value.toLowerCase() === 'true' ? 'Oui' : 'Non'
+          }
+          
+          return `${param.key}: ${displayValue}`
+        })
+        .join(', ')
+      
+      return params
+    }
+    
+    // Fallback vers parameters (ancien système)
+    if (strategy.parameters && Object.keys(strategy.parameters).length > 0) {
+      const params = Object.entries(strategy.parameters)
+        .filter(([key]) => !['price_min', 'price_max'].includes(key)) // Exclure les prix qui ont leur propre colonne
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ')
+      
+      return params || '-'
+    }
+    
+    return '-'
+  }
+
   // Toutes les colonnes disponibles pour le sélecteur
   const allColumnsData: ColumnOption[] = [
     { key: 'name', label: 'Nom', defaultVisible: true },
@@ -291,6 +333,7 @@ export default function Strategies() {
     { key: 'yahoo_price', label: 'Prix Yahoo', defaultVisible: true },
     { key: 'asset_id', label: 'Asset', defaultVisible: true },
     { key: 'algorithm_type', label: 'Algorithme', defaultVisible: true },
+    { key: 'algorithm_parameters', label: 'Paramètres Algorithme', defaultVisible: true },
     { key: 'broker_account_id', label: 'Broker', defaultVisible: true },
     { key: 'execution_mode', label: 'Mode', defaultVisible: true },
     { key: 'quantity_range', label: 'Quantité (Min/Max)', defaultVisible: true },
@@ -408,6 +451,31 @@ export default function Strategies() {
       render: (value: string) => {
         const algo = ALGORITHM_OPTIONS.find(a => a.value === value)
         return <span>{algo?.label || value || '-'}</span>
+      },
+    },
+    {
+      key: 'algorithm_parameters',
+      label: 'Paramètres Algorithme',
+      align: 'center' as const,
+      render: (_value: any, row: Strategy) => {
+        const formatted = formatAlgorithmParameters(row)
+        return (
+          <span 
+            className="text-muted small" 
+            style={{ 
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '300px',
+              display: 'inline-block',
+              cursor: 'help'
+            }}
+            title={formatted}
+          >
+            {formatted}
+          </span>
+        )
       },
     },
     {

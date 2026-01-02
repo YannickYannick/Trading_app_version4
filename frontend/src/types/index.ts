@@ -178,6 +178,13 @@ export interface Strategy {
     price_max?: number
     [key: string]: any
   }
+  algorithm_parameters?: Array<{
+    id: number
+    key: string
+    value: string
+    param_type: 'int' | 'float' | 'str' | 'bool'
+    description?: string
+  }>
 }
 
 export interface StrategyPerformance {
