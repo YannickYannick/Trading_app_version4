@@ -308,8 +308,8 @@ const TradesChart: React.FC<TradesChartProps> = ({
       }, 50)
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
-      // Utiliser plusieurs requestAnimationFrame en cascade pour s'assurer que toutes les données sont rendues
-      // Cela garantit que le graphique a bien affiché toutes les séries avant d'ajuster l'échelle
+      // Utiliser plusieurs requestAnimationFrame en cascade + délais pour garantir le rendu complet
+      // Le problème vient du fait que fitContent() est appelé avant que les données soient vraiment rendues
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -317,24 +317,36 @@ const TradesChart: React.FC<TradesChartProps> = ({
               try {
                 const timeScale = chartRef.current.timeScale()
                 timeScale.fitContent()
-                console.log('[TradesChart] Time scale adjusted to fit content after data loaded')
+                console.log('[TradesChart] Time scale adjusted to fit content after data loaded (first pass)')
                 
-                // Forcer un nouveau recalcul après un court délai supplémentaire pour être sûr
+                // Forcer plusieurs recalculs avec des délais croissants pour être absolument sûr
                 setTimeout(() => {
                   if (chartRef.current) {
                     try {
                       chartRef.current.timeScale().fitContent()
-                      console.log('[TradesChart] Time scale re-adjusted (second pass)')
+                      console.log('[TradesChart] Time scale re-adjusted (second pass - 150ms)')
+                      
+                      // Encore un dernier recalcul après un délai plus long
+                      setTimeout(() => {
+                        if (chartRef.current) {
+                          try {
+                            chartRef.current.timeScale().fitContent()
+                            console.log('[TradesChart] Time scale re-adjusted (third pass - 300ms) - final')
+                          } catch (err) {
+                            console.error('[TradesChart] Error in third fitContent pass:', err)
+                          }
+                        }
+                      }, 150) // Délai total ~300ms
                     } catch (err) {
                       console.error('[TradesChart] Error in second fitContent pass:', err)
                     }
                   }
-                }, 100)
+                }, 150) // Délai total ~150ms
               } catch (err) {
                 console.error('[TradesChart] Error fitting content:', err)
               }
             }
-          }, 100) // Augmenter le délai à 100ms
+          }, 150) // Délai initial augmenté à 150ms
         })
       })
       
