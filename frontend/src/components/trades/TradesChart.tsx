@@ -117,10 +117,17 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       // Créer ou récupérer les séries pour chaque asset
       histories.forEach(({ assetId, history }, index) => {
-        if (!history || history.results.length === 0) {
-          console.warn(`No price history for asset ${assetId}`)
+        if (!history) {
+          console.warn(`[TradesChart] No history object for asset ${assetId}`)
           return
         }
+        
+        if (!history.results || history.results.length === 0) {
+          console.warn(`[TradesChart] No price history results for asset ${assetId} (count: ${history.count}, results: ${history.results?.length || 0})`)
+          return
+        }
+        
+        console.log(`[TradesChart] Processing ${history.results.length} price records for asset ${assetId}`)
 
         let series = priceSeriesRefs.current.get(assetId)
 

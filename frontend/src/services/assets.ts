@@ -301,10 +301,19 @@ export const assetService = {
       }>(`/all-assets/${allAssetId}/prices/`, {
         params: { days, format },
       })
+      
+      // Log pour debug
+      console.log(`[getPriceHistory] Response for asset ${allAssetId}:`, {
+        count: response.data.count,
+        resultsLength: response.data.results?.length,
+        all_asset_symbol: response.data.all_asset_symbol,
+      })
+      
       return response.data
     } catch (error: any) {
       // Ne pas logger les erreurs si c'est juste qu'il n'y a pas d'historique (404 ou message explicite)
       if (error?.response?.status === 404 || error?.response?.data?.message?.includes('No price history')) {
+        console.warn(`[getPriceHistory] No price history for asset ${allAssetId} (expected)`)
         return {
           all_asset_id: allAssetId,
           all_asset_symbol: '',
@@ -312,7 +321,7 @@ export const assetService = {
           results: [],
         }
       }
-      console.error(`Error fetching price history for AllAsset ${allAssetId}:`, error)
+      console.error(`[getPriceHistory] Error fetching price history for AllAsset ${allAssetId}:`, error)
       return {
         all_asset_id: allAssetId,
         all_asset_symbol: '',

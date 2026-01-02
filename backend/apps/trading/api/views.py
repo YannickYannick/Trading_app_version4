@@ -418,9 +418,20 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         
         price_history = all_asset.price_history_json or {}
         
+        # Debug: logger le contenu de price_history_json
+        logger = logging.getLogger('trading.api.assets')
+        logger.debug(
+            f"AllAsset {all_asset.id} ({all_asset.symbol}): "
+            f"price_history_json type={type(price_history)}, "
+            f"length={len(price_history) if price_history else 0}, "
+            f"has_price_history={all_asset.has_price_history}"
+        )
+        
         # Convertir en liste et filtrer par source si nécessaire
         prices_list = []
-        sorted_dates = sorted(price_history.keys(), reverse=True)[:days]
+        sorted_dates = sorted(price_history.keys(), reverse=True)[:days] if price_history else []
+        
+        logger.debug(f"Sorted dates count: {len(sorted_dates)}, days requested: {days}")
         
         for date_str in sorted_dates:
             price_data = price_history[date_str]
@@ -429,19 +440,27 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             if source and price_data.get('source') != source:
                 continue
             
+            # Vérifier que les prix ne sont pas None/NaN
+            close_price = price_data.get('close')
+            if close_price is None:
+                logger.debug(f"Skipping {date_str} for {all_asset.symbol}: close price is None")
+                continue
+            
             prices_list.append({
                 'date': date_str,
                 'open': price_data.get('open'),
                 'high': price_data.get('high'),
                 'low': price_data.get('low'),
-                'close': price_data.get('close'),
-                'close_price': price_data.get('close'),  # Alias pour compatibilité frontend
+                'close': close_price,
+                'close_price': close_price,  # Alias pour compatibilité frontend
                 'open_price': price_data.get('open'),    # Alias pour compatibilité frontend
                 'high_price': price_data.get('high'),    # Alias pour compatibilité frontend
                 'low_price': price_data.get('low'),      # Alias pour compatibilité frontend
-                'volume': price_data.get('volume'),
+                'volume': price_data.get('volume', 0),
                 'source': price_data.get('source', 'YAHOO')
             })
+        
+        logger.debug(f"Final prices_list count: {len(prices_list)}")
         
         # Retourner selon le format demandé
         if format_type == 'json':
