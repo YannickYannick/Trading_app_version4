@@ -1,7 +1,7 @@
 /**
  * Panneau latéral pour ajuster les paramètres d'une stratégie en temps réel
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button, Loading } from '@components/common'
 import { strategyService } from '@services'
 import type { Strategy } from '@types'
@@ -80,52 +80,55 @@ export default function StrategyParametersPanel({
   const [localParameters, setLocalParameters] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const initializedRef = useRef<string | null>(null) // Pour éviter les réinitialisations multiples
 
   // Initialiser les paramètres locaux (uniquement quand la stratégie change)
   useEffect(() => {
-    if (strategy && strategy.algorithm_type) {
-      const params: Record<string, any> = {}
-      
-      // Charger depuis strategy.algorithm_parameters
-      if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
-        strategy.algorithm_parameters.forEach(param => {
-          let value: any = param.value
-          if (param.param_type === 'int') {
-            value = parseInt(value, 10)
-          } else if (param.param_type === 'float') {
-            value = parseFloat(value)
-          } else if (param.param_type === 'bool') {
-            value = value.toLowerCase() === 'true' || value === true || value === '1'
-          }
-          params[param.key] = value
-        })
-      }
+    if (!strategy || !strategy.algorithm_type) return
+    
+    // Vérifier si on a déjà initialisé pour cette stratégie
+    const strategyKey = `${strategy.id}-${strategy.algorithm_type}`
+    if (initializedRef.current === strategyKey) {
+      return // Déjà initialisé
+    }
 
-      // Remplir avec les valeurs par défaut si manquantes
-      const definitions = ALGORITHM_PARAMETERS_DEFINITIONS[strategy.algorithm_type] || []
-      definitions.forEach(def => {
-        if (params[def.key] === undefined || params[def.key] === null) {
-          params[def.key] = def.default
+    const params: Record<string, any> = {}
+    
+    // Charger depuis strategy.algorithm_parameters
+    if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
+      strategy.algorithm_parameters.forEach(param => {
+        let value: any = param.value
+        if (param.param_type === 'int') {
+          value = parseInt(value, 10)
+        } else if (param.param_type === 'float') {
+          value = parseFloat(value)
+        } else if (param.param_type === 'bool') {
+          value = value.toLowerCase() === 'true' || value === true || value === '1'
         }
+        params[param.key] = value
       })
+    }
 
-      setLocalParameters(params)
-      
-      // Initialiser currentParameters UNIQUEMENT si elles sont vides ou différentes
-      // Comparer les paramètres pour éviter les appels inutiles
-      const paramsChanged = Object.keys(params).some(key => 
-        currentParameters[key] !== params[key]
-      ) || Object.keys(currentParameters).length === 0
-      
-      if (paramsChanged && Object.keys(params).length > 0) {
-        // Initialiser tous les paramètres en une seule fois via un objet complet
-        // Le parent doit gérer la mise à jour en batch
-        Object.keys(params).forEach(key => {
-          if (currentParameters[key] !== params[key]) {
-            onParameterChange(key, params[key])
-          }
-        })
+    // Remplir avec les valeurs par défaut si manquantes
+    const definitions = ALGORITHM_PARAMETERS_DEFINITIONS[strategy.algorithm_type] || []
+    definitions.forEach(def => {
+      if (params[def.key] === undefined || params[def.key] === null) {
+        params[def.key] = def.default
       }
+    })
+
+    setLocalParameters(params)
+    initializedRef.current = strategyKey
+    
+    // Initialiser currentParameters UNIQUEMENT si elles sont vides
+    // Utiliser setTimeout pour différer et éviter les boucles
+    const hasCurrentParams = currentParameters && Object.keys(currentParameters).length > 0
+    if (!hasCurrentParams && Object.keys(params).length > 0) {
+      setTimeout(() => {
+        Object.keys(params).forEach(key => {
+          onParameterChange(key, params[key])
+        })
+      }, 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strategy?.id, strategy?.algorithm_type]) // Utiliser uniquement strategy.id pour éviter les re-renders
