@@ -62,6 +62,23 @@ class AllAssets(models.Model):
     binance_quote_asset = models.CharField(max_length=20, blank=True)
     binance_status = models.CharField(max_length=20, blank=True)
     
+    # Historique des prix en format JSONB (compact)
+    price_history_json = models.JSONField(
+        default=dict,
+        blank=True,
+        null=True,
+        help_text="Historique des prix au format JSON: {'YYYY-MM-DD': {'open': x, 'high': y, 'low': z, 'close': w, 'volume': v, 'source': 'YAHOO'}, ...}"
+    )
+    price_history_updated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date de dernière mise à jour de l'historique des prix"
+    )
+    price_history_days = models.IntegerField(
+        default=0,
+        help_text="Nombre de jours d'historique stockés"
+    )
+    
     class Meta:
         unique_together = ['symbol', 'platform']
         indexes = [
@@ -97,6 +114,29 @@ class AllAssets(models.Model):
     def is_yahoo_manual(self) -> bool:
         """Vérifie si l'asset nécessite une validation manuelle."""
         return self.symbole_yahoo == 'manual'
+    
+    @property
+    def has_price_history(self) -> bool:
+        """Vérifie si l'asset a un historique de prix stocké."""
+        return bool(self.price_history_json) and len(self.price_history_json) > 0
+    
+    def get_price_history_count(self) -> int:
+        """Retourne le nombre de jours d'historique stockés."""
+        if not self.price_history_json:
+            return 0
+        return len(self.price_history_json)
+    
+    def get_price_history_dates(self) -> list:
+        """Retourne la liste des dates disponibles dans l'historique, triées du plus récent au plus ancien."""
+        if not self.price_history_json:
+            return []
+        return sorted(self.price_history_json.keys(), reverse=True)
+    
+    def get_price_for_date(self, date_str: str) -> dict:
+        """Récupère les données de prix pour une date spécifique (format 'YYYY-MM-DD')."""
+        if not self.price_history_json:
+            return {}
+        return self.price_history_json.get(date_str, {})
     
     def set_yahoo_symbol(self, symbol: str, method: str = '') -> None:
         """Met à jour le symbole Yahoo avec la méthode de validation."""
@@ -196,3 +236,46 @@ class AssetPrice(TimeStampedModel):
     
     def __str__(self):
         return f"{self.asset.symbol} - {self.date}"
+
+
+class AllAssetPriceHistory(TimeStampedModel):
+    """Historique des prix consolidé pour un AllAsset."""
+    
+    class PriceSource(models.TextChoices):
+        YAHOO_FINANCE = 'YAHOO', 'Yahoo Finance'
+        SAXO = 'SAXO', 'Saxo Bank'
+        BINANCE = 'BINANCE', 'Binance'
+        INTERACTIVE_BROKERS = 'IB', 'Interactive Brokers'
+        MANUAL = 'MANUAL', 'Manuel'
+    
+    all_asset = models.ForeignKey(
+        AllAssets,
+        on_delete=models.CASCADE,
+        related_name='price_history',
+        help_text="AllAsset pour lequel cet historique est enregistré"
+    )
+    date = models.DateField(db_index=True)
+    open_price = models.DecimalField(max_digits=20, decimal_places=8)
+    high_price = models.DecimalField(max_digits=20, decimal_places=8)
+    low_price = models.DecimalField(max_digits=20, decimal_places=8)
+    close_price = models.DecimalField(max_digits=20, decimal_places=8)
+    volume = models.BigIntegerField(null=True, blank=True)
+    source = models.CharField(
+        max_length=10,
+        choices=PriceSource.choices,
+        default=PriceSource.YAHOO_FINANCE,
+        help_text="Source des données de prix"
+    )
+    
+    class Meta:
+        unique_together = ['all_asset', 'date', 'source']
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['all_asset', 'date']),
+            models.Index(fields=['all_asset', '-date']),
+        ]
+        verbose_name = 'AllAsset Price History'
+        verbose_name_plural = 'AllAssets Price History'
+    
+    def __str__(self):
+        return f"{self.all_asset.symbol} - {self.date} - {self.get_source_display()}"

@@ -529,3 +529,10 @@ broker = self.get_broker_instance(broker_account, use_cache=True)
 4. **Cache** : Utiliser `use_cache=True` pour améliorer les performances
 5. **Standardisation** : Le service fournit une interface unifiée, masquant les différences entre brokers
 
+
+
+
+
+
+
+

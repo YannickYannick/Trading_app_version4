@@ -260,3 +260,10 @@ Ne pas valider le prix, mais au moins trouver le symbole Yahoo.
 3. ⏳ Vérifier les logs pour identifier la cause exacte
 4. ⏳ Implémenter la solution appropriée selon les logs
 
+
+
+
+
+
+
+

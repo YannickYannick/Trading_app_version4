@@ -329,3 +329,10 @@ Pour implémenter ce système, suivez cette séquence :
 - [STRATEGIES_API.md](STRATEGIES_API.md) : API REST
 - [STRATEGIES_FRONTEND.md](STRATEGIES_FRONTEND.md) : Interface React
 
+
+
+
+
+
+
+

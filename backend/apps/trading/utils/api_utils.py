@@ -46,3 +46,10 @@ def error_response(error: str, status_code: int = status.HTTP_400_BAD_REQUEST, d
     return Response(response_data, status=status_code)
 
 
+
+
+
+
+
+
+

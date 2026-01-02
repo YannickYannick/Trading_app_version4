@@ -586,3 +586,10 @@ else:
 4. **Validation** : Les validations sont effectuées au niveau du serializer
 5. **Statuts** : Seuls certains statuts peuvent être modifiés/annulés
 
+
+
+
+
+
+
+

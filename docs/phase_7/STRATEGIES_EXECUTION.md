@@ -243,3 +243,10 @@ Toutes les erreurs sont loggées avec le contexte complet pour le débogage.
 - [STRATEGIES_SERVICES.md](STRATEGIES_SERVICES.md) : Services d'exécution
 - [STRATEGIES_API.md](STRATEGIES_API.md) : Endpoints d'exécution
 
+
+
+
+
+
+
+

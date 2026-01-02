@@ -292,3 +292,10 @@ Toutes les actions nécessitent une authentification (`IsAuthenticated`). Les st
 - [STRATEGIES_SERVICES.md](STRATEGIES_SERVICES.md) : Services utilisés par l'API
 - [STRATEGIES_EXECUTION.md](STRATEGIES_EXECUTION.md) : Détails sur l'exécution
 
+
+
+
+
+
+
+

@@ -557,6 +557,150 @@ class SaxoBroker(BrokerBase):
             logger.error(f"Saxo get_assets error: {e}")
             raise BrokerAPIError(f"Failed to get assets: {e}")
     
+    def get_asset_by_uic(
+        self,
+        uic: int,
+        asset_type: str = "Stock"
+    ) -> Optional[BrokerAsset]:
+        """
+        Récupérer un asset spécifique par UIC depuis l'API Saxo.
+        
+        Utilise l'endpoint /ref/v1/instruments/details/{UIC}/{AssetType} qui est
+        beaucoup plus rapide et efficace que de parcourir tous les instruments.
+        
+        Cette méthode est utilisée lors de la synchronisation des positions Saxo
+        pour récupérer les vraies données d'un instrument (symbol, name, exchange, etc.)
+        quand le symbole n'est pas directement disponible dans la réponse des positions.
+        
+        Flux:
+        1. Récupère les clés de compte (client_key, account_key) via _get_account_keys()
+        2. Appelle GET /ref/v1/instruments/details/{UIC}/{AssetType}
+        3. Essaie différents asset_types si le premier échoue
+        4. Retourne un BrokerAsset complet avec toutes les métadonnées
+        
+        Documentation: docs/saxo_instrument_details_api.md
+        
+        Args:
+            uic: UIC de l'asset à rechercher
+            asset_type: Type d'asset (Stock, Etf, CfdOnStock, etc.)
+            
+        Returns:
+            BrokerAsset si trouvé, None sinon
+        """
+        if not uic:
+            return None
+        
+        try:
+            # Mapper le type d'asset vers le format Saxo
+            asset_type_lower = asset_type.lower() if asset_type else ''
+            saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
+                asset_type_lower,
+                asset_type  # Utiliser le type original si non trouvé dans le mapping
+            )
+            
+            # Essayer différents asset_types si le premier ne fonctionne pas
+            asset_types_to_try = [saxo_asset_type, 'Stock', 'Etf', 'CfdOnStock']
+            
+            for at in asset_types_to_try:
+                try:
+                    logger.debug(f"Saxo: Fetching instrument details for UIC {uic} with asset_type={at}")
+                    
+                    # Récupérer les clés de compte si disponibles
+                    keys = self._get_account_keys()
+                    
+                    # Construire l'URL pour l'endpoint details
+                    # Format: /ref/v1/instruments/details/{UIC}/{AssetType}
+                    endpoint = f"/ref/v1/instruments/details/{uic}/{at}"
+                    
+                    # Paramètres de requête
+                    params = {
+                        'FieldGroups': 0  # Récupérer tous les champs
+                    }
+                    
+                    # Ajouter les clés de compte si disponibles
+                    if keys.get('account_key'):
+                        params['AccountKey'] = keys['account_key']
+                    if keys.get('client_key'):
+                        params['ClientKey'] = keys['client_key']
+                    
+                    # Faire la requête
+                    data = self._make_request('GET', endpoint, params=params)
+                    
+                    # Vérifier que la réponse contient les données attendues
+                    if not data:
+                        logger.debug(f"Saxo: No data returned for UIC {uic} with asset_type={at}")
+                        continue
+                    
+                    # Extraire les informations importantes
+                    symbol = data.get('Symbol', '')
+                    description = data.get('Description', '')
+                    asset_type_result = data.get('AssetType', at)
+                    currency_code = data.get('CurrencyCode', 'USD')
+                    is_tradable = data.get('IsTradable', True)
+                    
+                    # Extraire les informations d'échange
+                    exchange_data = data.get('Exchange', {})
+                    exchange_id = exchange_data.get('ExchangeId', '')
+                    country_code = exchange_data.get('CountryCode', '')
+                    
+                    # Construire le BrokerAsset avec toutes les données
+                    broker_asset = BrokerAsset(
+                        symbol=symbol,
+                        name=description,
+                        asset_type=asset_type_result,
+                        exchange=exchange_id,
+                        currency=currency_code or data.get('PriceCurrency', 'USD'),
+                        is_tradable=is_tradable,
+                        broker_id=str(uic),
+                        raw_data={
+                            'identifier': uic,
+                            'uic': uic,
+                            'exchange_id': exchange_id,
+                            'country_code': country_code,
+                            'issuer_country': exchange_data.get('CountryCode'),
+                            'primary_listing': data.get('PrimaryListing'),
+                            'tradable_as': data.get('TradableAs', []),
+                            'trading_status': data.get('TradingStatus'),
+                            # Conserver toutes les données pour référence future
+                            'full_data': data
+                        }
+                    )
+                    
+                    logger.info(
+                        f"Saxo: Successfully fetched asset for UIC {uic}: "
+                        f"{symbol} ({description}) via /instruments/details endpoint"
+                    )
+                    
+                    return broker_asset
+                    
+                except BrokerAPIError as e:
+                    # Si erreur 404, essayer le type suivant
+                    error_str = str(e)
+                    if '404' in error_str or 'Not Found' in error_str:
+                        logger.debug(
+                            f"Saxo: Instrument {uic} not found with asset_type={at}, "
+                            f"trying next type..."
+                        )
+                        continue
+                    else:
+                        # Autre erreur API, la propager
+                        raise
+                except Exception as e:
+                    logger.warning(
+                        f"Saxo: Error fetching instrument details for UIC {uic} "
+                        f"with asset_type={at}: {e}"
+                    )
+                    continue
+            
+            logger.warning(f"Saxo: Asset with UIC {uic} not found with any asset_type")
+            return None
+            
+        except BrokerError:
+            raise
+        except Exception as e:
+            logger.error(f"Saxo get_asset_by_uic error for UIC {uic}: {e}", exc_info=True)
+            return None
+    
     def search_assets(
         self, 
         query: str, 
@@ -752,37 +896,93 @@ class SaxoBroker(BrokerBase):
     
     def _get_account_keys(self) -> Dict[str, Optional[str]]:
         """
-        Récupère ClientKey et AccountKey depuis les comptes.
+        Récupère ClientKey, AccountKey et AccountId depuis les endpoints Saxo.
+        
+        Utilise les endpoints:
+        - /port/v1/accounts/me pour récupérer account_id et account_key
+        - /port/v1/clients/me pour récupérer client_key
         
         Returns:
-            Dict avec 'client_key' et 'account_key'
+            Dict avec 'client_key', 'account_key' et 'account_id'
         """
         try:
-            account_params = {}
-            if self.client_key:
-                account_params['ClientKey'] = self.client_key
+            # Récupérer les informations du client (client_key)
+            try:
+                client_data = self._make_request('GET', '/port/v1/clients/me')
+                client_key = client_data.get('ClientKey')
+            except Exception as e:
+                logger.warning(f"Error getting client info: {e}, using stored client_key")
+                client_key = self.client_key
             
-            account_data = self._make_request('GET', '/port/v1/accounts', params=account_params)
-            
-            accounts = account_data.get('Data', [])
-            if not accounts:
-                logger.warning("No accounts found in Saxo response")
-                return {'client_key': self.client_key, 'account_key': self.account_key}
-            
-            primary_account = accounts[0]
-            account_key = primary_account.get('AccountKey')
-            client_key_from_account = primary_account.get('ClientKey')
-            
-            # Utiliser le ClientKey de la réponse si disponible, sinon celui des credentials
-            client_key_to_use = client_key_from_account or self.client_key
-            
-            return {
-                'client_key': client_key_to_use,
-                'account_key': account_key or self.account_key
-            }
+            # Récupérer les informations du compte (account_id et account_key)
+            try:
+                account_data = self._make_request('GET', '/port/v1/accounts/me')
+                accounts = account_data.get('Data', [])
+                
+                if accounts and len(accounts) > 0:
+                    primary_account = accounts[0]
+                    account_id = primary_account.get('AccountId')
+                    account_key = primary_account.get('AccountKey')
+                    
+                    # Utiliser le ClientKey récupéré ou celui des credentials
+                    client_key_to_use = client_key or self.client_key
+                    
+                    result = {
+                        'client_key': client_key_to_use,
+                        'account_key': account_key or self.account_key,
+                        'account_id': account_id
+                    }
+                    
+                    logger.debug(
+                        f"Saxo: Retrieved account keys - "
+                        f"client_key={client_key_to_use[:10] if client_key_to_use else None}..., "
+                        f"account_key={account_key[:10] if account_key else None}..., "
+                        f"account_id={account_id}"
+                    )
+                    
+                    return result
+                else:
+                    logger.warning("No accounts found in /accounts/me response")
+                    return {
+                        'client_key': client_key or self.client_key,
+                        'account_key': self.account_key,
+                        'account_id': None
+                    }
+            except Exception as e:
+                logger.warning(f"Error getting account info: {e}, falling back to /accounts endpoint")
+                # Fallback vers l'ancienne méthode
+                account_params = {}
+                if self.client_key:
+                    account_params['ClientKey'] = self.client_key
+                
+                account_data = self._make_request('GET', '/port/v1/accounts', params=account_params)
+                accounts = account_data.get('Data', [])
+                
+                if accounts and len(accounts) > 0:
+                    primary_account = accounts[0]
+                    account_key = primary_account.get('AccountKey')
+                    account_id = primary_account.get('AccountId')
+                    client_key_from_account = primary_account.get('ClientKey')
+                    
+                    return {
+                        'client_key': client_key or client_key_from_account or self.client_key,
+                        'account_key': account_key or self.account_key,
+                        'account_id': account_id
+                    }
+                else:
+                    return {
+                        'client_key': client_key or self.client_key,
+                        'account_key': self.account_key,
+                        'account_id': None
+                    }
+                    
         except Exception as e:
             logger.warning(f"Error getting account keys: {e}, using credentials values")
-            return {'client_key': self.client_key, 'account_key': self.account_key}
+            return {
+                'client_key': self.client_key,
+                'account_key': self.account_key,
+                'account_id': None
+            }
     
     def get_positions(self, **kwargs) -> List[BrokerPosition]:
         """

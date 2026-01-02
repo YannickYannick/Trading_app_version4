@@ -184,3 +184,10 @@ def _make_request(self, method: str, endpoint: str, params: Optional[Dict] = Non
 4. ⏳ Tester avec un compte Binance réel/testnet
 5. ⏳ Vérifier que le solde reste stable après refresh
 
+
+
+
+
+
+
+

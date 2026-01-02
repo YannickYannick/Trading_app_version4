@@ -246,3 +246,10 @@ Donc seule l'extraction dans `get_assets()` nécessitait la correction.
 - API Saxo Documentation : https://www.developer.saxo/
 - Commit : `687ab0f` - "Fix UIC extraction and saving: use 'Identifier' instead of 'Uic', optimize bulk operations, increase timeout for sync"
 
+
+
+
+
+
+
+

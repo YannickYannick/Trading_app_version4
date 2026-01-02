@@ -441,3 +441,10 @@ class Meta:
 - **Modèle Order** : `backend/apps/trading/models/trading.py` (lignes 160-220)
 - **Serializer** : `backend/apps/trading/api/serializers.py` (lignes 351-412)
 
+
+
+
+
+
+
+

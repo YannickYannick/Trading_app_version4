@@ -257,3 +257,10 @@ La modal `PlaceOrderModal` est complexe et nécessite de nombreux clics/interact
 
 **Note** : Cette documentation sera mise à jour au fur et à mesure que les problèmes sont résolus.
 
+
+
+
+
+
+
+

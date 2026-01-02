@@ -405,3 +405,10 @@ class StrategyExecutor:
 - [STRATEGIES_EXECUTION.md](STRATEGIES_EXECUTION.md) : Détails sur l'exécution
 - [STRATEGIES_ALGORITHMS.md](STRATEGIES_ALGORITHMS.md) : Algorithmes utilisés
 
+
+
+
+
+
+
+

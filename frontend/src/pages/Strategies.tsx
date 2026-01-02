@@ -2,7 +2,7 @@
  * Page Strategies - Liste et gestion des stratégies de trading
  */
 import { useState, useEffect } from 'react'
-import { Card, Button, Table, Badge, Loading } from '@components/common'
+import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption } from '@components/common'
 import { strategyService, brokerService, assetService } from '@services'
 import { formatDate, formatCurrency } from '@utils/format'
 import type { Strategy, BrokerAccount, AllAsset } from '@types'
@@ -33,6 +33,9 @@ export default function Strategies() {
   const [assets, setAssets] = useState<AllAsset[]>([])
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccount[]>([])
   const [loadingOptions, setLoadingOptions] = useState(true)
+  
+  // Colonnes visibles
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([])
 
   const loadStrategies = async () => {
     try {
@@ -92,10 +95,78 @@ export default function Strategies() {
         updateData[key] = newValue
       }
       
-      await strategyService.update(row.id, updateData)
-      loadStrategies()
+      // Mise à jour optimiste de l'état local avant la sauvegarde
+      setStrategies(prevStrategies => 
+        prevStrategies.map(strategy => {
+          if (strategy.id === row.id) {
+            const updated: Strategy = { ...strategy }
+            
+            // Mettre à jour les champs directs
+            if (key === 'asset_id' || key === 'name' || key === 'description' || 
+                key === 'algorithm_type' || key === 'execution_mode' || 
+                key === 'check_frequency' || key === 'max_position_size' || 
+                key === 'max_daily_loss' || key === 'target_min_quantity' || 
+                key === 'target_max_quantity' || key === 'risk_level' ||
+                key === 'is_active' || key === 'is_automated') {
+              if (key === 'target_min_quantity' || key === 'target_max_quantity' ||
+                  key === 'max_position_size' || key === 'max_daily_loss' || 
+                  key === 'check_frequency') {
+                updated[key as keyof Strategy] = newValue ? parseFloat(newValue) : null
+              } else if (key === 'is_active' || key === 'is_automated') {
+                updated[key as keyof Strategy] = Boolean(newValue) as any
+              } else {
+                updated[key as keyof Strategy] = newValue
+              }
+            }
+            
+            // Mettre à jour les champs imbriqués
+            if (key === 'price_min' || key === 'price_max') {
+              updated.parameters = { ...(updated.parameters || {}), [key]: newValue ? parseFloat(newValue) : null }
+            }
+            
+            if (key === 'asset_id' && newValue) {
+              const asset = assets.find(a => a.id === parseInt(newValue))
+              if (asset) {
+                updated.asset = { id: asset.id, symbol: asset.symbol, name: asset.name }
+              }
+            }
+            
+            if (key === 'broker_account_id' && newValue) {
+              const broker = brokerAccounts.find(b => b.id === parseInt(newValue))
+              if (broker) {
+                updated.broker_name = broker.broker?.name || broker.account_name
+              }
+            }
+            
+            // Pour les ranges (quantity_range, price_range)
+            if (key === 'quantity_range' && typeof newValue === 'object') {
+              updated.target_min_quantity = newValue.min ? parseFloat(newValue.min) : null
+              updated.target_max_quantity = newValue.max ? parseFloat(newValue.max) : null
+            }
+            
+            if (key === 'price_range' && typeof newValue === 'object') {
+              updated.parameters = { ...(updated.parameters || {}) }
+              updated.parameters.price_min = newValue.min ? parseFloat(newValue.min) : null
+              updated.parameters.price_max = newValue.max ? parseFloat(newValue.max) : null
+            }
+            
+            return updated
+          }
+          return strategy
+        })
+      )
+      
+      // Sauvegarde asynchrone en arrière-plan (sans bloquer l'UI)
+      strategyService.update(row.id, updateData).catch((err: any) => {
+        console.error('Erreur lors de la sauvegarde:', err)
+        // En cas d'erreur, recharger pour restaurer l'état correct
+        loadStrategies()
+        alert(err.response?.data?.error || 'Erreur lors de la sauvegarde. Les données ont été restaurées.')
+      })
     } catch (err: any) {
       console.error('Erreur lors de la mise à jour:', err)
+      // En cas d'erreur immédiate, recharger
+      loadStrategies()
       alert(err.response?.data?.error || 'Erreur lors de la modification')
       throw err
     }
@@ -103,10 +174,28 @@ export default function Strategies() {
 
   const handleToggleActive = async (strategy: Strategy) => {
     try {
-      await strategyService.toggleActive(strategy.id, !strategy.is_active)
-      loadStrategies()
-    } catch (err) {
-      alert('Erreur lors de la modification')
+      const newActiveState = !strategy.is_active
+      
+      // Mise à jour optimiste de l'état local
+      setStrategies(prevStrategies => 
+        prevStrategies.map(s => 
+          s.id === strategy.id ? { ...s, is_active: newActiveState } : s
+        )
+      )
+      
+      // Sauvegarde asynchrone en arrière-plan
+      strategyService.toggleActive(strategy.id, newActiveState).catch((err: any) => {
+        console.error('Erreur lors du toggle:', err)
+        // En cas d'erreur, restaurer l'état
+        setStrategies(prevStrategies => 
+          prevStrategies.map(s => 
+            s.id === strategy.id ? { ...s, is_active: !newActiveState } : s
+          )
+        )
+        alert(err.response?.data?.error || 'Erreur lors de la modification')
+      })
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erreur lors de la modification')
     }
   }
 
@@ -130,7 +219,10 @@ export default function Strategies() {
         is_active: false,
         is_automated: false,
       })
-      loadStrategies()
+      
+      // Ajouter la nouvelle stratégie à l'état local sans recharger
+      setStrategies(prevStrategies => [newStrategy, ...prevStrategies])
+      
       // Focus sur la ligne créée après un court délai
       setTimeout(() => {
         const element = document.querySelector(`[data-strategy-id="${newStrategy.id}"]`)
@@ -143,11 +235,54 @@ export default function Strategies() {
     }
   }
 
+  // Toutes les colonnes disponibles pour le sélecteur
+  const allColumnsData: ColumnOption[] = [
+    { key: 'name', label: 'Nom', defaultVisible: true },
+    { key: 'description', label: 'Description', defaultVisible: true },
+    { key: 'asset_id', label: 'Asset', defaultVisible: true },
+    { key: 'algorithm_type', label: 'Algorithme', defaultVisible: true },
+    { key: 'broker_account_id', label: 'Broker', defaultVisible: true },
+    { key: 'execution_mode', label: 'Mode', defaultVisible: true },
+    { key: 'quantity_range', label: 'Quantité (Min/Max)', defaultVisible: true },
+    { key: 'price_range', label: 'Prix (Min/Max)', defaultVisible: true },
+    { key: 'portfolio_quantity', label: 'Portefeuille', defaultVisible: true },
+    { key: 'check_frequency', label: 'Fréquence (min)', defaultVisible: true },
+    { key: 'max_position_size', label: 'Taille Max (%)', defaultVisible: true },
+    { key: 'max_daily_loss', label: 'Perte Max (%)', defaultVisible: true },
+    { key: 'risk_level', label: 'Risque', defaultVisible: true },
+    { key: 'is_active', label: 'Statut', defaultVisible: true },
+    { key: 'is_automated', label: 'Auto', defaultVisible: true },
+    { key: 'total_trades', label: 'Performance', defaultVisible: true },
+    { key: 'actions', label: 'Actions', defaultVisible: true },
+  ]
+
+  // Initialiser les colonnes visibles depuis localStorage
+  useEffect(() => {
+    if (visibleColumns.length === 0) {
+      try {
+        const saved = localStorage.getItem('strategies_visible_columns')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setVisibleColumns(parsed)
+          } else {
+            setVisibleColumns(allColumnsData.filter(c => c.defaultVisible !== false).map(c => c.key))
+          }
+        } else {
+          setVisibleColumns(allColumnsData.filter(c => c.defaultVisible !== false).map(c => c.key))
+        }
+      } catch (e) {
+        setVisibleColumns(allColumnsData.filter(c => c.defaultVisible !== false).map(c => c.key))
+      }
+    }
+  }, [])
+
   const columns = [
     {
       key: 'name',
       label: 'Nom',
       editable: true,
+      align: 'center' as const,
       onCellEdit: handleCellEdit,
       render: (value: string, row: Strategy) => (
         <strong style={{ cursor: 'pointer' }} title="Double-cliquer pour éditer">
@@ -159,6 +294,7 @@ export default function Strategies() {
       key: 'description',
       label: 'Description',
       editable: true,
+      align: 'center' as const,
       onCellEdit: handleCellEdit,
       render: (value: string) => <span className="text-muted small">{value || '-'}</span>,
     },
@@ -167,6 +303,7 @@ export default function Strategies() {
       label: 'Asset',
       editable: true,
       cellType: 'select' as const,
+      align: 'center' as const,
       selectOptions: [
         { value: '', label: '- Sélectionner -' },
         ...assets.map(asset => ({ value: String(asset.id), label: `${asset.symbol} - ${asset.name}` }))
@@ -182,6 +319,7 @@ export default function Strategies() {
       label: 'Algorithme',
       editable: true,
       cellType: 'select' as const,
+      align: 'center' as const,
       selectOptions: ALGORITHM_OPTIONS,
       onCellEdit: handleCellEdit,
       render: (value: string) => {
@@ -194,6 +332,7 @@ export default function Strategies() {
       label: 'Broker',
       editable: true,
       cellType: 'select' as const,
+      align: 'center' as const,
       selectOptions: [
         { value: '', label: '- Sélectionner -' },
         ...brokerAccounts.map(account => ({ 
@@ -211,6 +350,7 @@ export default function Strategies() {
       label: 'Mode',
       editable: true,
       cellType: 'select' as const,
+      align: 'center' as const,
       selectOptions: EXECUTION_MODE_OPTIONS,
       onCellEdit: handleCellEdit,
       render: (value: string) => {
@@ -219,57 +359,97 @@ export default function Strategies() {
       },
     },
     {
-      key: 'target_min_quantity',
-      label: 'Qty Min',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'right' as const,
+      key: 'quantity_range',
+      label: 'Quantité (Min/Max)',
+      editable: true, // Maintenant éditable avec deux inputs
+      cellType: 'range' as const,
+      rangeFields: { min: 'target_min_quantity', max: 'target_max_quantity' },
+      align: 'center' as const,
+      width: '140px',
+      minWidth: '120px',
+      onCellEdit: async (value: any, row: Strategy) => {
+        // value est un objet { min, max }
+        if (typeof value === 'object' && value !== null) {
+          await handleCellEdit(value.min, row, 'target_min_quantity')
+          await handleCellEdit(value.max, row, 'target_max_quantity')
+        }
+      },
       render: (_: any, row: Strategy) => {
         const minQty = parseFloat(row.target_min_quantity?.toString() || '0')
-        return minQty > 0 ? <span className="text-info">{minQty.toFixed(2)}</span> : '-'
-      },
-    },
-    {
-      key: 'target_max_quantity',
-      label: 'Qty Max',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'right' as const,
-      render: (_: any, row: Strategy) => {
         const maxQty = parseFloat(row.target_max_quantity?.toString() || '0')
-        return maxQty > 0 ? <span className="text-warning">{maxQty.toFixed(2)}</span> : '-'
+        return (
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '2px', 
+            fontSize: '0.875rem', 
+            lineHeight: '1.3',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Min: </span>
+              <span style={{ color: '#3b82f6', fontWeight: '500' }}>{minQty > 0 ? minQty.toFixed(2) : '-'}</span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Max: </span>
+              <span style={{ color: '#f59e0b', fontWeight: '500' }}>{maxQty > 0 ? maxQty.toFixed(2) : '-'}</span>
+            </div>
+          </div>
+        )
       },
     },
     {
-      key: 'price_min',
-      label: 'Prix Min',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'right' as const,
+      key: 'price_range',
+      label: 'Prix (Min/Max)',
+      editable: true, // Maintenant éditable avec deux inputs
+      cellType: 'range' as const,
+      rangeFields: { min: 'parameters.price_min', max: 'parameters.price_max' },
+      align: 'center' as const,
+      width: '140px',
+      minWidth: '120px',
+      onCellEdit: async (value: any, row: Strategy) => {
+        // value est un objet { min, max }
+        if (typeof value === 'object' && value !== null) {
+          await handleCellEdit(value.min, row, 'price_min')
+          await handleCellEdit(value.max, row, 'price_max')
+        }
+      },
       render: (_: any, row: Strategy) => {
         const priceMin = row.parameters?.price_min
-        return priceMin ? formatCurrency(priceMin) : '-'
-      },
-    },
-    {
-      key: 'price_max',
-      label: 'Prix Max',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'right' as const,
-      render: (_: any, row: Strategy) => {
         const priceMax = row.parameters?.price_max
-        return priceMax ? formatCurrency(priceMax) : '-'
+        return (
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '2px', 
+            fontSize: '0.875rem', 
+            lineHeight: '1.3',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Min: </span>
+              <span style={{ color: '#3b82f6', fontWeight: '500' }}>{priceMin ? formatCurrency(priceMin) : '-'}</span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Max: </span>
+              <span style={{ color: '#f59e0b', fontWeight: '500' }}>{priceMax ? formatCurrency(priceMax) : '-'}</span>
+            </div>
+          </div>
+        )
       },
     },
     {
       key: 'portfolio_quantity',
       label: 'Portefeuille',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_: any, row: Strategy) => {
         const quantity = parseFloat(row.portfolio_quantity?.toString() || '0')
         if (quantity === 0) return <span className="text-muted">0</span>
@@ -283,7 +463,7 @@ export default function Strategies() {
       editable: true,
       cellType: 'number' as const,
       onCellEdit: handleCellEdit,
-      align: 'right' as const,
+      align: 'center' as const,
       render: (value: number) => value || 45,
     },
     {
@@ -292,7 +472,7 @@ export default function Strategies() {
       editable: true,
       cellType: 'number' as const,
       onCellEdit: handleCellEdit,
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_: any, row: Strategy) => {
         const size = parseFloat(row.max_position_size?.toString() || '0')
         return size > 0 ? `${size.toFixed(2)}%` : '-'
@@ -304,7 +484,7 @@ export default function Strategies() {
       editable: true,
       cellType: 'number' as const,
       onCellEdit: handleCellEdit,
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_: any, row: Strategy) => {
         const loss = parseFloat(row.max_daily_loss?.toString() || '0')
         return loss > 0 ? `${loss.toFixed(2)}%` : '-'
@@ -315,6 +495,7 @@ export default function Strategies() {
       label: 'Risque',
       editable: true,
       cellType: 'select' as const,
+      align: 'center' as const,
       selectOptions: [
         { value: 'LOW', label: 'Faible' },
         { value: 'MEDIUM', label: 'Moyen' },
@@ -332,6 +513,7 @@ export default function Strategies() {
       label: 'Statut',
       editable: true,
       cellType: 'checkbox' as const,
+      align: 'center' as const,
       onCellEdit: handleCellEdit,
       render: (value: boolean) => (
         <Badge variant={value ? 'success' : 'secondary'}>
@@ -344,12 +526,14 @@ export default function Strategies() {
       label: 'Auto',
       editable: true,
       cellType: 'checkbox' as const,
+      align: 'center' as const,
       onCellEdit: handleCellEdit,
       render: (value: boolean) => (value ? '✅' : '❌'),
     },
     {
       key: 'total_trades',
       label: 'Performance',
+      align: 'center' as const,
       render: (_: any, row: Strategy) => {
         const total = row.total_trades || 0
         const successful = row.successful_trades || 0
@@ -417,17 +601,29 @@ export default function Strategies() {
           <Button
             variant="danger"
             size="small"
-            onClick={async (e) => {
-              e.stopPropagation()
-              if (window.confirm(`Supprimer la stratégie "${row.name}" ?`)) {
-                try {
-                  await strategyService.delete(row.id)
-                  loadStrategies()
-                } catch (err) {
-                  alert('Erreur lors de la suppression')
-                }
-              }
-            }}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (window.confirm(`Supprimer la stratégie "${row.name}" ?`)) {
+                        try {
+                          // Suppression optimiste : retirer de l'affichage immédiatement
+                          setStrategies(prevStrategies => 
+                            prevStrategies.filter(s => s.id !== row.id)
+                          )
+                          
+                          // Suppression asynchrone en arrière-plan
+                          strategyService.delete(row.id).catch((err: any) => {
+                            console.error('Erreur lors de la suppression:', err)
+                            // En cas d'erreur, restaurer l'élément
+                            loadStrategies()
+                            alert(err.response?.data?.error || 'Erreur lors de la suppression')
+                          })
+                        } catch (err) {
+                          // En cas d'erreur immédiate, recharger
+                          loadStrategies()
+                          alert('Erreur lors de la suppression')
+                        }
+                      }
+                    }}
             title="Supprimer"
           >
             🗑️
@@ -441,12 +637,20 @@ export default function Strategies() {
     <div className="strategies-page">
       <div className="strategies-header">
         <h1>Stratégies de Trading</h1>
-        <Button
-          variant="primary"
-          onClick={handleCreateNew}
-        >
-          Créer une stratégie
-        </Button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <ColumnSelector
+            columns={allColumnsData}
+            visibleColumns={visibleColumns}
+            onColumnsChange={setVisibleColumns}
+            storageKey="strategies_visible_columns"
+          />
+          <Button
+            variant="primary"
+            onClick={handleCreateNew}
+          >
+            Créer une stratégie
+          </Button>
+        </div>
       </div>
 
       {loading || loadingOptions ? (
@@ -469,7 +673,11 @@ export default function Strategies() {
               {strategies.length} stratégie{strategies.length > 1 ? 's' : ''} trouvée{strategies.length > 1 ? 's' : ''}
             </div>
           )}
-          <Table data={strategies} columns={columns} />
+          <Table 
+            data={strategies} 
+            columns={columns} 
+            visibleColumns={visibleColumns.length > 0 ? visibleColumns : undefined} 
+          />
           {strategies.length === 0 && (
             <div className="empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
               <p>Aucune stratégie trouvée.</p>

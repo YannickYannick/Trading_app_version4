@@ -41,6 +41,7 @@ export default function Positions() {
     {
       key: 'symbol',
       label: 'Symbole',
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <Link to={`/positions/${row?.id || ''}`} className="link-symbol">
           {row?.asset?.symbol || 'N/A'}
@@ -50,6 +51,7 @@ export default function Positions() {
     {
       key: 'side',
       label: 'Side',
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <Badge variant={row?.side === 'BUY' ? 'success' : 'danger'}>
           {row?.side || 'N/A'}
@@ -59,25 +61,25 @@ export default function Positions() {
     {
       key: 'size',
       label: 'Taille',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Position) => (row?.size || 0).toFixed(4),
     },
     {
       key: 'entry_price',
       label: 'Prix d\'entrée',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Position) => formatCurrency(row?.entry_price || 0),
     },
     {
       key: 'current_price',
       label: 'Prix actuel',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Position) => formatCurrency(row?.current_price || 0),
     },
     {
       key: 'pnl',
       label: 'P&L',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <Badge variant={(row?.pnl || 0) >= 0 ? 'success' : 'danger'}>
           {formatCurrency(row?.pnl || 0)}
@@ -87,7 +89,7 @@ export default function Positions() {
     {
       key: 'pnl_percent',
       label: 'P&L %',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <span className={(row?.pnl_percent || 0) >= 0 ? 'positive' : 'negative'}>
           {formatPercent(row?.pnl_percent || 0)}
@@ -97,6 +99,7 @@ export default function Positions() {
     {
       key: 'status',
       label: 'Statut',
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <Badge variant={row?.status === 'OPEN' ? 'success' : 'secondary'}>
           {row?.status === 'OPEN' ? 'Ouverte' : 'Fermée'}
@@ -106,11 +109,13 @@ export default function Positions() {
     {
       key: 'opened_at',
       label: 'Ouverte le',
+      align: 'center' as const,
       render: (_value: any, row: Position) => formatDate(row?.opened_at || '', 'dd/MM/yyyy'),
     },
     {
       key: 'actions',
       label: 'Actions',
+      align: 'center' as const,
       render: (_value: any, row: Position) => (
         <div className="position-actions">
           <Button

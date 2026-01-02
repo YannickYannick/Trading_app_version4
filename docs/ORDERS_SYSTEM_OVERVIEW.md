@@ -318,3 +318,10 @@ Pour plus de détails, consultez :
 4. [ORDERS_VIEWS_URLS.md](./ORDERS_VIEWS_URLS.md) - Endpoints API REST
 5. [ORDERS_SERVICES.md](./ORDERS_SERVICES.md) - Services et logique métier
 
+
+
+
+
+
+
+

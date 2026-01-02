@@ -159,3 +159,10 @@ Au lieu de :
 - Un token LIVE ne fonctionnera **pas** avec une URL SIM
 - Vérifiez toujours que le token correspond à l'environnement utilisé
 
+
+
+
+
+
+
+

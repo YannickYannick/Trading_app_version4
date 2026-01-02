@@ -234,3 +234,10 @@ Si des problèmes surviennent, il est possible de revenir en SIM :
 - ✅ **Recommandation :** Tester d'abord avec un compte de test avant de migrer le compte principal
 - ✅ **Sécurité :** S'assurer que les credentials LIVE sont bien sécurisés
 
+
+
+
+
+
+
+

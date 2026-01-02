@@ -1,5 +1,8 @@
 .strategies-page {
   padding: 2rem;
+  max-width: 100%; /* Le sidebar est maintenant en haut, pas besoin de réserver d'espace sur les côtés */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .strategies-header {
@@ -83,6 +86,35 @@
 
 .strategies-page .table-wrapper {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.strategies-page .table {
+  width: 100%;
+  table-layout: auto; /* Permet au tableau de s'adapter automatiquement */
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .strategies-page {
+    max-width: calc(100vw - 260px);
+  }
+}
+
+@media (max-width: 1200px) {
+  .strategies-page {
+    max-width: calc(100vw - 240px);
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .strategies-page {
+    max-width: 100%;
+    padding: 0.75rem;
+  }
 }
 
 .strategies-hint {

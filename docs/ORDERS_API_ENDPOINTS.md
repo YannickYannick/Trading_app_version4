@@ -279,3 +279,10 @@ Pour créer l'interface frontend, voir :
 - Créer `frontend/src/components/orders/PlaceOrderModal.tsx`
 - Créer `frontend/src/pages/Orders.tsx`
 
+
+
+
+
+
+
+

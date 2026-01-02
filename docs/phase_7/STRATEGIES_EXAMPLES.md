@@ -237,3 +237,10 @@ Le paramètre `stop_loss` peut être utilisé pour gérer le risque, même si l'
 - [STRATEGIES_OVERVIEW.md](STRATEGIES_OVERVIEW.md) : Vue d'ensemble
 - [STRATEGIES_API.md](STRATEGIES_API.md) : Documentation API complète
 
+
+
+
+
+
+
+

@@ -20,14 +20,14 @@ from datetime import timedelta
 import logging
 
 from apps.trading.models import (
-    AllAssets, Asset, AssetPrice, Position, Trade, Order,
+    AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
     Strategy, StrategyPerformance, Broker, BrokerAccount, BrokerSyncLog,
     ScheduledTask, TaskExecutionLog
 )
 from apps.trading.services.broker_service import BrokerService
 from .serializers import (
     AllAssetsSerializer, AssetSerializer, AssetNestedSerializer, AssetPriceSerializer,
-    PositionSerializer, TradeSerializer, OrderSerializer,
+    AllAssetPriceHistorySerializer, PositionSerializer, TradeSerializer, OrderSerializer,
     StrategySerializer, BrokerSerializer, BrokerAccountSerializer
 )
 
@@ -385,6 +385,191 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             logger.error(f"Erreur lors de la validation Yahoo: {e}", exc_info=True)
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'])
+    def prices(self, request, pk=None):
+        """
+        GET /api/all-assets/{id}/prices/
+        Récupère l'historique des prix pour cet AllAsset depuis le champ JSONB.
+        
+        Query params:
+        - days: Nombre de jours à récupérer (défaut: 100)
+        - source: Filtrer par source (YAHOO, SAXO, BINANCE, etc.) - optionnel
+        - format: Format de réponse ('json' ou 'list', défaut: 'list')
+        """
+        all_asset = self.get_object()
+        days = int(request.query_params.get('days', 100))
+        source = request.query_params.get('source')
+        format_type = request.query_params.get('format', 'list')  # 'json' ou 'list'
+        
+        # Récupérer l'historique depuis le champ JSONB
+        if not all_asset.has_price_history:
+            return Response({
+                'all_asset_id': all_asset.id,
+                'all_asset_symbol': all_asset.symbol,
+                'count': 0,
+                'message': 'No price history available',
+                'results': []
+            })
+        
+        price_history = all_asset.price_history_json or {}
+        
+        # Convertir en liste et filtrer par source si nécessaire
+        prices_list = []
+        sorted_dates = sorted(price_history.keys(), reverse=True)[:days]
+        
+        for date_str in sorted_dates:
+            price_data = price_history[date_str]
+            
+            # Filtrer par source si spécifié
+            if source and price_data.get('source') != source:
+                continue
+            
+            prices_list.append({
+                'date': date_str,
+                'open': price_data.get('open'),
+                'high': price_data.get('high'),
+                'low': price_data.get('low'),
+                'close': price_data.get('close'),
+                'volume': price_data.get('volume'),
+                'source': price_data.get('source', 'YAHOO')
+            })
+        
+        # Retourner selon le format demandé
+        if format_type == 'json':
+            # Retourner le JSON brut (format compact)
+            return Response({
+                'all_asset_id': all_asset.id,
+                'all_asset_symbol': all_asset.symbol,
+                'count': len(prices_list),
+                'format': 'json',
+                'data': price_history
+            })
+        else:
+            # Retourner en format liste (compatible avec l'ancien format)
+            return Response({
+                'all_asset_id': all_asset.id,
+                'all_asset_symbol': all_asset.symbol,
+                'count': len(prices_list),
+                'format': 'list',
+                'total_days_available': len(price_history),
+                'results': prices_list
+            })
+    
+    @action(detail=True, methods=['post'])
+    def validate_single_yahoo(self, request, pk=None):
+        """
+        POST /api/all-assets/{id}/validate_single_yahoo/
+        Valide le symbole Yahoo pour un AllAsset spécifique.
+        """
+        from ..services.yahoo_validator import validate_single_asset
+        from ..utils.yahoo_config import ValidationStatus
+        from ..constants import DEFAULT_PRICE_TOLERANCE_PERCENT
+        from ..services.broker_service import BrokerService
+        from ..models import BrokerAccount
+        from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger('trading.api.assets')
+        all_asset = self.get_object()
+        
+        try:
+            # Récupérer la configuration broker si nécessaire (pour Saxo)
+            broker_config = {}
+            if all_asset.platform == 'SAXO':
+                saxo_account = BrokerAccount.objects.filter(
+                    broker_type='SAXO',
+                    user=request.user,
+                    is_active=True
+                ).first()
+                if saxo_account:
+                    try:
+                        broker_service = BrokerService(request.user)
+                        broker = broker_service.get_broker_instance(saxo_account, use_cache=True)
+                        if broker.authenticate():
+                            broker_config['access_token'] = broker.access_token
+                            broker_config['base_url'] = broker.base_url
+                    except Exception as e:
+                        logger.warning(f"Could not get valid Saxo token: {e}")
+            
+            # Valider l'asset
+            result = validate_single_asset(
+                all_asset,
+                broker_config=broker_config,
+                tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
+            )
+            
+            # Sauvegarder le résultat
+            all_asset.symbole_yahoo = result.yahoo_symbol
+            all_asset.yahoo_validation_method = result.method
+            all_asset.yahoo_validated_at = timezone.now()
+            all_asset.save(update_fields=[
+                'symbole_yahoo',
+                'yahoo_validation_method',
+                'yahoo_validated_at'
+            ])
+            
+            return Response({
+                'success': True,
+                'yahoo_symbol': result.yahoo_symbol,
+                'status': result.status,
+                'method': result.method,
+                'message': f'Symbole Yahoo trouvé: {result.yahoo_symbol}' if result.yahoo_symbol not in ['Not_searched', 'not_found', 'manual'] else 'Symbole Yahoo non trouvé'
+            })
+            
+        except Exception as e:
+            logger.exception(f"Error validating Yahoo symbol for {all_asset.symbol}: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def sync_price_history(self, request, pk=None):
+        """
+        POST /api/all-assets/{id}/sync_price_history/
+        Synchronise l'historique des prix pour un AllAsset spécifique.
+        
+        Body:
+        {
+            "days": 365,  // nombre de jours (défaut: 365)
+            "interval": "1d"  // intervalle Yahoo Finance: "1d", "1wk", "1mo" (défaut: "1d")
+        }
+        """
+        from ..services.sync.all_asset_price_sync_service import AllAssetPriceSyncService
+        import logging
+        
+        logger = logging.getLogger('trading.api.assets')
+        all_asset = self.get_object()
+        
+        try:
+            # Récupérer les paramètres
+            days = int(request.data.get('days', 365))
+            interval = request.data.get('interval', '1d')
+            
+            # Valider l'intervalle
+            if interval not in ['1d', '1wk', '1mo']:
+                return Response({
+                    'success': False,
+                    'error': f'Interval invalide. Doit être "1d", "1wk" ou "1mo"'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Synchroniser
+            service = AllAssetPriceSyncService()
+            result = service.sync_from_yahoo_finance(
+                all_asset=all_asset,
+                days=days,
+                interval=interval
+            )
+            
+            return Response(result)
+            
+        except Exception as e:
+            logger.exception(f"Error syncing price history for {all_asset.symbol}: {e}")
             return Response({
                 'success': False,
                 'error': str(e)
@@ -2512,3 +2697,269 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# ============================================
+# VUE DATATREE - ASSETS AVEC POSITIONS ET ORDERS
+# ============================================
+
+from rest_framework.decorators import api_view, permission_classes as perms
+
+logger = logging.getLogger(__name__)
+
+
+@api_view(['GET'])
+@perms([permissions.IsAuthenticated])
+def get_assets_with_positions_orders(request):
+    """
+    GET /api/assets/overview/
+    
+    Retourne les assets avec leurs positions et orders groupés
+    Structure hiérarchique pour DataTree (comme Tabulator v3)
+    
+    Chaque asset est un parent avec un champ 'children' contenant :
+    - Toutes les positions (ouvertes + fermées)
+    - Tous les orders (tous statuts)
+    
+    Si une Position.all_asset n'a pas d'Asset correspondant, 
+    on crée automatiquement l'Asset.
+    """
+    try:
+        user = request.user
+        
+        # =============================================
+        # 1. Récupérer tous les Assets concernés
+        # =============================================
+        
+        # Assets qui ont des orders
+        order_asset_ids = Order.objects.filter(
+            user=user
+        ).values_list('asset_id', flat=True).distinct()
+        
+        # Assets qui ont des positions (via Position.asset)
+        position_asset_ids = Position.objects.filter(
+            user=user,
+            asset__isnull=False
+        ).values_list('asset_id', flat=True).distinct()
+        
+        # AllAssets qui ont des positions mais pas d'Asset correspondant
+        # On doit créer les Asset manquants
+        positions_without_asset = Position.objects.filter(
+            user=user,
+            asset__isnull=True,
+            all_asset__isnull=False
+        ).select_related('all_asset')
+        
+        # Créer les Assets manquants
+        created_asset_ids = []
+        for position in positions_without_asset:
+            all_asset = position.all_asset
+            # Vérifier si un Asset avec ce symbol existe déjà
+            existing_asset = Asset.objects.filter(symbol=all_asset.symbol).first()
+            if existing_asset:
+                # Lier la position à l'Asset existant
+                position.asset = existing_asset
+                position.save(update_fields=['asset'])
+                created_asset_ids.append(existing_asset.id)
+            else:
+                # Créer un nouvel Asset depuis AllAssets
+                new_asset = Asset.create_from_all_asset(all_asset)
+                position.asset = new_asset
+                position.save(update_fields=['asset'])
+                created_asset_ids.append(new_asset.id)
+        
+        # Combiner tous les IDs d'assets
+        all_asset_ids = set(list(order_asset_ids) + list(position_asset_ids) + created_asset_ids)
+        
+        # Récupérer tous les Assets
+        assets = Asset.objects.filter(id__in=all_asset_ids).order_by('symbol')
+        
+        # =============================================
+        # 2. Précharger les données pour éviter N+1
+        # =============================================
+        
+        # Positions par asset_id
+        positions_by_asset = {}
+        all_positions = Position.objects.filter(
+            user=user,
+            asset_id__in=all_asset_ids
+        ).select_related('broker', 'strategy', 'all_asset')
+        
+        for pos in all_positions:
+            if pos.asset_id not in positions_by_asset:
+                positions_by_asset[pos.asset_id] = []
+            positions_by_asset[pos.asset_id].append(pos)
+        
+        # Orders par asset_id
+        orders_by_asset = {}
+        all_orders = Order.objects.filter(
+            user=user,
+            asset_id__in=all_asset_ids
+        ).select_related('broker')
+        
+        for order in all_orders:
+            if order.asset_id not in orders_by_asset:
+                orders_by_asset[order.asset_id] = []
+            orders_by_asset[order.asset_id].append(order)
+        
+        # =============================================
+        # 3. Construire la structure hiérarchique
+        # =============================================
+        
+        result_data = []
+        
+        for asset in assets:
+            positions = positions_by_asset.get(asset.id, [])
+            orders = orders_by_asset.get(asset.id, [])
+            
+            # Calculer les totaux
+            total_position_size = sum(float(pos.quantity) for pos in positions if pos.is_open)
+            total_pending_quantity = sum(
+                float(order.quantity) for order in orders 
+                if order.status in ['PENDING', 'OPEN']
+            )
+            
+            # Calculer le net position (LONG = +, SHORT = -)
+            net_position = 0.0
+            for pos in positions:
+                if pos.is_open:
+                    if pos.side == 'LONG':
+                        net_position += float(pos.quantity)
+                    else:
+                        net_position -= float(pos.quantity)
+            
+            # Compter positions et orders
+            open_positions_count = sum(1 for pos in positions if pos.is_open)
+            closed_positions_count = sum(1 for pos in positions if not pos.is_open)
+            pending_orders_count = sum(1 for o in orders if o.status in ['PENDING', 'OPEN'])
+            
+            # Calculer P&L total
+            total_pnl = sum(float(pos.pnl or 0) for pos in positions if pos.is_open)
+            
+            # =============================================
+            # 3.1 Créer la ligne PARENT (Asset)
+            # =============================================
+            asset_row = {
+                'id': f"asset_{asset.id}",
+                'type': 'asset',
+                'asset_id': asset.id,
+                'symbol': asset.symbol,
+                'name': asset.name,
+                'asset_type': asset.asset_type,
+                'currency': asset.currency,
+                'current_price': float(asset.current_price) if asset.current_price else None,
+                'total_position_size': total_position_size,
+                'total_pending_quantity': total_pending_quantity,
+                'net_position': net_position,
+                'total_pnl': total_pnl,
+                'positions_count': open_positions_count,
+                'closed_positions_count': closed_positions_count,
+                'pending_orders_count': pending_orders_count,
+                'has_children': len(positions) > 0 or len(orders) > 0,
+                'children': []
+            }
+            
+            # =============================================
+            # 3.2 Ajouter les POSITIONS comme enfants
+            # =============================================
+            for pos in positions:
+                position_row = {
+                    'id': f"position_{pos.id}",
+                    'type': 'position',
+                    'position_id': pos.id,
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'side': pos.side,
+                    'size': float(pos.quantity),
+                    'entry_price': float(pos.entry_price) if pos.entry_price else 0.0,
+                    'current_price': float(pos.current_price) if pos.current_price else None,
+                    'pnl': float(pos.pnl) if pos.pnl else 0.0,
+                    'pnl_percent': float(pos.pnl_percent) if pos.pnl_percent else 0.0,
+                    'status': 'OPEN' if pos.is_open else 'CLOSED',
+                    'stop_loss': float(pos.stop_loss) if pos.stop_loss else None,
+                    'take_profit': float(pos.take_profit) if pos.take_profit else None,
+                    'broker_name': pos.broker.name if pos.broker else None,
+                    'strategy_name': pos.strategy.name if pos.strategy else None,
+                    'opened_at': pos.opened_at.strftime('%d/%m/%Y %H:%M') if pos.opened_at else '',
+                    'closed_at': pos.closed_at.strftime('%d/%m/%Y %H:%M') if pos.closed_at else None,
+                }
+                asset_row['children'].append(position_row)
+            
+            # =============================================
+            # 3.3 Ajouter les ORDERS comme enfants
+            # =============================================
+            for order in orders:
+                order_row = {
+                    'id': f"order_{order.id}",
+                    'type': 'order',
+                    'order_id': order.id,
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'side': order.side,
+                    'quantity': float(order.quantity),
+                    'filled_quantity': float(order.filled_quantity) if order.filled_quantity else 0.0,
+                    'price': float(order.price) if order.price else None,
+                    'stop_price': float(order.stop_price) if order.stop_price else None,
+                    'order_type': order.order_type,
+                    'status': order.status,
+                    'broker_name': order.broker.name if order.broker else None,
+                    'broker_order_id': order.broker_order_id or None,
+                    'created_at': order.created_at.strftime('%d/%m/%Y %H:%M') if order.created_at else '',
+                    'updated_at': order.updated_at.strftime('%d/%m/%Y %H:%M') if order.updated_at else None,
+                }
+                asset_row['children'].append(order_row)
+            
+            result_data.append(asset_row)
+        
+        # =============================================
+        # 4. Ajouter les assets sans positions ni orders (optionnel)
+        # =============================================
+        
+        # Paramètre pour inclure les assets vides
+        include_empty = request.query_params.get('include_empty', 'true').lower() == 'true'
+        
+        if include_empty:
+            # Récupérer tous les autres assets actifs
+            other_assets = Asset.objects.filter(
+                is_active=True
+            ).exclude(
+                id__in=all_asset_ids
+            ).order_by('symbol')
+            
+            for asset in other_assets:
+                asset_row = {
+                    'id': f"asset_{asset.id}",
+                    'type': 'asset',
+                    'asset_id': asset.id,
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'asset_type': asset.asset_type,
+                    'currency': asset.currency,
+                    'current_price': float(asset.current_price) if asset.current_price else None,
+                    'total_position_size': 0,
+                    'total_pending_quantity': 0,
+                    'net_position': 0,
+                    'total_pnl': 0,
+                    'positions_count': 0,
+                    'closed_positions_count': 0,
+                    'pending_orders_count': 0,
+                    'has_children': False,
+                    'children': []
+                }
+                result_data.append(asset_row)
+        
+        # Trier par symbole
+        result_data.sort(key=lambda x: x['symbol'])
+        
+        return Response({
+            'success': True,
+            'count': len(result_data),
+            'data': result_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur dans get_assets_with_positions_orders: {e}", exc_info=True)
+        return Response({
+            'success': False,
+            'error': f'Erreur lors de la récupération des données: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

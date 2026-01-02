@@ -24,11 +24,13 @@ export default function Trades() {
     {
       key: 'timestamp',
       label: 'Date',
+      align: 'center' as const,
       render: (_value: any, row: Trade) => formatDate(row?.timestamp || row?.executed_at || '', 'dd/MM/yyyy HH:mm'),
     },
     {
       key: 'symbol',
       label: 'Symbole',
+      align: 'center' as const,
       render: (_value: any, row: Trade) => (
         <Link to={`/trades/${row?.id || ''}`} className="trade-symbol link-symbol">
           {row?.asset?.symbol || 'N/A'}
@@ -38,6 +40,7 @@ export default function Trades() {
     {
       key: 'side',
       label: 'Side',
+      align: 'center' as const,
       render: (_value: any, row: Trade) => (
         <Badge variant={row?.side === 'BUY' ? 'success' : 'danger'}>
           {row?.side || 'N/A'}
@@ -47,7 +50,7 @@ export default function Trades() {
     {
       key: 'size',
       label: 'Taille',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Trade) => {
         const size = Number(row?.size || row?.quantity || 0)
         return isNaN(size) ? '0.0000' : size.toFixed(4)
@@ -56,19 +59,19 @@ export default function Trades() {
     {
       key: 'price',
       label: 'Prix',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Trade) => formatCurrency(row?.price || 0),
     },
     {
       key: 'total',
       label: 'Total',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Trade) => formatCurrency((row?.size || row?.quantity || 0) * (row?.price || 0)),
     },
     {
       key: 'fees',
       label: 'Frais',
-      align: 'right' as const,
+      align: 'center' as const,
       render: (_value: any, row: Trade) => formatCurrency(row?.fees || 0),
     },
   ]

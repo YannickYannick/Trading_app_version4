@@ -229,7 +229,7 @@ export default function Brokers() {
           {filteredAccounts.map((account) => (
             <Card key={account.id} className="broker-card" hover>
               <div className="broker-card-header">
-                <div>
+                <div className="broker-card-title-section">
                   <h3 className="broker-card-title">{account.name}</h3>
                   <p className="broker-card-subtitle">
                     {account.broker_name || account.broker?.name || account.broker_type_display || account.broker_type}
@@ -251,7 +251,7 @@ export default function Brokers() {
               <div className="broker-card-info">
                 {/* Solde EUR */}
                 {(account.broker_type === 'BINANCE' || account.broker_type === 'SAXO') && (
-                  <div className="broker-info-item broker-balance-container">
+                  <div className="broker-balance-container">
                     <BrokerBalance accountId={account.id} />
                   </div>
                 )}
@@ -259,7 +259,7 @@ export default function Brokers() {
                 <div className="broker-info-item">
                   <span className="broker-info-label">Environnement:</span>
                   <span className="broker-info-value">
-                    {account.environment_display || (account.is_sandbox ? 'Simulation' : 'Live Trading')}
+                    {account.environment_display || (account.is_sandbox ? 'Simulation/Demo' : 'Live Trading')}
                   </span>
                 </div>
                 {account.last_sync && (
@@ -273,92 +273,114 @@ export default function Brokers() {
               </div>
 
               <div className="broker-card-actions">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      const creds = await brokerService.getCredentials(account.id)
-                      console.log('Credentials:', creds)
-                      alert(`Credentials:\nAPI Key: ${creds.has_api_key ? '✅ Présente' : '❌ Manquante'}\nAPI Secret: ${creds.has_api_secret ? '✅ Présente' : '❌ Manquante'}\nTestnet: ${creds.testnet}\nEnvironment: ${creds.environment}\n\nVoir la console pour plus de détails.`)
-                    } catch (err: any) {
-                      alert(`Erreur: ${err.message}`)
-                    }
-                  }}
-                  title="Afficher les credentials (masqués)"
-                >
-                  🔑 Creds
-                </Button>
-                {account.broker_type === 'SAXO' && (
-                  <>
+                {/* Groupe: Configuration */}
+                <div className="broker-actions-group">
+                  <div className="broker-actions-group-label">Configuration</div>
+                  <div className="broker-actions-group-buttons">
                     <Button
                       size="sm"
-                      variant="info"
-                      onClick={() => {
-                        setSelectedAccount(account)
-                        setIsSaxoOAuthModalOpen(true)
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const creds = await brokerService.getCredentials(account.id)
+                          console.log('Credentials:', creds)
+                          alert(`Credentials:\nAPI Key: ${creds.has_api_key ? '✅ Présente' : '❌ Manquante'}\nAPI Secret: ${creds.has_api_secret ? '✅ Présente' : '❌ Manquante'}\nTestnet: ${creds.testnet}\nEnvironment: ${creds.environment}\n\nVoir la console pour plus de détails.`)
+                        } catch (err: any) {
+                          alert(`Erreur: ${err.message}`)
+                        }
                       }}
-                      title="Gérer l'authentification OAuth2 Saxo"
+                      title="Afficher les credentials (masqués)"
                     >
-                      🔐 OAuth2
+                      🔑 Creds
+                    </Button>
+                    {account.broker_type === 'SAXO' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="info"
+                          onClick={() => {
+                            setSelectedAccount(account)
+                            setIsSaxoOAuthModalOpen(true)
+                          }}
+                          title="Gérer l'authentification OAuth2 Saxo"
+                        >
+                          🔐 OAuth2
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="info"
+                          onClick={() => handleRefreshToken(account)}
+                          disabled={refreshingTokens.has(account.id)}
+                          title="Rafraîchir le token d'accès Saxo"
+                        >
+                          {refreshingTokens.has(account.id) ? '🔄...' : '🔄 Refresh'}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Groupe: Actions */}
+                <div className="broker-actions-group">
+                  <div className="broker-actions-group-label">Actions</div>
+                  <div className="broker-actions-group-buttons">
+                    {account.broker_type === 'SAXO' && (
+                      <Button
+                        size="sm"
+                        variant="info"
+                        onClick={() => {
+                          setSelectedAccount(account)
+                          setIsSaxoTransactionsModalOpen(true)
+                        }}
+                        title="Voir les transactions Saxo"
+                      >
+                        📊 Transactions
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleTest(account)}
+                    >
+                      🧪 Tester
                     </Button>
                     <Button
                       size="sm"
-                      variant="info"
-                      onClick={() => {
-                        setSelectedAccount(account)
-                        setIsSaxoTransactionsModalOpen(true)
-                      }}
-                      title="Voir les transactions Saxo"
+                      variant="outline"
+                      onClick={() => handleSync(account)}
                     >
-                      📊 Transactions
+                      🔄 Synchroniser
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Groupe: Gestion */}
+                <div className="broker-actions-group">
+                  <div className="broker-actions-group-label">Gestion</div>
+                  <div className="broker-actions-group-buttons">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleEdit(account)}
+                    >
+                      ✏️ Modifier
                     </Button>
                     <Button
                       size="sm"
-                      variant="info"
-                      onClick={() => handleRefreshToken(account)}
-                      disabled={refreshingTokens.has(account.id)}
-                      title="Rafraîchir le token d'accès Saxo"
+                      variant={account.is_active ? 'danger' : 'success'}
+                      onClick={() => toggleActive(account)}
                     >
-                      {refreshingTokens.has(account.id) ? '🔄...' : '🔄 Refresh Token'}
+                      {account.is_active ? '⏸️ Désactiver' : '▶️ Activer'}
                     </Button>
-                  </>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleTest(account)}
-                >
-                  Tester
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleSync(account)}
-                >
-                  Synchroniser
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleEdit(account)}
-                >
-                  Modifier
-                </Button>
-                <Button
-                  size="sm"
-                  variant={account.is_active ? 'danger' : 'success'}
-                  onClick={() => toggleActive(account)}
-                >
-                  {account.is_active ? 'Désactiver' : 'Activer'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => handleDelete(account)}
-                >
-                  Supprimer
-                </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleDelete(account)}
+                    >
+                      🗑️ Supprimer
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
           ))}

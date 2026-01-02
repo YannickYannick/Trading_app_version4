@@ -116,3 +116,10 @@ Après cette optimisation, vous devriez voir :
 - [Documentation des améliorations](./validation-yahoo-ameliorations.md)
 - Code source : `backend/apps/trading/api/views.py` (ligne ~227)
 
+
+
+
+
+
+
+

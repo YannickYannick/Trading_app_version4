@@ -102,10 +102,19 @@ export interface Order {
   side: 'BUY' | 'SELL'
   quantity: number
   price: number | null
-  status: 'PENDING' | 'FILLED' | 'CANCELLED' | 'REJECTED'
+  stop_price?: number | null
+  status: 'PENDING' | 'OPEN' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED'
   filled_quantity: number
   created_at: string
+  updated_at?: string
   user: number
+  // Champs additionnels
+  broker?: { id: number; name: string }
+  broker_id?: number
+  broker_name?: string
+  broker_order_id?: string
+  total_value?: number // Calculé: quantity × price
+  average_price?: number // Prix moyen d'exécution
 }
 
 // ============================================================================
@@ -290,6 +299,89 @@ export interface RegisterData {
   password_confirm: string
   first_name?: string
   last_name?: string
+}
+
+// ============================================================================
+// DataTree - Assets avec Positions et Orders groupés
+// ============================================================================
+
+/**
+ * Enfant de type Position dans le DataTree
+ */
+export interface PositionChild {
+  id: string
+  type: 'position'
+  position_id: number
+  symbol: string
+  name: string
+  side: 'LONG' | 'SHORT'
+  size: number
+  entry_price: number
+  current_price: number | null
+  pnl: number
+  pnl_percent: number
+  status: 'OPEN' | 'CLOSED'
+  stop_loss: number | null
+  take_profit: number | null
+  broker_name: string | null
+  strategy_name: string | null
+  opened_at: string
+  closed_at: string | null
+}
+
+/**
+ * Enfant de type Order dans le DataTree
+ */
+export interface OrderChild {
+  id: string
+  type: 'order'
+  order_id: number
+  symbol: string
+  name: string
+  side: 'BUY' | 'SELL'
+  quantity: number
+  filled_quantity: number
+  price: number | null
+  stop_price: number | null
+  order_type: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
+  status: 'PENDING' | 'OPEN' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED'
+  broker_name: string | null
+  broker_order_id: string | null
+  created_at: string
+  updated_at: string | null
+}
+
+/**
+ * Asset parent dans le DataTree avec ses enfants (positions + orders)
+ */
+export interface AssetWithChildren {
+  id: string
+  type: 'asset'
+  asset_id: number
+  symbol: string
+  name: string
+  asset_type: string
+  currency: string
+  current_price: number | null
+  total_position_size: number
+  total_pending_quantity: number
+  net_position: number
+  total_pnl: number
+  positions_count: number
+  closed_positions_count: number
+  pending_orders_count: number
+  has_children: boolean
+  children: (PositionChild | OrderChild)[]
+}
+
+/**
+ * Réponse de l'API pour la vue d'ensemble DataTree
+ */
+export interface AssetsOverviewResponse {
+  success: boolean
+  count: number
+  data: AssetWithChildren[]
+  error?: string
 }
 
 // ============================================================================

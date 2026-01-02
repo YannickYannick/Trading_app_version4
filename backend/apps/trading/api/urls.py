@@ -125,6 +125,11 @@ urlpatterns = [
     path('health/', health_check, name='health-check'),
     path('ping/', ping, name='ping'),
     
+    # ============================================
+    # DATATREE - Vue d'ensemble Assets avec Positions/Orders
+    # ============================================
+    path('assets/overview/', views.get_assets_with_positions_orders, name='assets-overview'),
+    
     # Toutes les URLs du router (ViewSets)
     path('', include(router.urls)),
     

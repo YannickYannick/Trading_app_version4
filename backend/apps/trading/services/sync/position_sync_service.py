@@ -2,6 +2,20 @@
 Position Synchronization Service.
 
 This service synchronizes positions from brokers to the local database.
+
+Flux de synchronisation pour les positions Saxo:
+------------------------------------------------
+
+1. Récupération des positions depuis l'API Saxo via SaxoBroker.get_positions()
+2. Pour chaque position, création/matching d'un AllAsset intelligent:
+   - Étape 1: Recherche par (symbol, platform)
+   - Étape 2: Si symbol = "UIC_xxxx", recherche par saxo_uic
+   - Étape 3: Récupération depuis API Saxo via /instruments/details/{UIC}/{AssetType}
+     → Utilise l'endpoint rapide pour récupérer les vraies données (symbol, name, etc.)
+   - Étape 4: Création minimale en fallback si tout échoue
+3. Création/mise à jour de la Position avec le bon AllAsset
+
+Documentation complète: docs/saxo_position_sync_flow.md
 """
 import logging
 from typing import Dict, List, Optional, Any
@@ -12,7 +26,7 @@ from django.utils import timezone
 
 from .base_sync_service import BaseSyncService
 from ...brokers.factory import BrokerFactory
-from ...brokers.base import BrokerPosition
+from ...brokers.base import BrokerPosition, BrokerBase
 from ...models import BrokerAccount, Position, Asset, AllAssets, Broker
 from ...exceptions import SyncException, SyncAuthenticationError
 
@@ -212,9 +226,62 @@ class PositionSyncService(BaseSyncService):
         
         # Find or create AllAsset (source de vérité unique)
         try:
+            # Extraire l'UIC et l'asset_type depuis raw_data si disponible
+            raw_data = broker_position.raw_data or {}
+            uic_raw = raw_data.get('uic')
+            asset_type = raw_data.get('asset_type')
+            
+            # Convertir l'UIC en int de manière robuste
+            uic = None
+            if uic_raw is not None:
+                try:
+                    uic = int(uic_raw)
+                except (ValueError, TypeError):
+                    self.logger.warning(
+                        f"Invalid UIC value '{uic_raw}' for position {broker_position.symbol}, "
+                        f"skipping UIC-based lookup"
+                    )
+                    uic = None
+            
+            # Logger pour débugger les positions avec UIC fallback
+            if broker_position.symbol.startswith('UIC_'):
+                self.logger.info(
+                    f"Position with UIC fallback symbol: {broker_position.symbol}, "
+                    f"UIC={uic}, asset_type={asset_type}, "
+                    f"will attempt to fetch real symbol from API"
+                )
+            
+            # Récupérer l'instance du broker pour pouvoir appeler get_asset_by_uic si nécessaire
+            broker_instance = None
+            if broker_account.get_broker_type() == 'SAXO' and uic:
+                try:
+                    credentials = self._get_credentials(broker_account)
+                    broker_instance = BrokerFactory.create_broker(
+                        broker_account.get_broker_type(),
+                        self.user,
+                        credentials
+                    )
+                    # S'assurer que le broker est authentifié
+                    if not broker_instance.is_connected:
+                        if not broker_instance.authenticate():
+                            self.logger.error(
+                                f"Failed to authenticate Saxo broker for UIC lookup. "
+                                f"Position will use fallback symbol."
+                            )
+                            broker_instance = None
+                except Exception as e:
+                    self.logger.error(
+                        f"Error creating broker instance for UIC lookup: {e}",
+                        exc_info=True
+                    )
+                    broker_instance = None
+            
             all_asset = self._get_or_create_all_asset(
                 symbol=broker_position.symbol,
                 broker_type=broker_account.get_broker_type(),
+                uic=uic,
+                asset_type=asset_type,
+                broker_instance=broker_instance,
             )
         except Exception as e:
             error_msg = f"Error getting/creating AllAsset for {broker_position.symbol}: {str(e)}"
@@ -343,32 +410,131 @@ class PositionSyncService(BaseSyncService):
         self,
         symbol: str,
         broker_type: str,
+        uic: Optional[int] = None,
+        asset_type: Optional[str] = None,
+        broker_instance: Optional[BrokerBase] = None,
     ) -> Optional[AllAssets]:
         """
         Get or create an AllAsset for the given symbol.
         
         AllAssets est la source de vérité unique. Si l'asset n'existe pas,
-        on essaie de le créer avec les données minimales.
+        on essaie de le récupérer depuis l'API du broker (si UIC disponible)
+        avant de créer un AllAsset minimal.
         
         Args:
-            symbol: Asset symbol
+            symbol: Asset symbol (peut être "UIC_xxxx" si symbole réel non disponible)
             broker_type: Type of broker (SAXO, BINANCE, etc.)
+            uic: UIC de l'asset (optionnel, pour Saxo)
+            asset_type: Type d'asset (optionnel, pour améliorer la recherche)
+            broker_instance: Instance du broker (optionnel, pour appeler l'API)
             
         Returns:
             AllAssets instance or None
         """
         platform = broker_type.upper()
         
-        # Chercher dans AllAssets avec (symbol, platform) unique
+        # 1. Chercher dans AllAssets avec (symbol, platform) unique
         all_asset = AllAssets.objects.filter(
             symbol=symbol,
             platform=platform,
         ).first()
         
         if all_asset:
+            # Si l'AllAsset existe mais n'a pas d'UIC alors qu'on en a un, le mettre à jour
+            if platform == 'SAXO' and uic and not all_asset.saxo_uic:
+                all_asset.saxo_uic = uic
+                all_asset.save(update_fields=['saxo_uic'])
+                self.logger.debug(f"Updated saxo_uic for {symbol}: {uic}")
             return all_asset
         
-        # Si pas trouvé, créer un AllAsset minimal
+        # 2. Si symbol = "UIC_xxxx" et UIC disponible, chercher par UIC
+        if symbol.startswith('UIC_') and uic:
+            try:
+                # Convertir l'UIC du symbol en int pour comparaison
+                extracted_uic = int(symbol.replace('UIC_', ''))
+                
+                # S'assurer que uic est aussi un int
+                uic_int = int(uic) if not isinstance(uic, int) else uic
+                
+                if extracted_uic == uic_int:
+                    # Chercher par saxo_uic
+                    all_asset = AllAssets.objects.filter(
+                        saxo_uic=uic_int,
+                        platform=platform,
+                    ).first()
+                    
+                    if all_asset:
+                        self.logger.info(
+                            f"Found AllAsset by UIC {uic_int}: {all_asset.symbol} "
+                            f"(was looking for {symbol})"
+                        )
+                        return all_asset
+                    else:
+                        self.logger.debug(
+                            f"No existing AllAsset found with saxo_uic={uic_int}, "
+                            f"will try to fetch from API"
+                        )
+            except (ValueError, TypeError) as e:
+                self.logger.warning(
+                    f"Error extracting UIC from symbol {symbol}: {e}"
+                )
+        
+        # 3. Si toujours pas trouvé et UIC disponible, essayer de récupérer depuis l'API
+        if platform == 'SAXO' and uic and broker_instance:
+            try:
+                from ...brokers.saxo import SaxoBroker
+                if isinstance(broker_instance, SaxoBroker):
+                    # S'assurer que uic est un int
+                    uic_int = int(uic) if not isinstance(uic, int) else uic
+                    
+                    self.logger.info(
+                        f"Attempting to fetch asset from Saxo API for UIC {uic_int} "
+                        f"(asset_type={asset_type or 'Stock'})"
+                    )
+                    
+                    broker_asset = broker_instance.get_asset_by_uic(
+                        uic=uic_int,
+                        asset_type=asset_type or 'Stock'
+                    )
+                    
+                    if broker_asset:
+                        self.logger.info(
+                            f"✅ Successfully fetched asset from API: {broker_asset.symbol} "
+                            f"({broker_asset.name}) for UIC {uic_int}"
+                        )
+                        # Créer AllAsset avec toutes les données disponibles
+                        raw_data = broker_asset.raw_data or {}
+                        all_asset = AllAssets.objects.create(
+                            symbol=broker_asset.symbol,  # Le vrai symbole, pas "UIC_xxxx"
+                            name=broker_asset.name,
+                            platform=platform,
+                            asset_type=broker_asset.asset_type or asset_type or 'UNKNOWN',
+                            market=raw_data.get('country_code', ''),
+                            currency=broker_asset.currency or 'USD',
+                            exchange=broker_asset.exchange or raw_data.get('exchange_id', ''),
+                            is_tradable=broker_asset.is_tradable,
+                            # Champs spécifiques Saxo
+                            saxo_uic=uic_int,
+                            saxo_exchange_id=raw_data.get('exchange_id', ''),
+                            saxo_country_code=raw_data.get('country_code', ''),
+                        )
+                        self.logger.info(
+                            f"Created AllAsset from API for UIC {uic_int}: "
+                            f"{broker_asset.symbol} ({broker_asset.name})"
+                        )
+                        return all_asset
+                    else:
+                        self.logger.warning(
+                            f"⚠️ get_asset_by_uic returned None for UIC {uic_int}. "
+                            f"Asset may not be found in API or search limit reached."
+                        )
+            except Exception as e:
+                self.logger.error(
+                    f"❌ Exception while fetching asset from API for UIC {uic}: {e}",
+                    exc_info=True
+                )
+        
+        # 4. Si pas trouvé, créer un AllAsset minimal
         # L'utilisateur devra lancer une sync AllAssets pour enrichir les données
         self.logger.warning(
             f"AllAsset not found for {symbol} ({platform}). "
@@ -376,15 +542,21 @@ class PositionSyncService(BaseSyncService):
         )
         
         try:
-            all_asset = AllAssets.objects.create(
-                symbol=symbol,
-                name=symbol,  # Nom par défaut = symbol
-                platform=platform,
-                asset_type='UNKNOWN',
-                market='',
-                currency='USD',
-                is_tradable=True,
-            )
+            create_kwargs = {
+                'symbol': symbol,
+                'name': symbol,  # Nom par défaut = symbol
+                'platform': platform,
+                'asset_type': asset_type or 'UNKNOWN',
+                'market': '',
+                'currency': 'USD',
+                'is_tradable': True,
+            }
+            
+            # Ajouter l'UIC si disponible (même si symbol = "UIC_xxxx")
+            if platform == 'SAXO' and uic:
+                create_kwargs['saxo_uic'] = uic
+            
+            all_asset = AllAssets.objects.create(**create_kwargs)
             self.logger.info(f"Created minimal AllAsset for {symbol} ({platform})")
             return all_asset
         except Exception as e:

@@ -120,3 +120,10 @@ Si une synchronisation prend plus de 10 minutes :
 - Code backend : `backend/apps/trading/api/views.py` (méthode `sync`)
 - Code frontend : `frontend/src/services/brokers.ts` (méthode `sync`)
 
+
+
+
+
+
+
+

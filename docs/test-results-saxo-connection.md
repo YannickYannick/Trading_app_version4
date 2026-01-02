@@ -113,3 +113,10 @@ Une fois le token configuré, le script vous indiquera :
 - `docs/correction-probleme-yahoo.md` - Guide de correction
 - `backend/test_saxo_live_connection.py` - Script de test
 
+
+
+
+
+
+
+

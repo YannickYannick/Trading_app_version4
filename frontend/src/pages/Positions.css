@@ -69,6 +69,8 @@
 .position-actions {
   display: flex;
   gap: var(--spacing-sm);
+  justify-content: center;
+  align-items: center;
 }
 
 .position-details {

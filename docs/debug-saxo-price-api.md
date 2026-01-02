@@ -171,3 +171,10 @@ Des tests ont été réalisés avec plusieurs assets :
 - Documentation API Saxo Bank : `/trade/v1/infoprices`
 - Issue GitHub : Validation Yahoo Finance nécessite des prix de référence Saxo
 - Tests : Voir les logs du serveur Django lors de l'exécution de la validation Yahoo Finance
+
+
+
+
+
+
+

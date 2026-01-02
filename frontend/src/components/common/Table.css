@@ -1,6 +1,71 @@
 .table-wrapper {
   overflow-x: auto;
   border-radius: var(--border-radius-lg);
+  max-width: 100%;
+}
+
+.table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: auto; /* Passer à auto pour une meilleure adaptation */
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem;
+  text-align: center; /* Par défaut, centrer toutes les cellules */
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle; /* Aligner verticalement au centre */
+}
+
+.table td {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.table th {
+  white-space: nowrap;
+}
+
+.table td.text-center,
+.table th.text-center {
+  text-align: center;
+}
+
+.table td.text-right,
+.table th.text-right {
+  text-align: right;
+}
+
+.table-cell-editable {
+  /* Style pour les cellules éditables */
+}
+
+.table-cell-editable:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.table th {
+  background-color: var(--color-bg-secondary, #f9fafb);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table tbody tr {
+  transition: background-color 0.15s;
+}
+
+.table tbody tr:hover {
+  background-color: var(--color-bg-secondary, #f9fafb);
 }
 
 .table-row-clickable {

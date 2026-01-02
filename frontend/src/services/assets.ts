@@ -2,7 +2,7 @@
  * Service pour les Assets
  */
 import apiClient from './api/client'
-import type { ApiResponse, Asset, AllAsset, ApiError } from '@types'
+import type { ApiResponse, Asset, AllAsset, ApiError, AssetWithChildren, AssetsOverviewResponse } from '@types'
 
 export interface AssetFilters {
   platform?: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
@@ -150,6 +150,33 @@ export const assetService = {
       params,
     })
     return response.data.results
+  },
+
+  /**
+   * Récupérer la vue d'ensemble DataTree (Assets avec Positions et Orders groupés)
+   * 
+   * Retourne une structure hiérarchique où chaque asset est un parent
+   * avec ses positions et orders comme enfants (children).
+   * 
+   * @param includeEmpty - Inclure les assets sans positions ni orders (défaut: true)
+   */
+  async getAssetsOverview(includeEmpty: boolean = true): Promise<AssetWithChildren[]> {
+    const response = await apiClient.get<AssetsOverviewResponse>('/assets/overview/', {
+      params: { include_empty: includeEmpty ? 'true' : 'false' },
+    })
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Erreur lors de la récupération des données')
+    }
+    
+    return response.data.data
+  },
+
+  /**
+   * Récupérer la vue d'ensemble DataTree (uniquement les assets avec des positions/orders)
+   */
+  async getAssetsOverviewActive(): Promise<AssetWithChildren[]> {
+    return this.getAssetsOverview(false)
   },
 }
 

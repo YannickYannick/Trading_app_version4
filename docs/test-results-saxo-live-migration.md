@@ -125,3 +125,10 @@ Cela mettra à jour :
 3. Relancer la validation Yahoo Finance
 4. Vérifier que les prix sont maintenant obtenus
 
+
+
+
+
+
+
+

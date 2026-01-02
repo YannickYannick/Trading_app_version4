@@ -359,3 +359,10 @@ export default function AlgorithmParameters({
 - [STRATEGIES_API.md](STRATEGIES_API.md) : API utilisée par le frontend
 - [STRATEGIES_EXAMPLES.md](STRATEGIES_EXAMPLES.md) : Exemples d'utilisation
 
+
+
+
+
+
+
+

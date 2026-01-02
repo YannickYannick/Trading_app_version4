@@ -7,7 +7,7 @@ Un Serializer convertit automatiquement :
 """
 from rest_framework import serializers
 from apps.trading.models import (
-    AllAssets, Asset, AssetPrice, Position, Trade, Order,
+    AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
     Strategy, StrategyPerformance, Broker, BrokerAccount
 )
 
@@ -31,6 +31,8 @@ class AllAssetsSerializer(serializers.ModelSerializer):
     """
     # Champ calculé : nom d'affichage
     display_name = serializers.SerializerMethodField()
+    # Champ calculé : informations sur l'historique des prix
+    price_history_info = serializers.SerializerMethodField()
     
     class Meta:
         model = AllAssets
@@ -38,6 +40,8 @@ class AllAssetsSerializer(serializers.ModelSerializer):
             'id', 'symbol', 'name', 'display_name', 'platform', 'asset_type', 'market',
             'currency', 'exchange', 'is_tradable', 'last_updated', 'created_at',
             'saxo_uic', 'saxo_exchange_id', 'saxo_country_code',
+            'symbole_yahoo', 'yahoo_validation_method', 'yahoo_validated_at',
+            'price_history_days', 'price_history_updated_at', 'price_history_info',
             'binance_base_asset', 'binance_quote_asset', 'binance_status'
         ]
         read_only_fields = ['id', 'last_updated', 'created_at']
@@ -45,6 +49,19 @@ class AllAssetsSerializer(serializers.ModelSerializer):
     def get_display_name(self, obj):
         """Champ calculé : symbole + nom."""
         return f"{obj.symbol} - {obj.name}"
+    
+    def get_price_history_info(self, obj):
+        """Informations sur l'historique des prix."""
+        if not obj.has_price_history:
+            return None
+        return {
+            'days_count': obj.price_history_days or obj.get_price_history_count(),
+            'updated_at': obj.price_history_updated_at.isoformat() if obj.price_history_updated_at else None,
+            'date_range': {
+                'first': obj.get_price_history_dates()[-1] if obj.get_price_history_dates() else None,
+                'last': obj.get_price_history_dates()[0] if obj.get_price_history_dates() else None
+            }
+        }
 
 
 class AssetSerializer(serializers.ModelSerializer):
@@ -92,6 +109,21 @@ class AssetPriceSerializer(serializers.ModelSerializer):
             'id', 'asset', 'asset_symbol', 'date',
             'open_price', 'high_price', 'low_price', 'close_price', 'volume'
         ]
+
+
+class AllAssetPriceHistorySerializer(serializers.ModelSerializer):
+    """Serializer pour l'historique des prix d'un AllAsset."""
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    
+    class Meta:
+        model = AllAssetPriceHistory
+        fields = [
+            'id', 'all_asset', 'all_asset_symbol', 'date',
+            'open_price', 'high_price', 'low_price', 'close_price', 'volume',
+            'source', 'source_display', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 # ============================================
@@ -362,8 +394,9 @@ class OrderSerializer(serializers.ModelSerializer):
     asset_id = serializers.IntegerField(write_only=True, required=False)
     broker_id = serializers.IntegerField(write_only=True, required=False)
     
-    # Champ calculé
+    # Champs calculés
     fill_percentage = serializers.SerializerMethodField()
+    total_value = serializers.SerializerMethodField()
     
     class Meta:
         model = Order
@@ -374,15 +407,22 @@ class OrderSerializer(serializers.ModelSerializer):
             'order_type', 'side', 'status',
             'quantity', 'filled_quantity', 'fill_percentage',
             'price', 'stop_price',
-            'broker_order_id', 'created_at', 'updated_at'
+            'broker_order_id', 'created_at', 'updated_at',
+            'total_value'
         ]
-        read_only_fields = ['id', 'filled_quantity', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'filled_quantity', 'created_at', 'updated_at', 'total_value']
     
     def get_fill_percentage(self, obj):
         """Calcule le % de remplissage de l'ordre."""
         if obj.quantity and obj.quantity > 0:
             return round((obj.filled_quantity / obj.quantity) * 100, 2)
         return 0
+    
+    def get_total_value(self, obj):
+        """Calcule la valeur totale de l'ordre (quantity × price)."""
+        if obj.price and obj.quantity:
+            return float(obj.quantity * obj.price)
+        return 0.0
     
     def validate_quantity(self, value):
         """Valider que la quantité est positive."""

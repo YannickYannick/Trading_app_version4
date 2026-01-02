@@ -569,3 +569,10 @@ signal_result = algorithm.calculate_signals(price_data)
 - [STRATEGIES_SERVICES.md](STRATEGIES_SERVICES.md) : Services utilisant les algorithmes
 - [STRATEGIES_EXECUTION.md](STRATEGIES_EXECUTION.md) : Exécution des stratégies
 
+
+
+
+
+
+
+

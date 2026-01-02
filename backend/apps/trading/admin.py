@@ -1,8 +1,11 @@
 from django.contrib import admin
 from django.forms import Textarea
 from django.utils.translation import gettext_lazy as _
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.db.models import Count, Min, Max
 from .models import (
-    AllAssets, Asset, AssetPrice,
+    AllAssets, Asset, AssetPrice, AllAssetPriceHistory,
     Position, Trade, Order,
     Strategy, StrategyPerformance,
     Broker, BrokerAccount, BrokerSyncLog,
@@ -41,13 +44,49 @@ class YahooValidationFilter(admin.SimpleListFilter):
         return queryset
 
 
+class AllAssetPriceHistoryInline(admin.TabularInline):
+    """
+    Inline pour afficher l'historique complet des prix dans AllAssetsAdmin.
+    Affiche TOUS les prix historiques dans un tableau, ordonnés du plus récent au plus ancien.
+    """
+    model = AllAssetPriceHistory
+    extra = 0
+    readonly_fields = ['date', 'open_price', 'high_price', 'low_price', 'close_price', 'volume', 'source']
+    fields = ['date', 'open_price', 'high_price', 'low_price', 'close_price', 'volume', 'source']
+    ordering = ['-date']  # Plus récent en premier
+    can_delete = False
+    can_add = False  # Empêcher l'ajout depuis l'inline (utiliser la commande de sync)
+    show_change_link = False
+    verbose_name = "Historique des prix"
+    verbose_name_plural = "Historique complet des prix (toutes les dates)"
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False  # Lecture seule
+    
+    def get_queryset(self, request):
+        """
+        Retourner TOUS les prix historiques, sans limite.
+        Ordonné du plus récent au plus ancien pour voir l'historique complet.
+        """
+        qs = super().get_queryset(request)
+        # Pas de limite - afficher tous les enregistrements
+        return qs.select_related('all_asset').order_by('-date')
+
+
 @admin.register(AllAssets)
 class AllAssetsAdmin(admin.ModelAdmin):
-    list_display = ['symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'is_tradable', 'symbole_yahoo', 'last_updated']
+    list_display = ['symbol', 'name', 'platform', 'asset_type', 'market', 'currency', 'is_tradable', 'symbole_yahoo', 'price_history_count', 'last_updated']
     list_filter = ['platform', 'asset_type', 'market', 'is_tradable', 'currency', YahooValidationFilter]
     search_fields = ['symbol', 'name', 'saxo_uic', 'symbole_yahoo']
     ordering = ['symbol']
-    readonly_fields = ['last_updated', 'created_at', 'yahoo_validated_at']
+    readonly_fields = ['last_updated', 'created_at', 'yahoo_validated_at', 'price_history_json_display', 'price_history_info']
+    # inlines = [AllAssetPriceHistoryInline]  # Désactivé - utilise maintenant JSONB
+    
+    # Template personnalisé pour ajouter les boutons d'action
+    change_form_template = 'admin/trading/allassets/change_form.html'
     
     fieldsets = (
         ('Informations générales', {
@@ -65,11 +104,77 @@ class AllAssetsAdmin(admin.ModelAdmin):
             'fields': ('binance_base_asset', 'binance_quote_asset', 'binance_status'),
             'classes': ('collapse',)
         }),
+        ('Historique des prix (JSONB)', {
+            'fields': ('price_history_info', 'price_history_json_display', 'price_history_updated_at', 'price_history_days'),
+            'classes': ('collapse',)
+        }),
         ('Métadonnées', {
             'fields': ('created_at', 'last_updated'),
             'classes': ('collapse',)
         }),
     )
+    
+    def price_history_count(self, obj):
+        """Affiche le nombre de jours d'historique stockés dans JSONB."""
+        if obj.has_price_history:
+            days_count = obj.price_history_days or obj.get_price_history_count()
+            dates = obj.get_price_history_dates()
+            if dates:
+                date_range = f" ({dates[-1]} → {dates[0]})" if len(dates) > 1 else f" ({dates[0]})"
+                return format_html(
+                    '<span style="color: green; font-weight: bold;">{} jours{}</span>',
+                    days_count,
+                    date_range
+                )
+            return format_html('<span style="color: green; font-weight: bold;">{} jours</span>', days_count)
+        return mark_safe('<span style="color: gray;">Aucun</span>')
+    price_history_count.short_description = 'Historique prix'
+    
+    def price_history_info(self, obj):
+        """Affiche des informations sur l'historique des prix."""
+        if not obj.has_price_history:
+            return mark_safe('<span style="color: gray;">Aucun historique disponible</span>')
+        
+        days_count = obj.price_history_days or obj.get_price_history_count()
+        dates = obj.get_price_history_dates()
+        updated_at = obj.price_history_updated_at
+        
+        info_lines = [
+            f"<strong>Nombre de jours:</strong> {days_count}",
+        ]
+        
+        if dates:
+            info_lines.append(f"<strong>Période:</strong> {dates[-1]} → {dates[0]}")
+        
+        if updated_at:
+            info_lines.append(f"<strong>Dernière mise à jour:</strong> {updated_at.strftime('%d/%m/%Y %H:%M')}")
+        
+        return mark_safe('<br>'.join(info_lines))
+    price_history_info.short_description = 'Informations'
+    
+    def price_history_json_display(self, obj):
+        """Affiche l'historique des prix formaté (lecture seule)."""
+        if not obj.has_price_history:
+            return mark_safe('<span style="color: gray;">Aucun historique disponible</span>')
+        
+        import json
+        history_json = obj.price_history_json or {}
+        
+        # Limiter l'affichage aux 50 premières dates pour ne pas surcharger l'admin
+        sorted_dates = sorted(history_json.keys(), reverse=True)[:50]
+        limited_history = {date: history_json[date] for date in sorted_dates}
+        
+        json_str = json.dumps(limited_history, indent=2, ensure_ascii=False)
+        
+        if len(sorted_dates) < len(history_json):
+            warning = f"<p style='color: orange;'><strong>Note:</strong> Affichage des 50 dates les plus récentes sur {len(history_json)} au total.</p>"
+        else:
+            warning = ""
+        
+        return mark_safe(
+            f'{warning}<textarea readonly rows="15" cols="100" style="font-family: monospace; font-size: 11px; width: 100%;">{json_str}</textarea>'
+        )
+    price_history_json_display.short_description = 'Historique des prix (JSON)'
 
 
 @admin.register(Asset)
@@ -86,6 +191,34 @@ class AssetPriceAdmin(admin.ModelAdmin):
     list_filter = ['date', 'asset']
     search_fields = ['asset__symbol']
     ordering = ['-date']
+
+
+@admin.register(AllAssetPriceHistory)
+class AllAssetPriceHistoryAdmin(admin.ModelAdmin):
+    list_display = ['all_asset', 'date', 'open_price', 'high_price', 'low_price', 'close_price', 'volume', 'source', 'created_at']
+    list_filter = ['date', 'source', 'all_asset__platform', 'all_asset__asset_type']
+    search_fields = ['all_asset__symbol', 'all_asset__name']
+    ordering = ['-date']
+    readonly_fields = ['created_at', 'updated_at']
+    list_per_page = 100  # Afficher plus de lignes par page
+    
+    fieldsets = (
+        ('Informations générales', {
+            'fields': ('all_asset', 'date', 'source')
+        }),
+        ('Prix', {
+            'fields': ('open_price', 'high_price', 'low_price', 'close_price', 'volume')
+        }),
+        ('Métadonnées', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        """Optimiser les requêtes."""
+        qs = super().get_queryset(request)
+        return qs.select_related('all_asset')
 
 
 # ============== TRADING ==============

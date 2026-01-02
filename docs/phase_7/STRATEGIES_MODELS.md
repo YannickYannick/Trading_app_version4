@@ -554,3 +554,10 @@ class Strategy(models.Model):
 - [STRATEGIES_API.md](STRATEGIES_API.md) : API REST
 - [STRATEGIES_SERVICES.md](STRATEGIES_SERVICES.md) : Services backend
 
+
+
+
+
+
+
+

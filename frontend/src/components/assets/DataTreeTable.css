@@ -1,0 +1,475 @@
+/**
+ * Styles pour DataTreeTable - Tableau hiérarchique Assets/Positions/Orders
+ */
+
+/* Container principal */
+.datatree-container {
+  width: 100%;
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Toolbar */
+.datatree-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary, #f8fafc);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.toolbar-separator {
+  color: var(--border-color, #cbd5e1);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Table wrapper */
+.datatree-table-wrapper {
+  overflow-x: auto;
+}
+
+/* Table */
+.datatree-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.datatree-table th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  background: var(--bg-secondary, #f8fafc);
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+  white-space: nowrap;
+}
+
+.datatree-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  vertical-align: middle;
+}
+
+/* Colonnes spécifiques */
+.th-toggle {
+  width: 40px;
+}
+
+.th-symbol {
+  text-align: left;
+  min-width: 180px;
+}
+
+.th-type {
+  width: 100px;
+}
+
+.th-quantity {
+  width: 120px;
+}
+
+.th-price {
+  width: 100px;
+}
+
+.th-net {
+  width: 100px;
+}
+
+.th-pnl {
+  width: 120px;
+}
+
+.th-status {
+  width: 120px;
+}
+
+.th-actions {
+  width: 120px;
+}
+
+/* ============================================
+   LIGNES PARENT (Asset)
+   ============================================ */
+
+.parent-row {
+  background-color: #e3f2fd;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.parent-row:hover {
+  background-color: #bbdefb;
+}
+
+.parent-row.expanded {
+  background-color: #90caf9;
+}
+
+.parent-row td {
+  font-weight: 500;
+}
+
+/* Toggle icon */
+.toggle-cell {
+  text-align: center;
+  cursor: pointer;
+  min-width: 40px;
+  width: 40px;
+}
+
+.toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: #1e293b;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.toggle-icon:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.toggle-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.toggle-icon.disabled {
+  color: #94a3b8;
+  cursor: default;
+}
+
+.toggle-icon.disabled:hover {
+  background-color: transparent;
+}
+
+.toggle-icon.disabled svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Symbol cell */
+.symbol-cell {
+  text-align: left;
+}
+
+.symbol-cell strong {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #1e293b);
+}
+
+.symbol-cell .asset-name {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+/* Counts cell */
+.counts-cell {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.no-children {
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.75rem;
+}
+
+/* ============================================
+   LIGNES ENFANT (Position / Order)
+   ============================================ */
+
+.child-row {
+  cursor: default;
+}
+
+/* Position row */
+.child-row.position-row {
+  background-color: #e8f5e9;
+}
+
+.child-row.position-row:hover {
+  background-color: #c8e6c9;
+}
+
+/* Order row */
+.child-row.order-row {
+  background-color: #fff3e0;
+}
+
+.child-row.order-row:hover {
+  background-color: #ffe0b2;
+}
+
+/* Indentation */
+.indented-cell {
+  text-align: left;
+  padding-left: 40px !important;
+}
+
+.child-icon {
+  margin-right: 8px;
+}
+
+.child-label {
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+}
+
+/* ============================================
+   CELLULES DE DONNÉES
+   ============================================ */
+
+.center-cell {
+  text-align: center;
+}
+
+.number-cell {
+  text-align: right;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-size: 0.8125rem;
+}
+
+/* P&L */
+.pnl-positive {
+  color: var(--success, #16a34a);
+  font-weight: 600;
+}
+
+.pnl-negative {
+  color: var(--danger, #dc2626);
+  font-weight: 600;
+}
+
+.pnl-percent {
+  display: block;
+  font-size: 0.6875rem;
+  opacity: 0.8;
+}
+
+/* Net position */
+.net-positive {
+  color: var(--success, #16a34a);
+}
+
+.net-negative {
+  color: var(--danger, #dc2626);
+}
+
+/* ============================================
+   ACTIONS
+   ============================================ */
+
+.actions-cell {
+  text-align: center;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin: 0 2px;
+}
+
+.action-btn:hover {
+  transform: scale(1.1);
+}
+
+.action-btn.view-btn {
+  color: var(--info, #3b82f6);
+}
+
+.action-btn.view-btn:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.action-btn.edit-btn {
+  color: var(--primary, #6366f1);
+}
+
+.action-btn.edit-btn:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.action-btn.sell-btn {
+  color: var(--warning, #f59e0b);
+}
+
+.action-btn.sell-btn:hover {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.action-btn.cancel-btn {
+  color: var(--warning, #f59e0b);
+}
+
+.action-btn.cancel-btn:hover {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.action-btn.close-btn {
+  color: var(--danger, #dc2626);
+}
+
+.action-btn.close-btn:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+.action-btn.delete-btn {
+  color: var(--danger, #dc2626);
+}
+
+.action-btn.delete-btn:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* ============================================
+   ÉTATS
+   ============================================ */
+
+/* Loading */
+.datatree-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-secondary, #64748b);
+}
+
+.datatree-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e2e8f0);
+  border-top-color: var(--primary, #6366f1);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty */
+.datatree-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.datatree-empty svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.datatree-empty p {
+  font-size: 0.9375rem;
+  margin: 8px 0;
+}
+
+.datatree-empty .empty-hint {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin-top: 8px;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .datatree-toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .datatree-table th,
+  .datatree-table td {
+    padding: 8px 12px;
+  }
+
+  .th-net,
+  .th-pnl {
+    display: none;
+  }
+
+  .parent-row td:nth-child(6),
+  .parent-row td:nth-child(7),
+  .child-row td:nth-child(6),
+  .child-row td:nth-child(7) {
+    display: none;
+  }
+
+  .indented-cell {
+    padding-left: 24px !important;
+  }
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  .datatree-container {
+    --card-bg: #1e293b;
+    --bg-secondary: #0f172a;
+    --border-color: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --parent-bg: #1e3a5f;
+    --parent-bg-hover: #2563eb30;
+    --parent-bg-expanded: #1d4ed830;
+    --position-bg: #14532d30;
+    --position-bg-hover: #16a34a30;
+    --order-bg: #78350f30;
+    --order-bg-hover: #f59e0b30;
+  }
+}
+

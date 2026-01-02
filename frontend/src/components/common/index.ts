@@ -11,6 +11,8 @@ export { default as Badge } from './Badge'
 export type { BadgeProps } from './Badge'
 
 export { default as Table } from './Table'
+export { default as ColumnSelector } from './ColumnSelector'
+export type { ColumnOption } from './ColumnSelector'
 export type { TableProps, TableColumn } from './Table'
 
 export { default as Input } from './Input'
