@@ -370,15 +370,22 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
     : trades
 
-  // Ajouter les marqueurs de trades au graphique
-  useEffect(() => {
-    if (!chartRef.current || filteredTrades.length === 0) {
+  // Fonction pour mettre à jour les marqueurs pour toutes les séries existantes
+  const updateMarkersForSeries = useCallback(() => {
+    if (!chartRef.current) {
+      console.log('[TradesChart] Chart not initialized, skipping markers update')
+      return
+    }
+
+    if (filteredTrades.length === 0) {
       // Supprimer tous les marqueurs si pas de trades
       markersRefs.current.forEach((markersPrimitive) => {
         markersPrimitive.setMarkers([])
       })
       return
     }
+
+    console.log(`[TradesChart] Updating markers for ${priceSeriesRefs.current.size} series with ${filteredTrades.length} trades`)
 
     // Ajouter les marqueurs à toutes les séries concernées
     priceSeriesRefs.current.forEach((series, assetId) => {
@@ -468,18 +475,14 @@ const TradesChart: React.FC<TradesChartProps> = ({
         markersRefs.current.delete(assetId)
       }
     })
-  }, [filteredTrades, selectedAssets, viewMode])
+  }, [filteredTrades])
 
   // Ajouter les marqueurs de trades au graphique (via useEffect pour réactivité)
   useEffect(() => {
     // Attendre un peu que les séries soient créées si elles n'existent pas encore
     if (priceSeriesRefs.current.size === 0) {
-      console.log('[TradesChart] No series available yet, waiting...')
-      // Réessayer après un court délai
-      const timeoutId = setTimeout(() => {
-        updateMarkersForSeries()
-      }, 200)
-      return () => clearTimeout(timeoutId)
+      console.log('[TradesChart] No series available yet, will retry in useEffect')
+      return
     }
 
     updateMarkersForSeries()
