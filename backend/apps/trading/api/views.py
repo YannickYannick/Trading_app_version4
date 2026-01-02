@@ -390,7 +390,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=True, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='(?P<pk>[^/.]+)/prices')
     def prices(self, request, pk=None):
         """
         GET /api/all-assets/{id}/prices/
