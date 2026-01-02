@@ -426,13 +426,9 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Utiliser get_object() pour bénéficier des permissions et du format DRF
-            # Mais si ça échoue, on a déjà l'objet
-            try:
-                all_asset = self.get_object()
-            except Exception as e:
-                logger.warning(f"[PRICES] get_object() failed but asset exists: {e}, using direct queryset result")
-                # On continue avec all_asset récupéré directement
+            # Ne pas utiliser get_object() car il peut retourner 404 même si l'objet existe
+            # On utilise directement l'objet récupéré depuis le queryset
+            logger.debug(f"[PRICES] Using asset directly from queryset: {all_asset.id}")
                 
         except Exception as e:
             logger.error(f"[PRICES] Error getting AllAsset {pk}: {e}", exc_info=True)
