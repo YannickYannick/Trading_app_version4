@@ -205,11 +205,6 @@ export const assetService = {
     return response.data
   },
 
-  // Cache pour éviter les appels multiples pour le même asset
-  private _priceCache = new Map<number, { price: number | null; timestamp: number }>()
-  private readonly _cacheTimeout = 5 * 60 * 1000 // 5 minutes
-  private _inFlightRequests = new Map<number, Promise<number | null>>()
-
   /**
    * Récupérer le prix Yahoo actuel (dernier prix disponible)
    * Récupère directement depuis Yahoo Finance, pas depuis l'historique stocké
