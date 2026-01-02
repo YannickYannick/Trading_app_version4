@@ -48,6 +48,13 @@ const TradesChart: React.FC<TradesChartProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current) return
 
+    // Nettoyer le graphique existant s'il y en a un
+    if (chartRef.current) {
+      chartRef.current.remove()
+      chartRef.current = null
+      priceSeriesRefs.current.clear()
+    }
+
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: 500,
@@ -73,6 +80,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
     })
 
     chartRef.current = chart
+    console.log('[TradesChart] Chart initialized:', chartRef.current)
 
     // Gestion du resize
     const handleResize = () => {
@@ -87,18 +95,41 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
     return () => {
       window.removeEventListener('resize', handleResize)
-      chart.remove()
+      if (chartRef.current) {
+        chartRef.current.remove()
+        chartRef.current = null
+      }
+      priceSeriesRefs.current.clear()
     }
   }, [])
 
   // Charger l'historique des prix pour les assets sélectionnés
   const loadPriceHistory = useCallback(async (assetIds: number[]) => {
-    if (!chartRef.current || assetIds.length === 0) return
+    if (!chartRef.current) {
+      console.warn('[TradesChart] Chart not initialized yet, skipping loadPriceHistory')
+      return
+    }
+
+    if (assetIds.length === 0) {
+      // Supprimer toutes les séries si aucun asset sélectionné
+      priceSeriesRefs.current.forEach((series) => {
+        chartRef.current?.removeSeries(series)
+      })
+      priceSeriesRefs.current.clear()
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
+      // Vérifier à nouveau que le graphique est toujours initialisé
+      if (!chartRef.current) {
+        console.error('[TradesChart] Chart was destroyed during loadPriceHistory')
+        setError('Graphique non disponible')
+        return
+      }
+
       // Charger les historiques en parallèle
       const historyPromises = assetIds.map(async (assetId) => {
         try {
@@ -114,6 +145,13 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       const histories = await Promise.all(historyPromises)
       console.log(`[TradesChart] All histories loaded:`, histories)
+
+      // Vérifier à nouveau que le graphique est toujours disponible avant d'ajouter des séries
+      if (!chartRef.current) {
+        console.error('[TradesChart] Chart was destroyed after loading histories')
+        setError('Graphique non disponible')
+        return
+      }
 
       // Créer ou récupérer les séries pour chaque asset
       histories.forEach(({ assetId, history }, index) => {
@@ -131,19 +169,33 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
         let series = priceSeriesRefs.current.get(assetId)
 
-        // Créer la série si elle n'existe pas
+        // Créer la série si elle n'existe pas et que le graphique est disponible
         if (!series && chartRef.current) {
+          // Vérifier que addLineSeries existe (protection supplémentaire)
+          if (typeof chartRef.current.addLineSeries !== 'function') {
+            console.error('[TradesChart] addLineSeries is not a function on chart object', chartRef.current)
+            setError('Erreur lors de l\'initialisation du graphique')
+            return
+          }
+
           const color = priceColors[index % priceColors.length]
           const assetSymbol = allAssetsMap?.get(assetId)?.symbol || `Asset ${assetId}`
           
-          series = chartRef.current.addLineSeries({
-            color,
-            lineWidth: 2,
-            title: assetSymbol,
-            priceLineVisible: false,
-            lastValueVisible: true,
-          })
-          priceSeriesRefs.current.set(assetId, series)
+          try {
+            series = chartRef.current.addLineSeries({
+              color,
+              lineWidth: 2,
+              title: assetSymbol,
+              priceLineVisible: false,
+              lastValueVisible: true,
+            })
+            priceSeriesRefs.current.set(assetId, series)
+            console.log(`[TradesChart] Created line series for asset ${assetId}`)
+          } catch (err) {
+            console.error(`[TradesChart] Error creating line series for asset ${assetId}:`, err)
+            setError(`Erreur lors de la création de la série pour ${assetSymbol}`)
+            return
+          }
         }
 
         if (series && chartRef.current) {
@@ -278,13 +330,21 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
   // Charger l'historique quand les assets sélectionnés changent
   useEffect(() => {
+    // Attendre que le graphique soit initialisé avant de charger les données
+    if (!chartRef.current) {
+      console.log('[TradesChart] Waiting for chart to be initialized...')
+      return
+    }
+
     if (selectedAssets.length > 0) {
       loadPriceHistory(selectedAssets)
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
-      priceSeriesRefs.current.forEach((series) => {
-        chartRef.current?.removeSeries(series)
-      })
+      if (chartRef.current) {
+        priceSeriesRefs.current.forEach((series) => {
+          chartRef.current?.removeSeries(series)
+        })
+      }
       priceSeriesRefs.current.clear()
     }
   }, [selectedAssets, loadPriceHistory])
