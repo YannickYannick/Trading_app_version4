@@ -1,9 +1,8 @@
 /**
  * Contrôles pour le graphique des trades
  */
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { Button } from '@components/common'
-import { assetService } from '@services/assets'
 import type { AllAsset } from '@types'
 import './TradesChart.css'
 
@@ -13,6 +12,7 @@ export interface ChartControlsProps {
   onSelectedAssetsChange: (assets: number[]) => void
   onViewModeChange: (mode: 'global' | 'per_asset') => void
   allAssetsInTrades: number[] // IDs des AllAssets présents dans les trades
+  allAssetsMap: Map<number, AllAsset> // Map des AllAssets déjà chargés depuis les trades
 }
 
 const ChartControls: React.FC<ChartControlsProps> = ({
@@ -21,41 +21,19 @@ const ChartControls: React.FC<ChartControlsProps> = ({
   onSelectedAssetsChange,
   onViewModeChange,
   allAssetsInTrades,
+  allAssetsMap,
 }) => {
-  const [availableAssets, setAvailableAssets] = useState<AllAsset[]>([])
-  const [loading, setLoading] = useState(false)
-
-  // Charger les informations des AllAssets disponibles
-  useEffect(() => {
-    const loadAssets = async () => {
-      if (allAssetsInTrades.length === 0) return
-
-      setLoading(true)
-      try {
-        const assets: AllAsset[] = []
-        
-        // Charger les assets en parallèle
-        const assetPromises = allAssetsInTrades.map(async (assetId) => {
-          try {
-            const asset = await assetService.getAllAssetById(assetId)
-            return asset
-          } catch (err) {
-            console.error(`Error loading asset ${assetId}:`, err)
-            return null
-          }
-        })
-
-        const loadedAssets = await Promise.all(assetPromises)
-        setAvailableAssets(loadedAssets.filter((asset): asset is AllAsset => asset !== null))
-      } catch (err) {
-        console.error('Error loading assets:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadAssets()
-  }, [allAssetsInTrades])
+  // Utiliser directement la Map depuis le parent au lieu de recharger via API
+  // Cela évite les rechargements inutiles et les disparitions de la liste
+  const availableAssets = useMemo(() => {
+    return allAssetsInTrades
+      .map((assetId) => allAssetsMap.get(assetId))
+      .filter((asset): asset is AllAsset => asset !== undefined)
+      .sort((a, b) => {
+        // Trier par symbole pour une meilleure UX
+        return (a.symbol || '').localeCompare(b.symbol || '')
+      })
+  }, [allAssetsInTrades, allAssetsMap])
 
   const handleAssetToggle = (assetId: number) => {
     // Prévenir tout comportement par défaut (comme le submit de formulaire)
@@ -108,30 +86,38 @@ const ChartControls: React.FC<ChartControlsProps> = ({
             {selectedAssets.length === allAssetsInTrades.length ? 'Tout désélectionner' : 'Tout sélectionner'}
           </Button>
         </div>
-        {loading ? (
-          <p>Chargement...</p>
-        ) : availableAssets.length > 0 ? (
+        {availableAssets.length > 0 ? (
           <div className="assets-list">
-            {availableAssets.map((asset) => (
-              <label key={asset.id} className="asset-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedAssets.includes(asset.id)}
-                  onChange={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleAssetToggle(asset.id)
-                  }}
-                />
-                <span className="asset-label">
-                  <strong>{asset.symbol}</strong>
-                  {asset.name && <span className="asset-name"> - {asset.name}</span>}
-                  {asset.symbole_yahoo && (
-                    <span className="asset-yahoo"> ({asset.symbole_yahoo})</span>
-                  )}
-                </span>
-              </label>
-            ))}
+            {availableAssets.map((asset) => {
+              const isSelected = selectedAssets.includes(asset.id)
+              const hasHistory = asset.price_history_days && asset.price_history_days > 0
+              
+              return (
+                <label key={asset.id} className="asset-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleAssetToggle(asset.id)
+                    }}
+                  />
+                  <span className="asset-label">
+                    <strong className={isSelected ? 'selected' : ''}>{asset.symbol}</strong>
+                    {asset.name && <span className="asset-name"> - {asset.name}</span>}
+                    {asset.symbole_yahoo && (
+                      <span className="asset-yahoo"> ({asset.symbole_yahoo})</span>
+                    )}
+                    {hasHistory && (
+                      <span className="asset-history-badge" title={`${asset.price_history_days} jours d'historique`}>
+                        📊
+                      </span>
+                    )}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         ) : (
           <p className="no-assets">Aucun asset disponible</p>

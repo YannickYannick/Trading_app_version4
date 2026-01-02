@@ -302,13 +302,14 @@ export default function Trades() {
         >
           {showChart && (
             <>
-              <ChartControls
-                selectedAssets={selectedAssets}
-                viewMode={chartViewMode}
-                onSelectedAssetsChange={setSelectedAssets}
-                onViewModeChange={setChartViewMode}
-                allAssetsInTrades={allAssetsInTrades}
-              />
+                  <ChartControls
+                    selectedAssets={selectedAssets}
+                    viewMode={chartViewMode}
+                    onSelectedAssetsChange={setSelectedAssets}
+                    onViewModeChange={setChartViewMode}
+                    allAssetsInTrades={allAssetsInTrades}
+                    allAssetsMap={allAssetsMap}
+                  />
               <TradesChart
                 trades={trades}
                 selectedAssets={selectedAssets}
