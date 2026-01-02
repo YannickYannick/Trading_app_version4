@@ -173,6 +173,38 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     loadData()
   }, [strategy])
 
+  // Stabiliser les paramètres pour éviter les boucles infinies
+  // Utiliser une comparaison profonde avec JSON.stringify pour détecter les vrais changements
+  const parametersString = useMemo(() => {
+    // Trier les clés pour un ordre cohérent
+    const sorted = Object.keys(parameters).sort().reduce((acc, key) => {
+      acc[key] = parameters[key]
+      return acc
+    }, {} as Record<string, any>)
+    return JSON.stringify(sorted)
+  }, [
+    parameters.rsi_period,
+    parameters.rsi_low,
+    parameters.rsi_high,
+    parameters.ma1_period,
+    parameters.ma2_period,
+    parameters.bb_period,
+    parameters.bb_std,
+    parameters.macd_fast,
+    parameters.macd_slow,
+    parameters.macd_signal,
+    parameters.threshold_low,
+    parameters.threshold_high,
+    parameters.grid_min,
+    parameters.grid_max,
+    parameters.grid_levels,
+    parameters.min_quantity,
+    parameters.max_quantity,
+    parameters.budget,
+    parameters.order_size,
+    parameters.stop_loss,
+  ])
+
   // Calculer et afficher les indicateurs et signaux
   useEffect(() => {
     if (!chartRef.current || !priceSeriesRef.current || priceHistory.length === 0 || !strategy) return
