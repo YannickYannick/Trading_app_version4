@@ -413,18 +413,26 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 all_asset = queryset.get(pk=pk)
                 logger.info(f"[PRICES] AllAsset found directly: {all_asset.id} - {all_asset.symbol} - {all_asset.name}")
             except AllAssets.DoesNotExist:
-                logger.error(f"[PRICES] AllAsset {pk} does not exist in database")
-                return Response(
-                    {
-                        'all_asset_id': int(pk) if pk else None,
-                        'all_asset_symbol': None,
-                        'count': 0,
-                        'message': f'AllAsset {pk} not found in database',
-                        'error': 'Not found',
-                        'results': []
-                    },
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                logger.error(f"[PRICES] AllAsset {pk} does not exist in queryset")
+                # Vérifier si l'asset existe quand même dans la base (peut-être filtré)
+                try:
+                    direct_asset = AllAssets.objects.get(pk=pk)
+                    logger.warning(f"[PRICES] AllAsset {pk} exists in database but not in queryset (maybe filtered): {direct_asset.symbol}")
+                    # Utiliser l'asset direct si trouvé
+                    all_asset = direct_asset
+                except AllAssets.DoesNotExist:
+                    logger.error(f"[PRICES] AllAsset {pk} does not exist in database at all")
+                    return Response(
+                        {
+                            'all_asset_id': int(pk) if pk else None,
+                            'all_asset_symbol': None,
+                            'count': 0,
+                            'message': f'AllAsset {pk} not found in database',
+                            'error': 'Not found',
+                            'results': []
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             # Ne pas utiliser get_object() car il peut retourner 404 même si l'objet existe
             # On utilise directement l'objet récupéré depuis le queryset
