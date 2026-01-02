@@ -376,27 +376,76 @@ class TradeSyncService(BaseSyncService):
                     )
                     
                     if broker_asset:
-                        # Créer AllAsset avec toutes les données disponibles
                         raw_data = broker_asset.raw_data or {}
-                        all_asset = AllAssets.objects.create(
-                            symbol=broker_asset.symbol,  # Le vrai symbole, pas "UIC_xxxx"
-                            name=broker_asset.name,
-                            platform=platform,
-                            asset_type=broker_asset.asset_type or asset_type or 'UNKNOWN',
-                            market=raw_data.get('country_code', ''),
-                            currency=broker_asset.currency or 'USD',
-                            exchange=broker_asset.exchange or raw_data.get('exchange_id', ''),
-                            is_tradable=broker_asset.is_tradable,
+                        
+                        # Utiliser get_or_create pour éviter les doublons
+                        defaults = {
+                            'name': broker_asset.name,
+                            'asset_type': broker_asset.asset_type or asset_type or 'UNKNOWN',
+                            'market': raw_data.get('country_code', ''),
+                            'currency': broker_asset.currency or 'USD',
+                            'exchange': broker_asset.exchange or raw_data.get('exchange_id', ''),
+                            'is_tradable': broker_asset.is_tradable,
                             # Champs spécifiques Saxo
-                            saxo_uic=uic,
-                            saxo_exchange_id=raw_data.get('exchange_id', ''),
-                            saxo_country_code=raw_data.get('country_code', ''),
-                        )
-                        self.logger.info(
-                            f"Created AllAsset from API for UIC {uic}: "
-                            f"{broker_asset.symbol} ({broker_asset.name})"
-                        )
-                        return all_asset
+                            'saxo_uic': uic,
+                            'saxo_exchange_id': raw_data.get('exchange_id', ''),
+                            'saxo_country_code': raw_data.get('country_code', ''),
+                        }
+                        
+                        try:
+                            all_asset, created = AllAssets.objects.get_or_create(
+                                symbol=broker_asset.symbol,  # Le vrai symbole, pas "UIC_xxxx"
+                                platform=platform,
+                                defaults=defaults
+                            )
+                            
+                            if not created:
+                                # Mettre à jour l'asset existant avec les nouvelles données
+                                update_fields = []
+                                for field, value in defaults.items():
+                                    current_value = getattr(all_asset, field, None)
+                                    # Mettre à jour si la valeur actuelle est vide/None ou si la nouvelle valeur est meilleure
+                                    if value and (not current_value or (isinstance(value, str) and value and not current_value)):
+                                        setattr(all_asset, field, value)
+                                        update_fields.append(field)
+                                
+                                if update_fields:
+                                    all_asset.save(update_fields=update_fields)
+                                    self.logger.info(
+                                        f"Updated existing AllAsset from API for UIC {uic}: "
+                                        f"{broker_asset.symbol} ({broker_asset.name}) - fields: {update_fields}"
+                                    )
+                            else:
+                                self.logger.info(
+                                    f"Created AllAsset from API for UIC {uic}: "
+                                    f"{broker_asset.symbol} ({broker_asset.name})"
+                                )
+                            
+                            return all_asset
+                        except Exception as create_error:
+                            # En cas d'erreur (race condition), essayer de récupérer l'asset existant
+                            self.logger.warning(
+                                f"Error during get_or_create for {broker_asset.symbol} ({platform}): {create_error}. "
+                                f"Trying to get existing asset."
+                            )
+                            all_asset = AllAssets.objects.filter(
+                                symbol=broker_asset.symbol,
+                                platform=platform,
+                            ).first()
+                            
+                            if all_asset:
+                                # Mettre à jour avec les nouvelles données
+                                update_fields = []
+                                for field, value in defaults.items():
+                                    current_value = getattr(all_asset, field, None)
+                                    if value and (not current_value or (isinstance(value, str) and value and not current_value)):
+                                        setattr(all_asset, field, value)
+                                        update_fields.append(field)
+                                
+                                if update_fields:
+                                    all_asset.save(update_fields=update_fields)
+                                return all_asset
+                            raise
             except Exception as e:
                 self.logger.warning(
                     f"Failed to retrieve asset from API for UIC {uic}: {e}. "
@@ -411,10 +460,8 @@ class TradeSyncService(BaseSyncService):
         )
         
         try:
-            create_kwargs = {
-                'symbol': symbol,
+            defaults = {
                 'name': symbol,  # Nom par défaut = symbol
-                'platform': platform,
                 'asset_type': asset_type or 'UNKNOWN',
                 'market': '',
                 'currency': 'USD',
@@ -423,14 +470,58 @@ class TradeSyncService(BaseSyncService):
             
             # Ajouter l'UIC si disponible (même si symbol = "UIC_xxxx")
             if platform == 'SAXO' and uic:
-                create_kwargs['saxo_uic'] = uic
+                defaults['saxo_uic'] = uic
             
-            all_asset = AllAssets.objects.create(**create_kwargs)
-            self.logger.info(f"Created minimal AllAsset for {symbol} ({platform})")
-            return all_asset
+            try:
+                all_asset, created = AllAssets.objects.get_or_create(
+                    symbol=symbol,
+                    platform=platform,
+                    defaults=defaults
+                )
+                
+                if not created:
+                    # Mettre à jour l'asset existant si nécessaire
+                    update_fields = []
+                    for field, value in defaults.items():
+                        current_value = getattr(all_asset, field, None)
+                        if value and (not current_value or (isinstance(value, str) and value and not current_value)):
+                            setattr(all_asset, field, value)
+                            update_fields.append(field)
+                    
+                    if update_fields:
+                        all_asset.save(update_fields=update_fields)
+                        self.logger.info(f"Updated existing minimal AllAsset for {symbol} ({platform})")
+                else:
+                    self.logger.info(f"Created minimal AllAsset for {symbol} ({platform})")
+                
+                return all_asset
+            except Exception as create_error:
+                # En cas d'erreur (race condition), essayer de récupérer l'asset existant
+                self.logger.warning(
+                    f"Error during get_or_create for {symbol} ({platform}): {create_error}. "
+                    f"Trying to get existing asset."
+                )
+                all_asset = AllAssets.objects.filter(
+                    symbol=symbol,
+                    platform=platform,
+                ).first()
+                
+                if all_asset:
+                    # Mettre à jour avec les nouvelles données
+                    update_fields = []
+                    for field, value in defaults.items():
+                        current_value = getattr(all_asset, field, None)
+                        if value and (not current_value or (isinstance(value, str) and value and not current_value)):
+                            setattr(all_asset, field, value)
+                            update_fields.append(field)
+                    
+                    if update_fields:
+                        all_asset.save(update_fields=update_fields)
+                    return all_asset
+                raise
         except Exception as e:
             self.logger.error(
-                f"Failed to create AllAsset for {symbol} ({platform}): {str(e)}",
+                f"Failed to create/get AllAsset for {symbol} ({platform}): {str(e)}",
                 exc_info=True
             )
             return None
