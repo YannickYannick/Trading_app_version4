@@ -171,9 +171,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
         // Créer la série si elle n'existe pas et que le graphique est disponible
         if (!series && chartRef.current) {
-          // Vérifier que addLineSeries existe (protection supplémentaire)
-          if (typeof chartRef.current.addLineSeries !== 'function') {
-            console.error('[TradesChart] addLineSeries is not a function on chart object', chartRef.current)
+          // Dans lightweight-charts v5+, utiliser addSeries('Line') au lieu de addLineSeries()
+          // Vérifier que addSeries existe
+          if (typeof chartRef.current.addSeries !== 'function') {
+            console.error('[TradesChart] addSeries is not a function on chart object', chartRef.current)
             setError('Erreur lors de l\'initialisation du graphique')
             return
           }
@@ -182,13 +183,14 @@ const TradesChart: React.FC<TradesChartProps> = ({
           const assetSymbol = allAssetsMap?.get(assetId)?.symbol || `Asset ${assetId}`
           
           try {
-            series = chartRef.current.addLineSeries({
+            // Utiliser addSeries('Line') pour lightweight-charts v5+
+            series = chartRef.current.addSeries('Line', {
               color,
               lineWidth: 2,
               title: assetSymbol,
               priceLineVisible: false,
               lastValueVisible: true,
-            })
+            }) as ISeriesApi<'Line'>
             priceSeriesRefs.current.set(assetId, series)
             console.log(`[TradesChart] Created line series for asset ${assetId}`)
           } catch (err) {
