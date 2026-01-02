@@ -542,7 +542,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'all_asset_symbol': all_asset.symbol,
                 'count': len(prices_list),
                 'format': 'list',
-                'total_days_available': len(price_history),
+                'total_days_available': len(dates),
                 'results': prices_list
             })
     
