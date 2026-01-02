@@ -455,30 +455,13 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             })
         else:
             # Retourner en format liste (compatible avec l'ancien format)
-            # Mapper les clés pour correspondre au format attendu par le frontend
-            results_mapped = []
-            for item in prices_list:
-                results_mapped.append({
-                    'date': item['date'],
-                    'close_price': item['close'],  # Alias pour compatibilité
-                    'open_price': item['open'],    # Alias pour compatibilité
-                    'high_price': item['high'],    # Alias pour compatibilité
-                    'low_price': item['low'],      # Alias pour compatibilité
-                    'open': item['open'],
-                    'high': item['high'],
-                    'low': item['low'],
-                    'close': item['close'],
-                    'volume': item['volume'],
-                    'source': item['source']
-                })
-            
             return Response({
                 'all_asset_id': all_asset.id,
                 'all_asset_symbol': all_asset.symbol,
-                'count': len(results_mapped),
+                'count': len(prices_list),
                 'format': 'list',
                 'total_days_available': len(price_history),
-                'results': results_mapped
+                'results': prices_list  # Contient déjà les alias close_price, open_price, etc.
             })
     
     @action(detail=True, methods=['post'])
