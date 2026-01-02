@@ -485,6 +485,43 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           <p>{error}</p>
         </div>
       )}
+
+      {/* Panneau d'informations sur les performances */}
+      {performanceMetrics && (
+        <div className="performance-panel">
+          <div className="performance-metric">
+            <span className="metric-label">Trades simulés:</span>
+            <span className="metric-value">{performanceMetrics.totalTrades}</span>
+          </div>
+          <div className="performance-metric">
+            <span className="metric-label">Taux de réussite:</span>
+            <span className={`metric-value ${performanceMetrics.winRate >= 50 ? 'positive' : 'negative'}`}>
+              {performanceMetrics.winRate.toFixed(1)}%
+            </span>
+          </div>
+          <div className="performance-metric">
+            <span className="metric-label">PnL total:</span>
+            <span className={`metric-value ${performanceMetrics.totalPnL >= 0 ? 'positive' : 'negative'}`}>
+              {performanceMetrics.totalPnL >= 0 ? '+' : ''}{performanceMetrics.totalPnL.toFixed(2)}
+            </span>
+          </div>
+          <div className="performance-metric">
+            <span className="metric-label">PnL moyen:</span>
+            <span className={`metric-value ${performanceMetrics.totalPnLPercent >= 0 ? 'positive' : 'negative'}`}>
+              {performanceMetrics.totalPnLPercent >= 0 ? '+' : ''}{performanceMetrics.totalPnLPercent.toFixed(2)}%
+            </span>
+          </div>
+          {performanceMetrics.currentPosition && (
+            <div className="performance-metric">
+              <span className="metric-label">Position ouverte:</span>
+              <span className="metric-value">
+                {performanceMetrics.currentPosition.side} @ {performanceMetrics.currentPosition.entryPrice.toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         ref={chartContainerRef}
         style={{
