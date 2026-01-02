@@ -2,7 +2,7 @@
  * Composant de graphique interactif pour visualiser les trades et l'historique des prix
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { createChart, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
+import { createChart, LineSeries, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
 import { assetService } from '@services/assets'
 import type { Trade, AllAsset } from '@types'
 import './TradesChart.css'
@@ -171,7 +171,8 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
         // Créer la série si elle n'existe pas et que le graphique est disponible
         if (!series && chartRef.current) {
-          // Dans lightweight-charts v5+, utiliser addSeries('Line') au lieu de addLineSeries()
+          // Dans lightweight-charts v5+, utiliser addSeries(LineSeries, options) selon la doc officielle
+          // https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
           // Vérifier que addSeries existe
           if (typeof chartRef.current.addSeries !== 'function') {
             console.error('[TradesChart] addSeries is not a function on chart object', chartRef.current)
@@ -183,8 +184,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
           const assetSymbol = allAssetsMap?.get(assetId)?.symbol || `Asset ${assetId}`
           
           try {
-            // Utiliser addSeries('Line') pour lightweight-charts v5+
-            series = chartRef.current.addSeries('Line', {
+            // Utiliser addSeries(LineSeries, options) pour lightweight-charts v5+
+            // LineSeries doit être importé séparément
+            series = chartRef.current.addSeries(LineSeries, {
               color,
               lineWidth: 2,
               title: assetSymbol,
