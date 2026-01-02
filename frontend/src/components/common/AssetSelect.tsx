@@ -215,27 +215,36 @@ export default function AssetSelect({
               </div>
             ) : (
               // Afficher les résultats d'autocomplétion si disponibles (même format que PlaceOrderModal)
-              (autocompleteResults.length > 0 ? autocompleteResults : filteredOptions).slice(0, 100).map((asset) => {
-                const assetId = 'id' in asset ? asset.id : asset.id
-                const assetSymbol = 'symbol' in asset ? asset.symbol : asset.symbol
-                const assetName = 'name' in asset ? asset.name : asset.name
-                const assetPlatform = 'platform' in asset ? asset.platform : (asset as AllAsset).platform || ''
-                
-                return (
-                  <div
-                    key={assetId}
-                    className={`asset-select-option autocomplete-item ${value === assetId ? 'selected' : ''}`}
-                    onClick={() => handleSelect(assetId)}
-                    onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
-                  >
-                    <div className="asset-select-option-symbol autocomplete-symbol">{assetSymbol}</div>
-                    <div className="asset-select-option-name autocomplete-name">{assetName}</div>
-                    {assetPlatform && (
-                      <div className="asset-select-option-platform autocomplete-platform">{assetPlatform}</div>
-                    )}
-                  </div>
-                )
-              })
+              (autocompleteResults.length > 0 
+                ? autocompleteResults.map((asset) => (
+                    <div
+                      key={asset.id}
+                      className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
+                      onClick={() => handleSelect(asset.id)}
+                      onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
+                    >
+                      <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
+                      <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
+                      {asset.platform && (
+                        <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
+                      )}
+                    </div>
+                  ))
+                : filteredOptions.slice(0, 100).map((asset) => (
+                    <div
+                      key={asset.id}
+                      className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
+                      onClick={() => handleSelect(asset.id)}
+                      onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
+                    >
+                      <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
+                      <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
+                      {asset.platform && (
+                        <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
+                      )}
+                    </div>
+                  ))
+              )
             )}
           </div>
         </div>
