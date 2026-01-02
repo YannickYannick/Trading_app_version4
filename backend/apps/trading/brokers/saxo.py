@@ -892,6 +892,139 @@ class SaxoBroker(BrokerBase):
             logger.error(f"Saxo get_price_details error: {e}")
             return {}
     
+    def get_historical_prices(
+        self,
+        uic: int,
+        asset_type: str = "Stock",
+        count: int = 1000,
+        days: Optional[int] = None,
+        horizon: int = 1
+    ) -> List[Dict[str, Any]]:
+        """
+        Récupérer l'historique des prix OHLCV depuis Saxo Bank Chart API.
+        
+        Args:
+            uic: UIC de l'asset
+            asset_type: Type d'asset (Stock, Etf, etc.)
+            count: Nombre de points à récupérer (défaut: 1000)
+            days: Nombre de jours d'historique (si fourni, calcule count automatiquement)
+            horizon: 1 pour daily (1d), 0 pour intraday
+            
+        Returns:
+            Liste de dicts avec format: [{'date': 'YYYY-MM-DD', 'open': x, 'high': y, 'low': z, 'close': w, 'volume': v}, ...]
+        """
+        try:
+            # Récupérer les clés du compte
+            keys = self._get_account_keys()
+            account_key = keys.get('account_key')
+            
+            if not account_key:
+                logger.warning("Saxo: No account_key available for historical prices")
+                return []
+            
+            # Mapper le type d'asset
+            saxo_asset_type = self.ASSET_TYPE_MAPPING.get(asset_type.lower(), asset_type)
+            
+            # Calculer count si days est fourni
+            if days is not None:
+                # Pour daily (horizon=1), count devrait être environ days
+                # Pour intraday, on pourrait avoir besoin de plus
+                count = max(days, count)
+            
+            # Paramètres pour l'API Chart
+            params = {
+                "AccountKey": account_key,
+                "AssetType": saxo_asset_type,
+                "Uic": uic,
+                "Count": count,
+                "FieldGroups": "Price",
+                "Horizon": horizon,  # 1 = daily, 0 = intraday
+                "Mode": "Price",
+                "ChartSampleFieldSet": "Default"
+            }
+            
+            # Optionnel: ajouter Time pour spécifier une date de fin
+            # Si non spécifié, retourne jusqu'à maintenant
+            
+            logger.debug(f"Saxo: Fetching historical prices for UIC {uic}, type={saxo_asset_type}, count={count}")
+            
+            # Appel à l'API Chart
+            data = self._make_request('GET', '/chart/v3/charts', params=params)
+            
+            # Parser la réponse
+            result = []
+            series_list = data.get("Data", {}).get("Series", [])
+            
+            if not series_list:
+                logger.warning(f"Saxo: No Series data in chart response for UIC {uic}")
+                return []
+            
+            # Prendre la première série (il y a généralement une seule série)
+            series = series_list[0]
+            points = series.get("Points", [])
+            
+            for point in points:
+                try:
+                    # Parser la date
+                    date_str = point.get("Date")
+                    if not date_str:
+                        continue
+                    
+                    # Convertir la date en format YYYY-MM-DD
+                    # La date peut être en format ISO (2024-12-31T00:00:00)
+                    if isinstance(date_str, str):
+                        if 'T' in date_str:
+                            date_str = date_str.split('T')[0]
+                        elif ' ' in date_str:
+                            date_str = date_str.split(' ')[0]
+                    
+                    # Extraire les prix OHLCV
+                    price_data = {
+                        'date': date_str,
+                        'open': self._safe_decimal(point.get('Open')),
+                        'high': self._safe_decimal(point.get('High')),
+                        'low': self._safe_decimal(point.get('Low')),
+                        'close': self._safe_decimal(point.get('Close')),
+                        'volume': int(point.get('Volume', 0) or 0),
+                    }
+                    
+                    # Vérifier que tous les prix sont valides
+                    if all(v is not None for v in [price_data['open'], price_data['high'], 
+                                                    price_data['low'], price_data['close']]):
+                        result.append(price_data)
+                    else:
+                        logger.debug(f"Saxo: Skipping point with invalid prices for {date_str}")
+                        
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.warning(f"Saxo: Error parsing chart point: {e}")
+                    continue
+            
+            logger.info(f"Saxo: Retrieved {len(result)} historical price points for UIC {uic}")
+            return result
+            
+        except BrokerError:
+            raise
+        except Exception as e:
+            logger.error(f"Saxo get_historical_prices error for UIC {uic}: {e}")
+            return []
+    
+    def _safe_decimal(self, value: Any) -> Optional[Decimal]:
+        """
+        Convert value to Decimal, handling None and invalid values.
+        
+        Args:
+            value: Value to convert
+            
+        Returns:
+            Decimal or None if invalid
+        """
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (ValueError, TypeError, Exception):
+            return None
+    
     # ==================== Positions ====================
     
     def _get_account_keys(self) -> Dict[str, Optional[str]]:
