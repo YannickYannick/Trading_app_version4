@@ -136,7 +136,44 @@ export default function Strategies() {
     try {
       const updateData: any = {}
       
-      if (key === 'all_asset') {
+      if (key === 'yahoo_symbol') {
+        // Mettre à jour le symbole Yahoo de l'AllAsset associé
+        const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id
+          ? row.all_asset.id
+          : (typeof row.all_asset === 'number' ? row.all_asset : null)
+        
+        if (allAssetId && newValue !== null && newValue !== undefined) {
+          try {
+            // Mise à jour optimiste de l'état local
+            setStrategies(prevStrategies => 
+              prevStrategies.map(strategy => {
+                if (strategy.id === row.id) {
+                  const updated: Strategy = { ...strategy }
+                  if (typeof updated.all_asset === 'object' && updated.all_asset) {
+                    updated.all_asset = { ...updated.all_asset, symbole_yahoo: newValue }
+                  }
+                  updated.all_asset_yahoo_symbol = newValue
+                  return updated
+                }
+                return strategy
+              })
+            )
+            
+            // Sauvegarde asynchrone
+            await assetServiceUtil.updateAllAsset(allAssetId, { symbole_yahoo: newValue })
+            
+            // Recharger pour avoir les données à jour
+            loadStrategies()
+          } catch (err: any) {
+            console.error('Erreur lors de la mise à jour du symbole Yahoo:', err)
+            // En cas d'erreur, recharger pour restaurer l'état correct
+            loadStrategies()
+            alert(err.response?.data?.error || 'Erreur lors de la mise à jour du symbole Yahoo')
+            throw err
+          }
+        }
+        return // Ne pas continuer avec la mise à jour de la stratégie
+      } else if (key === 'all_asset') {
         updateData['all_asset'] = newValue || null
       } else if (key === 'asset_id') {
         updateData['asset'] = newValue || null
