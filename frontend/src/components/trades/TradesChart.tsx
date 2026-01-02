@@ -302,7 +302,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       // Ajouter les marqueurs immédiatement après la création des séries
       // Cela évite le retard d'affichage des marqueurs
-      updateMarkersForSeries()
+      // Utiliser setTimeout pour s'assurer que les séries sont complètement créées
+      setTimeout(() => {
+        updateMarkersForSeries()
+      }, 50)
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
       // Utiliser plusieurs requestAnimationFrame en cascade pour s'assurer que toutes les données sont rendues
