@@ -350,9 +350,11 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const metrics = calculatePerformanceMetrics(simulated)
     setPerformanceMetrics(metrics)
     
-    // Ne montrer que les signaux qui ont déclenché un trade (entry points)
-    // Cela évite d'afficher trop de marqueurs
-    const signalMarkers: MarkerData[] = simulated
+    // Afficher les signaux qui ont déclenché un trade (entry points) + tous les signaux BUY/SELL importants
+    // Pour éviter trop de marqueurs, on montre:
+    // 1. Les entry points des trades simulés
+    // 2. Les signaux BUY/SELL (limités si trop nombreux)
+    const entryPointMarkers: MarkerData[] = simulated
       .filter(trade => trade.status === 'CLOSED' || trade.status === 'OPEN')
       .map(trade => {
         let text = `${trade.side} @ ${trade.entryPrice.toFixed(2)}`
@@ -369,6 +371,19 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           text,
         }
       })
+    
+    // Aussi afficher les signaux BUY/SELL (limiter si trop nombreux)
+    const buySellSignals = signals.filter(s => s.signal !== 'HOLD')
+    const maxSignalsToShow = 50 // Limiter à 50 signaux max
+    const signalMarkers: MarkerData[] = buySellSignals
+      .slice(0, maxSignalsToShow)
+      .map(signal => ({
+        time: signal.time as Time,
+        position: signal.signal === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
+        color: signal.signal === 'BUY' ? '#10b981' : '#ef4444',
+        shape: signal.signal === 'BUY' ? ('arrowUp' as const) : ('arrowDown' as const),
+        text: `${signal.signal} @ ${signal.price.toFixed(2)}`,
+      }))
 
     // Ajouter les marqueurs des trades réels
     const tradeMarkers: MarkerData[] = trades
@@ -401,8 +416,28 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       })
       .filter((m): m is MarkerData => m !== null)
 
-    // Combiner les marqueurs de signaux et de trades
-    const allMarkers = [...signalMarkers, ...tradeMarkers]
+    // Combiner les marqueurs : entry points prioritaires + signaux + trades réels
+    // Éviter les doublons en utilisant un Set pour les dates
+    const markerMap = new Map<string, MarkerData>()
+    
+    // Ajouter les entry points (priorité 1)
+    entryPointMarkers.forEach(m => {
+      markerMap.set(m.time as string, m)
+    })
+    
+    // Ajouter les signaux (ne pas écraser les entry points)
+    signalMarkers.forEach(m => {
+      if (!markerMap.has(m.time as string)) {
+        markerMap.set(m.time as string, m)
+      }
+    })
+    
+    // Ajouter les trades réels (priorité 2)
+    tradeMarkers.forEach(m => {
+      markerMap.set(m.time as string, m)
+    })
+    
+    const allMarkers = Array.from(markerMap.values())
 
     // Mettre à jour les marqueurs (uniquement si la série de prix existe)
     if (allMarkers.length > 0 && priceSeriesRef.current) {
@@ -430,7 +465,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     })
   }, [priceHistory, strategy, parameters, trades])
 
-  // Créer la série de prix et réajouter les marqueurs après
+  // Créer la série de prix
   useEffect(() => {
     if (!chartRef.current || priceHistory.length === 0) return
 
@@ -441,6 +476,16 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       } catch (err) {
         console.warn('[StrategyVisualizationChart] Error removing price series:', err)
       }
+    }
+
+    // Supprimer les anciens marqueurs
+    if (markersRef.current) {
+      try {
+        markersRef.current.setMarkers([])
+      } catch (err) {
+        console.warn('[StrategyVisualizationChart] Error clearing markers:', err)
+      }
+      markersRef.current = null
     }
 
     // Créer la série de prix
@@ -461,9 +506,6 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
     priceSeries.setData(priceData)
     priceSeriesRef.current = priceSeries
-
-    // Réajouter les marqueurs après création de la série
-    // Cela sera géré par l'useEffect des indicateurs qui se déclenchera après
   }, [priceHistory, strategy])
 
   if (!strategy) {
