@@ -144,6 +144,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
       
       // Supprimer les séries marquées
+      const hasRemovedSeries = seriesToRemove.length > 0
       seriesToRemove.forEach(({ assetId, series }) => {
         console.log(`[TradesChart] Removing series for asset ${assetId} (no longer selected)`)
         if (chartRef.current) {
@@ -164,14 +165,22 @@ const TradesChart: React.FC<TradesChartProps> = ({
       if (newAssetIds.length === 0) {
         console.log('[TradesChart] All assets already loaded, skipping fetch')
         setLoading(false)
-        // Ajuster l'échelle même si pas de nouveaux assets
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (chartRef.current) {
-              chartRef.current.timeScale().fitContent()
-            }
-          }, 50)
-        })
+        // Ajuster l'échelle même si pas de nouveaux assets (notamment après suppression de séries)
+        if (hasRemovedSeries || priceSeriesRefs.current.size > 0) {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              if (chartRef.current) {
+                try {
+                  const timeScale = chartRef.current.timeScale()
+                  timeScale.fitContent()
+                  console.log('[TradesChart] Time scale adjusted after series removal')
+                } catch (err) {
+                  console.error('[TradesChart] Error fitting content after removal:', err)
+                }
+              }
+            }, 50)
+          })
+        }
         return
       }
 
@@ -291,21 +300,20 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
       // Utiliser requestAnimationFrame + setTimeout pour s'assurer que toutes les données sont rendues
-      if (chartRef.current && priceSeriesRefs.current.size > 0) {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (chartRef.current) {
-              try {
-                const timeScale = chartRef.current.timeScale()
-                timeScale.fitContent()
-                console.log('[TradesChart] Time scale adjusted to fit content')
-              } catch (err) {
-                console.error('[TradesChart] Error fitting content:', err)
-              }
+      // Toujours ajuster l'échelle, même s'il n'y a pas de nouvelles séries (au cas où des séries ont été supprimées)
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (chartRef.current) {
+            try {
+              const timeScale = chartRef.current.timeScale()
+              timeScale.fitContent()
+              console.log('[TradesChart] Time scale adjusted to fit content')
+            } catch (err) {
+              console.error('[TradesChart] Error fitting content:', err)
             }
-          }, 50)
-        })
-      }
+          }
+        }, 50)
+      })
       
       // Si aucune série n'a été créée, afficher un message d'erreur avec détails
       if (priceSeriesRefs.current.size === 0) {
@@ -421,6 +429,23 @@ const TradesChart: React.FC<TradesChartProps> = ({
         markersRefs.current.delete(assetId)
       }
     })
+
+    // Réajuster l'échelle après avoir ajouté/mis à jour les marqueurs
+    if (chartRef.current && priceSeriesRefs.current.size > 0) {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (chartRef.current) {
+            try {
+              const timeScale = chartRef.current.timeScale()
+              timeScale.fitContent()
+              console.log('[TradesChart] Time scale adjusted after markers update')
+            } catch (err) {
+              console.error('[TradesChart] Error fitting content after markers:', err)
+            }
+          }
+        }, 50)
+      })
+    }
   }, [filteredTrades, selectedAssets, viewMode])
 
   // Créer une clé stable pour la comparaison (trier les IDs pour être indépendant de l'ordre)
