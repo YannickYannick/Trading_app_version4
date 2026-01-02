@@ -133,8 +133,52 @@ const TradesChart: React.FC<TradesChartProps> = ({
         return
       }
 
-      // Charger les historiques en parallèle
-      const historyPromises = assetIds.map(async (assetId) => {
+      // ✅ D'abord, supprimer les séries qui ne sont plus sélectionnées
+      const assetsToKeepSet = new Set(assetIds)
+      const seriesToRemove: Array<{ assetId: number; series: ISeriesApi<'Line'> }> = []
+      
+      priceSeriesRefs.current.forEach((series, assetId) => {
+        if (!assetsToKeepSet.has(assetId)) {
+          seriesToRemove.push({ assetId, series })
+        }
+      })
+      
+      // Supprimer les séries marquées
+      seriesToRemove.forEach(({ assetId, series }) => {
+        console.log(`[TradesChart] Removing series for asset ${assetId} (no longer selected)`)
+        if (chartRef.current) {
+          chartRef.current.removeSeries(series)
+        }
+        priceSeriesRefs.current.delete(assetId)
+        // Supprimer aussi les marqueurs associés
+        const markersPrimitive = markersRefs.current.get(assetId)
+        if (markersPrimitive) {
+          markersPrimitive.setMarkers([])
+          markersRefs.current.delete(assetId)
+        }
+      })
+
+      // ✅ Ensuite, charger uniquement les NOUVEAUX assets (pas déjà dans priceSeriesRefs)
+      const newAssetIds = assetIds.filter(id => !priceSeriesRefs.current.has(id))
+      
+      if (newAssetIds.length === 0) {
+        console.log('[TradesChart] All assets already loaded, skipping fetch')
+        setLoading(false)
+        // Ajuster l'échelle même si pas de nouveaux assets
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (chartRef.current) {
+              chartRef.current.timeScale().fitContent()
+            }
+          }, 50)
+        })
+        return
+      }
+
+      console.log(`[TradesChart] Loading price history for ${newAssetIds.length} new asset(s):`, newAssetIds)
+
+      // Charger les historiques en parallèle pour les NOUVEAUX assets uniquement
+      const historyPromises = newAssetIds.map(async (assetId) => {
         try {
           console.log(`[TradesChart] Loading price history for asset ${assetId}...`)
           const history = await assetService.getPriceHistory(assetId, 365, 'list')
@@ -170,11 +214,15 @@ const TradesChart: React.FC<TradesChartProps> = ({
         
         console.log(`[TradesChart] Processing ${history.results.length} price records for asset ${assetId}`)
 
-        // Vérifier si la série existe déjà (pour éviter de la recréer)
+        // Vérifier que la série n'existe pas déjà (ne devrait pas arriver car on filtre newAssetIds)
         let series = priceSeriesRefs.current.get(assetId)
+        if (series) {
+          console.warn(`[TradesChart] Series already exists for asset ${assetId}, skipping creation`)
+          return
+        }
 
-        // Créer la série si elle n'existe pas et que le graphique est disponible
-        if (!series && chartRef.current) {
+        // Créer la série (elle n'existe pas car c'est un nouvel asset)
+        if (chartRef.current) {
           // Dans lightweight-charts v5+, utiliser addSeries(LineSeries, options) selon la doc officielle
           // https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
           // Vérifier que addSeries existe
@@ -268,28 +316,16 @@ const TradesChart: React.FC<TradesChartProps> = ({
         console.warn(`[TradesChart] No series created. Assets without history:`, assetsWithoutHistory)
         console.warn(`[TradesChart] Full histories data:`, histories)
         
-        if (assetsWithoutHistory.length === selectedAssets.length) {
+        if (assetsWithoutHistory.length === assetIds.length) {
           setError('Aucun historique de prix disponible pour les assets sélectionnés. Utilisez le bouton "Charger l\'historique" pour synchroniser.')
         } else {
-          setError(`Aucun historique pour ${assetsWithoutHistory.length} asset(s) sur ${selectedAssets.length}`)
+          setError(`Aucun historique pour ${assetsWithoutHistory.length} asset(s) sur ${assetIds.length}`)
         }
       } else {
         console.log(`[TradesChart] Created ${priceSeriesRefs.current.size} series successfully`)
       }
 
-      // Supprimer les séries et marqueurs pour les assets non sélectionnés
-      priceSeriesRefs.current.forEach((series, assetId) => {
-        if (!assetIds.includes(assetId)) {
-          chartRef.current?.removeSeries(series)
-          priceSeriesRefs.current.delete(assetId)
-          // Supprimer aussi les marqueurs associés
-          const markersPrimitive = markersRefs.current.get(assetId)
-          if (markersPrimitive) {
-            markersPrimitive.setMarkers([])
-            markersRefs.current.delete(assetId)
-          }
-        }
-      })
+      // Les séries non sélectionnées ont déjà été supprimées au début de la fonction
     } catch (err: any) {
       setError(err.message || 'Erreur lors du chargement de l\'historique')
       console.error('Error loading price history:', err)
