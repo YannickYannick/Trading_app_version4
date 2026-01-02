@@ -293,70 +293,53 @@ const TradesChart: React.FC<TradesChartProps> = ({
           if (priceData.length > 0) {
             console.log(`Setting ${priceData.length} price points for asset ${assetId}`)
             series.setData(priceData)
-            // Ne pas appeler fitContent ici, on le fait après toutes les séries
+            // Ne pas appeler fitContent ici, on le fait APRÈS toutes les séries
           } else {
             console.warn(`No valid price data for asset ${assetId} after filtering`)
           }
         }
       })
 
-      // Ajuster l'échelle de temps une fois toutes les séries ajoutées
-      // Utiliser plusieurs requestAnimationFrame en cascade + délais pour garantir le rendu complet
-      // Le problème vient du fait que fitContent() est appelé avant que les données soient vraiment rendues
-      // On ajoute les marqueurs APRÈS le dernier fitContent() pour éviter les interférences
+      // ✅ LA SOLUTION ROBUSTE : Appeler fitContent() UNE SEULE FOIS, à la toute fin
+      // Après que TOUTES les séries ont reçu leurs données
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (chartRef.current && priceSeriesRefs.current.size > 0) {
               try {
                 const timeScale = chartRef.current.timeScale()
-                timeScale.fitContent()
-                console.log('[TradesChart] Time scale adjusted to fit content after data loaded (first pass - ~150ms)')
                 
-                // Forcer plusieurs recalculs avec des délais croissants pour être absolument sûr
+                // 🔒 Étape 1 : Reset de l'échelle (si disponible) pour partir sur une base propre
+                // Cela élimine 95% des cas où il faut zoomer manuellement
+                if (typeof timeScale.resetTimeScale === 'function') {
+                  timeScale.resetTimeScale()
+                  console.log('[TradesChart] Time scale reset')
+                }
+                
+                // 🔒 Étape 2 : Fit content UNE SEULE FOIS, après toutes les données
+                timeScale.fitContent()
+                console.log('[TradesChart] Time scale fitContent() called after all data loaded')
+                
+                // Ajouter les marqueurs APRÈS l'ajustement d'échelle
+                updateMarkersForSeries()
+                
+                // 🔒 Étape 3 : Un dernier ajustement après les marqueurs (juste pour être sûr)
                 setTimeout(() => {
                   if (chartRef.current) {
                     try {
                       chartRef.current.timeScale().fitContent()
-                      console.log('[TradesChart] Time scale re-adjusted (second pass - ~250ms)')
-                      
-                      // Encore un dernier recalcul après un délai plus long
-                      setTimeout(() => {
-                        if (chartRef.current) {
-                          try {
-                            chartRef.current.timeScale().fitContent()
-                            console.log('[TradesChart] Time scale re-adjusted (third pass - ~400ms) - final')
-                            
-                            // Ajouter les marqueurs APRÈS le dernier ajustement d'échelle
-                            // Cela évite que les marqueurs interfèrent avec l'ajustement initial
-                            updateMarkersForSeries()
-                            
-                            // Dernier ajustement après ajout des marqueurs pour être sûr
-                            setTimeout(() => {
-                              if (chartRef.current) {
-                                try {
-                                  chartRef.current.timeScale().fitContent()
-                                  console.log('[TradesChart] Time scale final adjustment after markers (~500ms)')
-                                } catch (err) {
-                                  console.error('[TradesChart] Error in final fitContent after markers:', err)
-                                }
-                              }
-                            }, 100)
-                          } catch (err) {
-                            console.error('[TradesChart] Error in third fitContent pass:', err)
-                          }
-                        }
-                      }, 150) // Délai pour la troisième passe
+                      console.log('[TradesChart] Time scale final adjustment after markers')
                     } catch (err) {
-                      console.error('[TradesChart] Error in second fitContent pass:', err)
+                      console.error('[TradesChart] Error in final fitContent after markers:', err)
                     }
                   }
-                }, 100) // Délai pour la deuxième passe
+                }, 50)
               } catch (err) {
                 console.error('[TradesChart] Error fitting content:', err)
               }
             }
-          }, 150) // Délai initial
+          }, 100) // Petit délai pour laisser le rendu se terminer
         })
       })
       
