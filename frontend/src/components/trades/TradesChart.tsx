@@ -300,16 +300,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
         }
       })
 
-      // Ajouter les marqueurs immédiatement après la création des séries
-      // Cela évite le retard d'affichage des marqueurs
-      // Utiliser setTimeout pour s'assurer que les séries sont complètement créées
-      setTimeout(() => {
-        updateMarkersForSeries()
-      }, 50)
-
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
       // Utiliser plusieurs requestAnimationFrame en cascade + délais pour garantir le rendu complet
       // Le problème vient du fait que fitContent() est appelé avant que les données soient vraiment rendues
+      // On ajoute les marqueurs APRÈS le dernier fitContent() pour éviter les interférences
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -317,36 +311,52 @@ const TradesChart: React.FC<TradesChartProps> = ({
               try {
                 const timeScale = chartRef.current.timeScale()
                 timeScale.fitContent()
-                console.log('[TradesChart] Time scale adjusted to fit content after data loaded (first pass)')
+                console.log('[TradesChart] Time scale adjusted to fit content after data loaded (first pass - ~150ms)')
                 
                 // Forcer plusieurs recalculs avec des délais croissants pour être absolument sûr
                 setTimeout(() => {
                   if (chartRef.current) {
                     try {
                       chartRef.current.timeScale().fitContent()
-                      console.log('[TradesChart] Time scale re-adjusted (second pass - 150ms)')
+                      console.log('[TradesChart] Time scale re-adjusted (second pass - ~250ms)')
                       
                       // Encore un dernier recalcul après un délai plus long
                       setTimeout(() => {
                         if (chartRef.current) {
                           try {
                             chartRef.current.timeScale().fitContent()
-                            console.log('[TradesChart] Time scale re-adjusted (third pass - 300ms) - final')
+                            console.log('[TradesChart] Time scale re-adjusted (third pass - ~400ms) - final')
+                            
+                            // Ajouter les marqueurs APRÈS le dernier ajustement d'échelle
+                            // Cela évite que les marqueurs interfèrent avec l'ajustement initial
+                            updateMarkersForSeries()
+                            
+                            // Dernier ajustement après ajout des marqueurs pour être sûr
+                            setTimeout(() => {
+                              if (chartRef.current) {
+                                try {
+                                  chartRef.current.timeScale().fitContent()
+                                  console.log('[TradesChart] Time scale final adjustment after markers (~500ms)')
+                                } catch (err) {
+                                  console.error('[TradesChart] Error in final fitContent after markers:', err)
+                                }
+                              }
+                            }, 100)
                           } catch (err) {
                             console.error('[TradesChart] Error in third fitContent pass:', err)
                           }
                         }
-                      }, 150) // Délai total ~300ms
+                      }, 150) // Délai pour la troisième passe
                     } catch (err) {
                       console.error('[TradesChart] Error in second fitContent pass:', err)
                     }
                   }
-                }, 150) // Délai total ~150ms
+                }, 100) // Délai pour la deuxième passe
               } catch (err) {
                 console.error('[TradesChart] Error fitting content:', err)
               }
             }
-          }, 150) // Délai initial augmenté à 150ms
+          }, 150) // Délai initial
         })
       })
       
