@@ -24,6 +24,11 @@ apiClient.interceptors.request.use(
     const accessToken = localStorage.getItem('access_token')
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`
+    } else {
+      // Debug: vérifier si on est dans un contexte navigateur et si l'utilisateur est connecté
+      if (typeof window !== 'undefined') {
+        console.warn('[API Client] No access_token found in localStorage')
+      }
     }
     
     // Ajouter le CSRF token pour les requêtes POST/PUT/DELETE
