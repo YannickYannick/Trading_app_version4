@@ -63,28 +63,55 @@
 .asset-select-option {
   padding: 0.75rem;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color, #f3f4f6);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
   transition: background-color 0.15s;
 }
 
+/* Style pour les items d'autocomplétion (comme PlaceOrderModal) */
+.asset-select-option.autocomplete-item {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem;
+}
+
+.asset-select-option:last-child {
+  border-bottom: none;
+}
+
 .asset-select-option:hover {
-  background-color: var(--bg-secondary, #f9fafb);
+  background-color: var(--hover-background, #f3f4f6);
 }
 
 .asset-select-option.selected {
   background-color: var(--primary-color-light, #dbeafe);
 }
 
-.asset-select-option-symbol {
+.asset-select-option-symbol,
+.autocomplete-symbol {
   font-weight: 600;
-  color: var(--text-primary, #1f2937);
+  color: var(--text-primary, #111827);
   font-size: 0.875rem;
 }
 
-.asset-select-option-name {
+.asset-select-option-name,
+.autocomplete-name {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-select-option-platform,
+.autocomplete-platform {
   font-size: 0.75rem;
-  color: var(--color-text-muted, #6b7280);
-  margin-top: 0.25rem;
+  color: var(--text-tertiary, #9ca3af);
+  background: var(--secondary-background, #f3f4f6);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .asset-select-option-yahoo {

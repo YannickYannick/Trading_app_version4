@@ -31,18 +31,46 @@ export default function AssetSelect({
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Recherche avec API si activée
+  // Type pour les résultats d'autocomplétion
+  type AutocompleteAsset = {
+    id: number
+    symbol: string
+    name: string
+    platform: string
+    asset_type?: string
+    currency?: string
+    market?: string
+    text?: string
+    saxo_uic?: number
+  }
+
+  const [autocompleteResults, setAutocompleteResults] = useState<AutocompleteAsset[]>([])
+
+  // Recherche avec API si activée (même API que PlaceOrderModal)
   const searchAssets = useCallback(async (term: string) => {
-    if (!term || term.length < 2) {
+    if (!term || term.length < 1) {
+      setAutocompleteResults([])
       setFilteredOptions(options)
       return
     }
 
     setLoading(true)
     try {
-      // Utiliser l'API d'autocomplétion si disponible
-      const results = await assetService.searchAllAssets(term)
-      setFilteredOptions(results)
+      // Utiliser l'API d'autocomplétion (même que PlaceOrderModal)
+      const results = await assetService.autocompleteAllAssets(term)
+      setAutocompleteResults(results)
+      // Convertir les résultats en format AllAsset pour compatibilité
+      const convertedResults: AllAsset[] = results.map(r => ({
+        id: r.id,
+        symbol: r.symbol,
+        name: r.name,
+        symbole_yahoo: null,
+        asset_type: r.asset_type || '',
+        currency: r.currency || '',
+        market: r.market || '',
+        platform: r.platform,
+      } as AllAsset))
+      setFilteredOptions(convertedResults)
     } catch (err) {
       console.error('Erreur lors de la recherche d\'assets:', err)
       // Fallback sur les options locales
@@ -55,6 +83,7 @@ export default function AssetSelect({
         )
       })
       setFilteredOptions(filtered)
+      setAutocompleteResults([])
     } finally {
       setLoading(false)
     }
