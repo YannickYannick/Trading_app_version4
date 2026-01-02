@@ -239,18 +239,21 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
 
       // Ajuster l'échelle de temps une fois toutes les séries ajoutées
-      // Utiliser setTimeout pour s'assurer que toutes les données sont rendues
+      // Utiliser requestAnimationFrame + setTimeout pour s'assurer que toutes les données sont rendues
       if (chartRef.current && priceSeriesRefs.current.size > 0) {
-        setTimeout(() => {
-          if (chartRef.current) {
-            try {
-              chartRef.current.timeScale().fitContent()
-              console.log('[TradesChart] Time scale adjusted to fit content')
-            } catch (err) {
-              console.error('[TradesChart] Error fitting content:', err)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (chartRef.current) {
+              try {
+                const timeScale = chartRef.current.timeScale()
+                timeScale.fitContent()
+                console.log('[TradesChart] Time scale adjusted to fit content')
+              } catch (err) {
+                console.error('[TradesChart] Error fitting content:', err)
+              }
             }
-          }
-        }, 100)
+          }, 50)
+        })
       }
       
       // Si aucune série n'a été créée, afficher un message d'erreur avec détails
