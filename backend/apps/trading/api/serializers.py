@@ -230,6 +230,7 @@ class StrategySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'all_asset', 'all_asset_symbol', 'all_asset_name',
             'algorithm_type', 'risk_level', 'max_position_size', 'max_daily_loss',
+            'min_quantity', 'max_quantity', 'budget',
             'parameters', 'algorithm_parameters', 'algorithm_parameters_data',
             'is_active', 'is_automated', 'created_at', 'updated_at'
         ]

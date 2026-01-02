@@ -90,8 +90,18 @@ export function simulateTradesFromSignals(
         currentPosition = null
       }
 
-      // Ouvrir une position BUY (avec quantité minimale)
-      const buyQuantity = Math.max(orderSize, minQuantity)
+      // Ouvrir une position BUY (avec quantité minimale/maximale et budget)
+      let buyQuantity = Math.max(orderSize, minQuantity)
+      if (maxQuantity && buyQuantity > maxQuantity) {
+        buyQuantity = maxQuantity
+      }
+      // Si budget défini, ajuster la quantité selon le budget disponible
+      if (budget && budget > 0) {
+        const maxQuantityFromBudget = budget / price
+        if (maxQuantityFromBudget < buyQuantity) {
+          buyQuantity = Math.max(minQuantity, maxQuantityFromBudget)
+        }
+      }
       currentPosition = {
         entryTime: signal.time,
         entryPrice: price,
@@ -115,8 +125,18 @@ export function simulateTradesFromSignals(
         currentPosition = null
       }
 
-      // Ouvrir une position SELL (short) (avec quantité minimale)
-      const sellQuantity = Math.max(orderSize, minQuantity)
+      // Ouvrir une position SELL (short) (avec quantité minimale/maximale et budget)
+      let sellQuantity = Math.max(orderSize, minQuantity)
+      if (maxQuantity && sellQuantity > maxQuantity) {
+        sellQuantity = maxQuantity
+      }
+      // Si budget défini, ajuster la quantité selon le budget disponible
+      if (budget && budget > 0) {
+        const maxQuantityFromBudget = budget / price
+        if (maxQuantityFromBudget < sellQuantity) {
+          sellQuantity = Math.max(minQuantity, maxQuantityFromBudget)
+        }
+      }
       currentPosition = {
         entryTime: signal.time,
         entryPrice: price,

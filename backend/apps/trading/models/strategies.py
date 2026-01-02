@@ -155,6 +155,20 @@ class Strategy(TimeStampedModel):
         help_text="Perte maximale journalière en %"
     )
     
+    # Quantité et budget
+    min_quantity = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True,
+        help_text="Quantité minimale d'achat (1 pour actions, 0.0005 pour crypto)"
+    )
+    max_quantity = models.DecimalField(
+        max_digits=20, decimal_places=10, null=True, blank=True,
+        help_text="Quantité maximale d'achat"
+    )
+    budget = models.DecimalField(
+        max_digits=20, decimal_places=2, null=True, blank=True,
+        help_text="Budget alloué à cette stratégie"
+    )
+    
     # Paramètres (JSONField conservé pour compatibilité backward)
     parameters = models.JSONField(default=dict, blank=True, help_text="Paramètres (ancien système - utilisé en fallback)")
     

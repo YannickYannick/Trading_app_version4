@@ -65,7 +65,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       width: containerWidth,
       height: 600,
       layout: {
-        background: { color: 'transparent' },
+        background: { color: '#ffffff' },
         textColor: '#333',
       },
       grid: {
@@ -184,6 +184,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       grid_min: parameters.grid_min,
       grid_max: parameters.grid_max,
       grid_levels: parameters.grid_levels,
+      min_quantity: parameters.min_quantity,
+      max_quantity: parameters.max_quantity,
+      budget: parameters.budget,
     }
 
     const prices = priceHistory.map(p => p.value)
@@ -343,7 +346,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const orderSize = strategyParams.order_size || 1.0
     const stopLoss = strategyParams.stop_loss
     const minQuantity = strategyParams.min_quantity || 0
-    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity)
+    const maxQuantity = strategyParams.max_quantity
+    const budget = strategyParams.budget
+    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity, maxQuantity, budget)
     setSimulatedTrades(simulated)
     
     // Calculer les métriques de performance

@@ -3,6 +3,7 @@
  */
 import { ReactNode, useState, useRef, useEffect } from 'react'
 import clsx from 'clsx'
+import AssetSelect from './AssetSelect'
 import './Table.css'
 
 export interface TableColumn<T = any> {
@@ -13,8 +14,9 @@ export interface TableColumn<T = any> {
   align?: 'left' | 'center' | 'right'
   editable?: boolean // Si la colonne est éditable
   onCellEdit?: (value: any, row: T, key: string) => void | Promise<void> // Callback lors de l'édition
-  cellType?: 'text' | 'number' | 'select' | 'checkbox' | 'range' // Type de cellule éditable
+  cellType?: 'text' | 'number' | 'select' | 'checkbox' | 'range' | 'asset_select' // Type de cellule éditable
   selectOptions?: Array<{ value: any; label: string }> // Options pour select
+  assetOptions?: any[] // Options pour asset_select (AllAsset[])
   rangeFields?: { min: string; max: string } // Pour cellType='range' : les clés des champs min et max
   width?: string | number // Largeur de la colonne (px, %, auto, etc.)
   minWidth?: string | number // Largeur minimale
@@ -265,6 +267,25 @@ function EditableCell<T extends Record<string, any>>({
           />
         </div>
       </div>
+    )
+  }
+
+  if (column.cellType === 'asset_select' && column.assetOptions) {
+    return (
+      <AssetSelect
+        value={editValue ? Number(editValue) : null}
+        options={column.assetOptions}
+        onChange={(newValue) => {
+          setEditValue(newValue)
+          // Sauvegarder immédiatement
+          if (onEdit) {
+            onEdit(newValue, row, column.key)
+          }
+          setIsEditing(false)
+        }}
+        onBlur={handleBlur}
+        placeholder="Rechercher un asset..."
+      />
     )
   }
 

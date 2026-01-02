@@ -29,3 +29,5 @@ export type { LoadingProps } from './Loading'
 export { default as ErrorMessage } from './ErrorMessage'
 export { ErrorBoundary } from './ErrorBoundary'
 
+export { default as AssetSelect } from './AssetSelect'
+

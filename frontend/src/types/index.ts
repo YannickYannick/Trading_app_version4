@@ -163,6 +163,9 @@ export interface Strategy {
   portfolio_quantity?: number
   target_min_quantity?: number
   target_max_quantity?: number
+  min_quantity?: number
+  max_quantity?: number
+  budget?: number
   broker_account?: { id: number; name: string }
   broker_account_id?: number
   broker_name?: string

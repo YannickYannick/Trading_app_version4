@@ -136,7 +136,9 @@ export default function Strategies() {
     try {
       const updateData: any = {}
       
-      if (key === 'asset_id') {
+      if (key === 'all_asset') {
+        updateData['all_asset'] = newValue || null
+      } else if (key === 'asset_id') {
         updateData['asset'] = newValue || null
       } else if (key === 'broker_account_id') {
         updateData['broker_account'] = newValue || null
@@ -405,9 +407,12 @@ export default function Strategies() {
       render: (value: string) => <span className="text-muted small">{value || '-'}</span>,
     },
     {
-      key: 'all_asset_symbol',
+      key: 'all_asset',
       label: 'Symbole AllAsset',
+      editable: true,
+      cellType: 'asset_select' as const,
       align: 'center' as const,
+      onCellEdit: handleCellEdit,
       render: (_value: any, row: Strategy) => (
         <span className="all-asset-symbol">
           {row?.all_asset_symbol || (typeof row.all_asset === 'object' && row.all_asset?.symbol) || 'N/A'}

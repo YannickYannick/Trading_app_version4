@@ -47,6 +47,8 @@ export interface StrategyParameters {
   order_size?: number
   stop_loss?: number
   min_quantity?: number
+  max_quantity?: number
+  budget?: number
 }
 
 /**
