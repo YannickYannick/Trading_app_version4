@@ -54,10 +54,18 @@ const TradesChart: React.FC<TradesChartProps> = ({
       chartRef.current.remove()
       chartRef.current = null
       priceSeriesRefs.current.clear()
+      markersRefs.current.clear()
     }
 
+    // Vérifier que le conteneur a une largeur avant de créer le graphique
+    const containerWidth = chartContainerRef.current.clientWidth
+    if (containerWidth === 0) {
+      console.warn('[TradesChart] Container has no width, chart may not render correctly')
+    }
+    console.log(`[TradesChart] Creating chart with container width: ${containerWidth}px`)
+
     const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
+      width: containerWidth > 0 ? containerWidth : chartContainerRef.current.clientWidth, // Utiliser la largeur réelle
       height: 500,
       layout: {
         background: { color: 'transparent' },
