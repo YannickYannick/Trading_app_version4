@@ -402,14 +402,16 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         - format: Format de réponse ('json' ou 'list', défaut: 'list')
         
         Avec detail=True, DRF gère automatiquement le routing vers {pk}
-        et appelle get_object() pour récupérer l'instance.
+        On récupère directement l'objet pour éviter les problèmes avec filter_queryset().
         """
         logger = logging.getLogger('trading.api.assets')
         logger.info(f"[PRICES] Prices endpoint called for AllAsset ID: {pk}, user: {request.user}")
         
-        # Récupérer l'objet via la méthode standard de DRF
+        # Récupérer l'objet directement depuis le queryset de base (sans filtres)
+        # pour éviter les problèmes avec django_filters qui nécessite request.query_params
         try:
-            all_asset = self.get_object()
+            # Utiliser le queryset de base directement, sans filtres
+            all_asset = AllAssets.objects.get(pk=pk)
             logger.info(f"[PRICES] Found AllAsset: {all_asset.symbol} (ID: {all_asset.pk})")
         except AllAssets.DoesNotExist:
             logger.error(f"[PRICES] AllAsset {pk} not found")
@@ -439,7 +441,10 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             )
         
         # Récupérer les paramètres de requête
-        days_param = request.query_params.get('days', '100')
+        # Gérer à la fois DRF request (query_params) et WSGIRequest standard (GET)
+        query_params = getattr(request, 'query_params', request.GET)
+        
+        days_param = query_params.get('days', '100')
         try:
             days = int(days_param)
             if days <= 0:
@@ -448,13 +453,12 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             logger.warning(f"[PRICES] Invalid days parameter: {days_param}, using default 100")
             days = 100
         
-        source = request.query_params.get('source')
-        format_type = request.query_params.get('format', 'list')
+        source = query_params.get('source')
+        format_type = query_params.get('format', 'list')
         
-        # Récupérer l'historique depuis le champ JSONB (c'est un dict, pas une liste!)
-        price_history = all_asset.price_history_json or {}
-        
-        if not price_history or len(price_history) == 0:
+        # Utiliser la même logique que show_last_saxo_trade.py
+        # Vérifier si l'historique existe
+        if not all_asset.has_price_history:
             logger.debug(f"[PRICES] No price history for AllAsset {all_asset.id}")
             return Response({
                 'all_asset_id': all_asset.id,
@@ -464,25 +468,47 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'results': []
             })
         
-        # Convertir le dict en liste et filtrer
+        # Récupérer les dates disponibles (triées du plus récent au plus ancien)
+        dates = all_asset.get_price_history_dates()
+        
+        if not dates:
+            logger.debug(f"[PRICES] No dates in price history for AllAsset {all_asset.id}")
+            return Response({
+                'all_asset_id': all_asset.id,
+                'all_asset_symbol': all_asset.symbol,
+                'count': 0,
+                'message': 'No dates available in price history',
+                'results': []
+            })
+        
+        # Limiter au nombre de jours demandés
+        dates_to_return = dates[:days]
+        
+        logger.debug(f"[PRICES] Total history dates: {len(dates)}, Requested days: {days}, Returning: {len(dates_to_return)}")
+        
+        # Convertir en liste formatée (comme dans le script)
         prices_list = []
-        sorted_dates = sorted(price_history.keys(), reverse=True)[:days]
         
-        logger.debug(f"[PRICES] Total history dates: {len(price_history)}, Requested days: {days}, Returning: {len(sorted_dates)}")
-        
-        for date_str in sorted_dates:
-            price_data = price_history[date_str]
+        for date_str in dates_to_return:
+            # Utiliser get_price_for_date() comme dans le script
+            price_data = all_asset.get_price_for_date(date_str)
             
-            # Filtrer par source si spécifié
-            if source and price_data.get('source') != source:
+            if not price_data:
+                logger.debug(f"[PRICES] No price data for date {date_str}")
                 continue
             
-            # Vérifier que les prix ne sont pas None/NaN
+            # Filtrer par source si spécifié
+            price_source = price_data.get('source', 'YAHOO')
+            if source and price_source != source:
+                continue
+            
+            # Vérifier que le prix de clôture n'est pas None/NaN
             close_price = price_data.get('close')
             if close_price is None:
                 logger.debug(f"[PRICES] Skipping {date_str}: close price is None")
                 continue
             
+            # Formater comme le script (mais en JSON)
             prices_list.append({
                 'date': date_str,
                 'open': price_data.get('open'),
@@ -494,7 +520,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'high_price': price_data.get('high'),
                 'low_price': price_data.get('low'),
                 'volume': price_data.get('volume', 0),
-                'source': price_data.get('source', 'YAHOO')
+                'source': price_source
             })
         
         logger.debug(f"[PRICES] Final prices_list count: {len(prices_list)}")
