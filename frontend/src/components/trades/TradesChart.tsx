@@ -385,7 +385,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
   }, [filteredTrades, selectedAssets, viewMode])
 
   // Charger l'historique quand les assets sélectionnés changent
-  const prevSelectedAssetsRef = useRef<number[]>([])
+  const prevSelectedAssetsRef = useRef<string>('')
   useEffect(() => {
     // Attendre que le graphique soit initialisé avant de charger les données
     if (!chartRef.current) {
@@ -393,23 +393,21 @@ const TradesChart: React.FC<TradesChartProps> = ({
       return
     }
 
-    // Comparer les assets sélectionnés pour éviter les rechargements inutiles
-    const prevAssets = prevSelectedAssetsRef.current
-    const assetsChanged = 
-      prevAssets.length !== selectedAssets.length ||
-      !prevAssets.every((id, index) => id === selectedAssets[index])
+    // Créer une clé stable pour la comparaison (trier les IDs pour être indépendant de l'ordre)
+    const sortedAssets = [...selectedAssets].sort((a, b) => a - b)
+    const assetsKey = sortedAssets.join(',')
 
-    if (!assetsChanged && selectedAssets.length > 0) {
-      // Les assets n'ont pas changé, pas besoin de recharger
-      console.log('[TradesChart] Selected assets unchanged, skipping reload')
+    // Comparer avec la valeur précédente pour éviter les rechargements inutiles
+    if (prevSelectedAssetsRef.current === assetsKey) {
+      console.log('[TradesChart] Selected assets unchanged, skipping reload:', assetsKey)
       return
     }
 
-    // Mettre à jour la référence
-    prevSelectedAssetsRef.current = [...selectedAssets]
+    // Mettre à jour la référence AVANT de charger (pour éviter les doubles appels)
+    prevSelectedAssetsRef.current = assetsKey
+    console.log('[TradesChart] Selected assets changed, loading price history for:', selectedAssets, 'key:', assetsKey)
 
     if (selectedAssets.length > 0) {
-      console.log('[TradesChart] Selected assets changed, loading price history for:', selectedAssets)
       loadPriceHistory(selectedAssets)
     } else {
       // Supprimer toutes les séries si aucun asset sélectionné
@@ -425,7 +423,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
       markersRefs.current.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAssets.join(',')]) // Utiliser join pour une comparaison stable
+  }, [selectedAssets.join(',')]) // Dépendance basée sur la liste jointe
 
   if (!trades || trades.length === 0) {
     return (
