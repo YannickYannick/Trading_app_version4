@@ -220,9 +220,14 @@ class StrategySerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         # Définir le queryset pour all_asset
         from apps.trading.models import AllAssets
+        # Rendre all_asset optionnel pour permettre la création sans asset
+        request = kwargs.get('context', {}).get('request')
+        is_create = request and request.method == 'POST'
+        
         self.fields['all_asset'] = serializers.PrimaryKeyRelatedField(
             queryset=AllAssets.objects.all(),
-            required=True
+            required=False,  # Optionnel pour permettre création sans asset
+            allow_null=True
         )
     
     def validate_max_position_size(self, value):

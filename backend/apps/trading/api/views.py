@@ -435,6 +435,10 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'high': price_data.get('high'),
                 'low': price_data.get('low'),
                 'close': price_data.get('close'),
+                'close_price': price_data.get('close'),  # Alias pour compatibilité frontend
+                'open_price': price_data.get('open'),    # Alias pour compatibilité frontend
+                'high_price': price_data.get('high'),    # Alias pour compatibilité frontend
+                'low_price': price_data.get('low'),      # Alias pour compatibilité frontend
                 'volume': price_data.get('volume'),
                 'source': price_data.get('source', 'YAHOO')
             })
@@ -451,13 +455,30 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             })
         else:
             # Retourner en format liste (compatible avec l'ancien format)
+            # Mapper les clés pour correspondre au format attendu par le frontend
+            results_mapped = []
+            for item in prices_list:
+                results_mapped.append({
+                    'date': item['date'],
+                    'close_price': item['close'],  # Alias pour compatibilité
+                    'open_price': item['open'],    # Alias pour compatibilité
+                    'high_price': item['high'],    # Alias pour compatibilité
+                    'low_price': item['low'],      # Alias pour compatibilité
+                    'open': item['open'],
+                    'high': item['high'],
+                    'low': item['low'],
+                    'close': item['close'],
+                    'volume': item['volume'],
+                    'source': item['source']
+                })
+            
             return Response({
                 'all_asset_id': all_asset.id,
                 'all_asset_symbol': all_asset.symbol,
-                'count': len(prices_list),
+                'count': len(results_mapped),
                 'format': 'list',
                 'total_days_available': len(price_history),
-                'results': prices_list
+                'results': results_mapped
             })
     
     @action(detail=True, methods=['post'])

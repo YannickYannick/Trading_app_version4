@@ -214,17 +214,22 @@ export const assetService = {
         all_asset_id: number
         all_asset_symbol: string
         count: number
-        results: Array<{ date: string; close_price: number; open_price: number; high_price: number; low_price: number; volume: number }>
+        results: Array<{ date: string; close: number; open: number; high: number; low: number; volume: number }>
       }>(`/all-assets/${allAssetId}/prices/`, {
         params: { days: 1, format: 'list' },
       })
       
       // Prendre le premier résultat (le plus récent)
       if (response.data.results && response.data.results.length > 0) {
-        return response.data.results[0].close_price || null
+        // Le format retourné utilise 'close' pas 'close_price'
+        return response.data.results[0].close || null
       }
       return null
-    } catch (error) {
+    } catch (error: any) {
+      // Ignorer silencieusement les 404 (AllAsset n'existe pas ou pas d'historique)
+      if (error?.response?.status === 404) {
+        return null
+      }
       console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
       return null
     }
