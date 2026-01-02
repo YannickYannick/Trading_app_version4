@@ -74,7 +74,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
         borderColor: '#e0e0e0',
         timeVisible: true,
         secondsVisible: false,
-        fitContent: true, // Activer le fit automatique
+        // fitContent est géré manuellement après le chargement des données
       },
       crosshair: {
         mode: 1, // Normal mode
