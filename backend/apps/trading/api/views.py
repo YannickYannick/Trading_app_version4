@@ -464,6 +464,54 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'results': prices_list  # Contient déjà les alias close_price, open_price, etc.
             })
     
+    @action(detail=True, methods=['get'])
+    def current_price(self, request, pk=None):
+        """
+        GET /api/all-assets/{id}/current_price/
+        Récupère le prix actuel depuis Yahoo Finance pour cet AllAsset.
+        
+        Ne nécessite pas d'historique synchronisé - récupère directement depuis Yahoo.
+        """
+        from ..services.data_providers.yahoo_finance import YahooFinanceService
+        
+        all_asset = self.get_object()
+        
+        if not all_asset.symbole_yahoo or all_asset.symbole_yahoo in ['Not_searched', 'not_found', 'manual']:
+            return Response({
+                'success': False,
+                'message': f'No validated Yahoo symbol for {all_asset.symbol}',
+                'price': None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            yahoo_service = YahooFinanceService()
+            price = yahoo_service.get_current_price(all_asset.symbole_yahoo)
+            
+            if price is None:
+                return Response({
+                    'success': False,
+                    'message': f'Could not fetch current price for {all_asset.symbole_yahoo}',
+                    'price': None
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response({
+                'success': True,
+                'all_asset_id': all_asset.id,
+                'all_asset_symbol': all_asset.symbol,
+                'yahoo_symbol': all_asset.symbole_yahoo,
+                'price': float(price),
+                'currency': all_asset.currency or 'USD'
+            })
+            
+        except Exception as e:
+            logger = logging.getLogger('trading.api.assets')
+            logger.exception(f"Error fetching current price for {all_asset.symbol}: {e}")
+            return Response({
+                'success': False,
+                'message': str(e),
+                'price': None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=True, methods=['post'])
     def validate_single_yahoo(self, request, pk=None):
         """

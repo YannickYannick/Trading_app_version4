@@ -207,29 +207,51 @@ export const assetService = {
 
   /**
    * Récupérer le prix Yahoo actuel (dernier prix disponible)
+   * Récupère directement depuis Yahoo Finance, pas depuis l'historique stocké
    */
   async getYahooCurrentPrice(allAssetId: number): Promise<number | null> {
     try {
+      // Essayer d'abord l'endpoint current_price qui récupère directement depuis Yahoo
       const response = await apiClient.get<{
+        success: boolean
         all_asset_id: number
         all_asset_symbol: string
-        count: number
-        results: Array<{ date: string; close: number; open: number; high: number; low: number; volume: number }>
-      }>(`/all-assets/${allAssetId}/prices/`, {
-        params: { days: 1, format: 'list' },
-      })
+        yahoo_symbol: string
+        price: number
+        currency: string
+        message?: string
+      }>(`/all-assets/${allAssetId}/current_price/`)
       
-      // Prendre le premier résultat (le plus récent)
-      if (response.data.results && response.data.results.length > 0) {
-        // Le format retourné utilise 'close' pas 'close_price'
-        return response.data.results[0].close || null
+      if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
+        return response.data.price
       }
+      
+      // Fallback: essayer depuis l'historique si current_price échoue
+      try {
+        const historyResponse = await apiClient.get<{
+          all_asset_id: number
+          all_asset_symbol: string
+          count: number
+          results: Array<{ date: string; close: number; open: number; high: number; low: number; volume: number }>
+        }>(`/all-assets/${allAssetId}/prices/`, {
+          params: { days: 1, format: 'list' },
+        })
+        
+        // Prendre le premier résultat (le plus récent)
+        if (historyResponse.data.results && historyResponse.data.results.length > 0) {
+          return historyResponse.data.results[0].close || null
+        }
+      } catch (historyError) {
+        // Ignorer l'erreur de l'historique
+      }
+      
       return null
     } catch (error: any) {
-      // Ignorer silencieusement les 404 (AllAsset n'existe pas ou pas d'historique)
+      // Ignorer silencieusement les 404 (AllAsset n'existe pas)
       if (error?.response?.status === 404) {
         return null
       }
+      // Logger les autres erreurs mais ne pas bloquer
       console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
       return null
     }
