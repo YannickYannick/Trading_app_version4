@@ -388,7 +388,10 @@ const TradesChart: React.FC<TradesChartProps> = ({
       const markers: MarkerData[] = assetTrades
         .map((trade) => {
           const tradeDate = trade.executed_at || trade.timestamp
-          if (!tradeDate) return null
+          if (!tradeDate) {
+            console.warn(`[TradesChart] Trade ${trade.id} has no date (executed_at: ${trade.executed_at}, timestamp: ${trade.timestamp})`)
+            return null
+          }
           
           const isBuy = trade.side === 'BUY'
           // Convertir explicitement en nombres pour éviter l'erreur toFixed
@@ -397,20 +400,34 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
           // Vérifier que les valeurs sont valides
           if (isNaN(quantity) || isNaN(price)) {
-            console.warn(`[TradesChart] Invalid quantity or price for trade:`, trade)
+            console.warn(`[TradesChart] Invalid quantity or price for trade ${trade.id}:`, trade)
             return null
           }
 
           // Convertir la date au format YYYY-MM-DD
-          let dateStr = tradeDate
-          if (dateStr.includes('T')) {
-            dateStr = dateStr.split('T')[0]
+          let dateStr: string
+          if (typeof tradeDate === 'string') {
+            dateStr = tradeDate
+            if (dateStr.includes('T')) {
+              dateStr = dateStr.split('T')[0]
+            }
+            // Gérer les dates au format ISO avec timezone
+            if (dateStr.includes('Z')) {
+              dateStr = dateStr.split('Z')[0].split('T')[0]
+            }
+          } else if (tradeDate instanceof Date) {
+            dateStr = tradeDate.toISOString().split('T')[0]
+          } else {
+            console.warn(`[TradesChart] Trade ${trade.id} has invalid date format:`, tradeDate)
+            return null
           }
+          
+          console.log(`[TradesChart] Creating marker for trade ${trade.id} (${trade.side}) on ${dateStr} for asset ${assetId}`)
 
           return {
             time: dateStr as Time,
             position: isBuy ? ('belowBar' as const) : ('aboveBar' as const),
-            color: isBuy ? '#10b981' : '#ef4444',
+            color: isBuy ? '#3b82f6' : '#ef4444', // BUY = bleu, SELL = rouge
             shape: isBuy ? ('arrowUp' as const) : ('arrowDown' as const),
             text: `${trade.side} ${quantity.toFixed(2)} @ ${price.toFixed(2)}`,
           }
