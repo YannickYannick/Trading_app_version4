@@ -1024,19 +1024,22 @@ class TradeViewSet(viewsets.ModelViewSet):
         win_rate = 50.0  # Valeur par défaut
         
         # Essayer de calculer un vrai win_rate si possible
+        # Q est déjà importé en haut du fichier (ligne 17)
         try:
             # Si les trades ont une position liée avec PnL
-            from django.db.models import Q
             trades_with_pnl = recent_trades.exclude(position__isnull=True)
             if trades_with_pnl.exists():
+                # Vérifier si les positions ont un PnL calculé
                 winning_count = trades_with_pnl.filter(
                     Q(position__pnl__gt=0) | Q(position__pnl_percent__gt=0)
                 ).count()
                 total_with_pnl = trades_with_pnl.count()
                 if total_with_pnl > 0:
                     win_rate = (winning_count / total_with_pnl) * 100
-        except Exception:
+        except Exception as e:
             # Si le calcul échoue, utiliser la valeur par défaut
+            logger = logging.getLogger('trading.api.trades')
+            logger.debug(f"Could not calculate win_rate: {e}")
             pass
         
         return Response({
