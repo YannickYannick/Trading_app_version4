@@ -1,7 +1,7 @@
 /**
  * Composant de graphique interactif pour visualiser les trades et l'historique des prix
  */
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createChart, LineSeries, createSeriesMarkers, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
 import { assetService } from '@services/assets'
 import type { Trade, AllAsset } from '@types'
@@ -385,6 +385,13 @@ const TradesChart: React.FC<TradesChartProps> = ({
     })
   }, [filteredTrades, selectedAssets, viewMode])
 
+  // Créer une clé stable pour la comparaison (trier les IDs pour être indépendant de l'ordre)
+  // Utiliser useMemo pour éviter de recalculer à chaque render
+  const assetsKey = useMemo(() => {
+    const sortedAssets = [...selectedAssets].sort((a, b) => a - b)
+    return sortedAssets.join(',')
+  }, [selectedAssets])
+
   // Charger l'historique quand les assets sélectionnés changent
   const prevSelectedAssetsRef = useRef<string>('')
   useEffect(() => {
@@ -393,10 +400,6 @@ const TradesChart: React.FC<TradesChartProps> = ({
       console.log('[TradesChart] Waiting for chart to be initialized...')
       return
     }
-
-    // Créer une clé stable pour la comparaison (trier les IDs pour être indépendant de l'ordre)
-    const sortedAssets = [...selectedAssets].sort((a, b) => a - b)
-    const assetsKey = sortedAssets.join(',')
 
     // Comparer avec la valeur précédente pour éviter les rechargements inutiles
     if (prevSelectedAssetsRef.current === assetsKey) {
@@ -411,7 +414,8 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
     if (selectedAssets.length > 0) {
       // Charger l'historique pour les nouveaux assets sélectionnés
-      loadPriceHistory(selectedAssets).catch((err) => {
+      // Passer une copie de selectedAssets pour éviter les problèmes de référence
+      loadPriceHistory([...selectedAssets]).catch((err) => {
         console.error('[TradesChart] Error in loadPriceHistory:', err)
         // En cas d'erreur, réinitialiser la référence pour permettre une nouvelle tentative
         prevSelectedAssetsRef.current = ''
@@ -429,8 +433,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
       markersRefs.current.clear()
     }
+    // Utiliser assetsKey comme dépendance (calculé avec useMemo)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAssets.join(',')]) // Dépendance basée sur la liste jointe
+  }, [assetsKey]) // Dépendance basée sur la clé triée
 
   if (!trades || trades.length === 0) {
     return (
