@@ -171,12 +171,17 @@ const TradesChart: React.FC<TradesChartProps> = ({
             console.warn(`No valid price data for asset ${assetId} after filtering`)
           }
         }
-
-          if (priceData.length > 0) {
-            series.setData(priceData)
-          }
-        }
       })
+
+      // Ajuster l'échelle de temps une fois toutes les séries ajoutées
+      if (chartRef.current && priceSeriesRefs.current.size > 0) {
+        chartRef.current.timeScale().fitContent()
+      }
+      
+      // Si aucune série n'a été créée, afficher un message d'erreur
+      if (priceSeriesRefs.current.size === 0) {
+        setError('Aucun historique de prix disponible pour les assets sélectionnés')
+      }
 
       // Supprimer les séries pour les assets non sélectionnés
       priceSeriesRefs.current.forEach((series, assetId) => {
@@ -278,12 +283,21 @@ const TradesChart: React.FC<TradesChartProps> = ({
           <p>Chargement de l'historique des prix...</p>
         </div>
       )}
-      {error && (
+      {error && !loading && (
         <div className="trades-chart-error">
           <p>Erreur: {error}</p>
         </div>
       )}
-      <div ref={chartContainerRef} className="trades-chart" />
+      {!loading && !error && selectedAssets.length === 0 && (
+        <div className="trades-chart-empty">
+          <p>Sélectionnez au moins un asset pour afficher le graphique</p>
+        </div>
+      )}
+      <div 
+        ref={chartContainerRef} 
+        className="trades-chart"
+        style={{ display: (loading || error || selectedAssets.length === 0) ? 'none' : 'block' }}
+      />
       <div className="trades-chart-legend">
         <div className="legend-item">
           <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
