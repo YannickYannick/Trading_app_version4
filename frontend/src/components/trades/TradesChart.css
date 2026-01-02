@@ -1,0 +1,184 @@
+.trades-chart-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 20px;
+  background: var(--bg-card, #fff);
+  border-radius: var(--border-radius, 8px);
+  padding: 20px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.trades-chart {
+  width: 100%;
+  height: 500px;
+  position: relative;
+}
+
+.trades-chart-loading,
+.trades-chart-error,
+.trades-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  color: var(--text-color-secondary, #666);
+}
+
+.trades-chart-error {
+  color: var(--danger-color, #ef4444);
+}
+
+.trades-chart-legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-color-secondary, #666);
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Contrôles */
+.chart-controls {
+  background: var(--bg-card, #fff);
+  border-radius: var(--border-radius, 8px);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.controls-section {
+  margin-bottom: 20px;
+}
+
+.controls-section:last-child {
+  margin-bottom: 0;
+}
+
+.controls-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-color-primary, #1f2937);
+}
+
+.view-mode-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.assets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.assets-header h3 {
+  margin-bottom: 0;
+}
+
+.assets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-input, #f9fafb);
+  border-radius: var(--border-radius, 6px);
+}
+
+.asset-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.asset-checkbox:hover {
+  background-color: var(--bg-hover, rgba(59, 130, 246, 0.1));
+}
+
+.asset-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.asset-label {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-color-primary, #1f2937);
+}
+
+.asset-label strong {
+  color: var(--primary-color, #3b82f6);
+}
+
+.asset-name {
+  color: var(--text-color-secondary, #6b7280);
+  font-size: 13px;
+}
+
+.asset-yahoo {
+  color: var(--text-color-secondary, #9ca3af);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.no-assets {
+  color: var(--text-color-secondary, #6b7280);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.controls-info {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-color-secondary, #6b7280);
+  font-size: 13px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .trades-chart {
+    height: 400px;
+  }
+
+  .chart-controls {
+    padding: 15px;
+  }
+
+  .assets-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .view-mode-buttons {
+    width: 100%;
+  }
+
+  .view-mode-buttons button {
+    flex: 1;
+  }
+}
+

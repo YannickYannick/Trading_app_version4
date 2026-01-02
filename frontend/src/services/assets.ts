@@ -256,6 +256,62 @@ export const assetService = {
       return null
     }
   },
+
+  /**
+   * Récupérer l'historique des prix pour un AllAsset
+   */
+  async getPriceHistory(
+    allAssetId: number,
+    days: number = 365,
+    format: 'list' | 'json' = 'list'
+  ): Promise<{
+    all_asset_id: number
+    all_asset_symbol: string
+    count: number
+    results: Array<{
+      date: string
+      close: number
+      open: number
+      high: number
+      low: number
+      volume: number
+      close_price?: number
+      open_price?: number
+      high_price?: number
+      low_price?: number
+    }>
+  }> {
+    try {
+      const response = await apiClient.get<{
+        all_asset_id: number
+        all_asset_symbol: string
+        count: number
+        results: Array<{
+          date: string
+          close: number
+          open: number
+          high: number
+          low: number
+          volume: number
+          close_price?: number
+          open_price?: number
+          high_price?: number
+          low_price?: number
+        }>
+      }>(`/all-assets/${allAssetId}/prices/`, {
+        params: { days, format },
+      })
+      return response.data
+    } catch (error: any) {
+      console.error(`Error fetching price history for AllAsset ${allAssetId}:`, error)
+      return {
+        all_asset_id: allAssetId,
+        all_asset_symbol: '',
+        count: 0,
+        results: [],
+      }
+    }
+  },
 }
 
 export default assetService

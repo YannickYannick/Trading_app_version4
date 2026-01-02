@@ -1,13 +1,15 @@
 /**
  * Page Trades - Historique des trades
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Input, YahooActions } from '@components/common'
 import { useTrades } from '@hooks/useTrades'
 import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
-import type { Trade } from '@types'
+import type { Trade, AllAsset } from '@types'
+import TradesChart from '@components/trades/TradesChart'
+import ChartControls from '@components/trades/ChartControls'
 import './Trades.css'
 
 export default function Trades() {
@@ -15,12 +17,45 @@ export default function Trades() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
+  const [selectedAssets, setSelectedAssets] = useState<number[]>([])
+  const [chartViewMode, setChartViewMode] = useState<'global' | 'per_asset'>('global')
+  const [showChart, setShowChart] = useState(true)
   
   const { trades, loading, error, statistics, total, refetch } = useTrades({
     side: sideFilter,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   })
+
+  // Extraire les IDs uniques des AllAssets présents dans les trades
+  const allAssetsInTrades = useMemo(() => {
+    const assetIds = new Set<number>()
+    trades.forEach((trade) => {
+      const assetId = trade.all_asset?.id || (typeof trade.all_asset === 'number' ? trade.all_asset : null)
+      if (assetId) {
+        assetIds.add(assetId)
+      }
+    })
+    return Array.from(assetIds)
+  }, [trades])
+
+  // Créer une Map pour accéder rapidement aux AllAssets
+  const allAssetsMap = useMemo(() => {
+    const map = new Map<number, AllAsset>()
+    trades.forEach((trade) => {
+      if (trade.all_asset && typeof trade.all_asset === 'object') {
+        map.set(trade.all_asset.id, trade.all_asset)
+      }
+    })
+    return map
+  }, [trades])
+
+  // Sélectionner automatiquement le premier asset si aucun n'est sélectionné et qu'on est en mode per_asset
+  useEffect(() => {
+    if (chartViewMode === 'per_asset' && selectedAssets.length === 0 && allAssetsInTrades.length > 0) {
+      setSelectedAssets([allAssetsInTrades[0]])
+    }
+  }, [chartViewMode, allAssetsInTrades])
 
   // Charger les prix Yahoo actuels pour tous les AllAssets
   useEffect(() => {
@@ -247,6 +282,41 @@ export default function Trades() {
             <p className="stat-value">{statistics.sell_trades || 0}</p>
           </Card>
         </div>
+      )}
+
+      {/* Graphique des trades */}
+      {trades.length > 0 && (
+        <Card
+          title="Graphique des Trades"
+          className="trades-chart-card"
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowChart(!showChart)}
+            >
+              {showChart ? 'Masquer' : 'Afficher'} le graphique
+            </Button>
+          }
+        >
+          {showChart && (
+            <>
+              <ChartControls
+                selectedAssets={selectedAssets}
+                viewMode={chartViewMode}
+                onSelectedAssetsChange={setSelectedAssets}
+                onViewModeChange={setChartViewMode}
+                allAssetsInTrades={allAssetsInTrades}
+              />
+              <TradesChart
+                trades={trades}
+                selectedAssets={selectedAssets}
+                viewMode={chartViewMode}
+                allAssetsMap={allAssetsMap}
+              />
+            </>
+          )}
+        </Card>
       )}
 
       <Card
