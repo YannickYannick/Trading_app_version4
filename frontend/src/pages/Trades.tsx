@@ -320,6 +320,26 @@ export default function Trades() {
         </Card>
       )}
 
+      {/* Tableau d'historique des prix */}
+      {trades.length > 0 && selectedAssets.length > 0 && (
+        <Card
+          title="Historique des Prix"
+          className="price-history-card"
+        >
+          {selectedAssets.map((assetId) => {
+            const asset = allAssetsMap.get(assetId)
+            return (
+              <PriceHistoryTable
+                key={assetId}
+                allAssetId={assetId}
+                allAssetSymbol={asset?.symbol || `Asset #${assetId}`}
+                days={365}
+              />
+            )
+          })}
+        </Card>
+      )}
+
       <Card
         title="Filtres de date"
         className="filters-card"
