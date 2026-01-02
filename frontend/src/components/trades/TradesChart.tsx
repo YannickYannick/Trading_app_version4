@@ -2,7 +2,7 @@
  * Composant de graphique interactif pour visualiser les trades et l'historique des prix
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { createChart, LineSeries, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
+import { createChart, LineSeries, createSeriesMarkers, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
 import { assetService } from '@services/assets'
 import type { Trade, AllAsset } from '@types'
 import './TradesChart.css'
@@ -100,6 +100,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
         chartRef.current = null
       }
       priceSeriesRefs.current.clear()
+      markersRefs.current.clear()
     }
   }, [])
 
@@ -185,7 +186,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
           
           try {
             // Utiliser addSeries(LineSeries, options) pour lightweight-charts v5+
-            // LineSeries doit être importé séparément
+            // LineSeries doit être importé séparément depuis 'lightweight-charts'
             series = chartRef.current.addSeries(LineSeries, {
               color,
               lineWidth: 2,
@@ -262,11 +263,17 @@ const TradesChart: React.FC<TradesChartProps> = ({
         console.log(`[TradesChart] Created ${priceSeriesRefs.current.size} series successfully`)
       }
 
-      // Supprimer les séries pour les assets non sélectionnés
+      // Supprimer les séries et marqueurs pour les assets non sélectionnés
       priceSeriesRefs.current.forEach((series, assetId) => {
         if (!assetIds.includes(assetId)) {
           chartRef.current?.removeSeries(series)
           priceSeriesRefs.current.delete(assetId)
+          // Supprimer aussi les marqueurs associés
+          const markersPrimitive = markersRefs.current.get(assetId)
+          if (markersPrimitive) {
+            markersPrimitive.setMarkers([])
+            markersRefs.current.delete(assetId)
+          }
         }
       })
     } catch (err: any) {
@@ -287,7 +294,13 @@ const TradesChart: React.FC<TradesChartProps> = ({
 
   // Ajouter les marqueurs de trades au graphique
   useEffect(() => {
-    if (!chartRef.current || filteredTrades.length === 0) return
+    if (!chartRef.current || filteredTrades.length === 0) {
+      // Supprimer tous les marqueurs si pas de trades
+      markersRefs.current.forEach((markersPrimitive) => {
+        markersPrimitive.setMarkers([])
+      })
+      return
+    }
 
     // Ajouter les marqueurs à toutes les séries concernées
     priceSeriesRefs.current.forEach((series, assetId) => {
@@ -296,8 +309,6 @@ const TradesChart: React.FC<TradesChartProps> = ({
         const tradeAssetId = trade.all_asset?.id || (typeof trade.all_asset === 'number' ? trade.all_asset : null)
         return tradeAssetId === assetId
       })
-
-      if (assetTrades.length === 0) return
 
       // Convertir les trades en marqueurs
       const markers: MarkerData[] = assetTrades
@@ -325,9 +336,32 @@ const TradesChart: React.FC<TradesChartProps> = ({
         })
         .filter((marker): marker is MarkerData => marker !== null) // Filtrer les marqueurs null
 
+      // Dans lightweight-charts v5+, utiliser createSeriesMarkers pour gérer les marqueurs
+      let markersPrimitive = markersRefs.current.get(assetId)
+      
       if (markers.length > 0) {
-        console.log(`Adding ${markers.length} markers to series for asset ${assetId}`)
-        series.setMarkers(markers)
+        // Créer ou mettre à jour les marqueurs
+        if (!markersPrimitive) {
+          console.log(`Creating markers primitive for asset ${assetId} with ${markers.length} markers`)
+          markersPrimitive = createSeriesMarkers(series, markers)
+          markersRefs.current.set(assetId, markersPrimitive)
+        } else {
+          console.log(`Updating ${markers.length} markers for asset ${assetId}`)
+          markersPrimitive.setMarkers(markers)
+        }
+      } else {
+        // Supprimer les marqueurs si aucun trade
+        if (markersPrimitive) {
+          markersPrimitive.setMarkers([])
+        }
+      }
+    })
+
+    // Supprimer les marqueurs pour les assets non sélectionnés
+    markersRefs.current.forEach((markersPrimitive, assetId) => {
+      if (!priceSeriesRefs.current.has(assetId)) {
+        markersPrimitive.setMarkers([])
+        markersRefs.current.delete(assetId)
       }
     })
   }, [filteredTrades, selectedAssets, viewMode])
