@@ -17,6 +17,18 @@ class Strategy(TimeStampedModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='strategies'
     )
+    
+    # Asset cible de la stratégie (obligatoire pour nouvelles stratégies)
+    # Note: nullable temporairement pour permettre la migration des stratégies existantes
+    all_asset = models.ForeignKey(
+        'AllAssets',
+        on_delete=models.CASCADE,
+        related_name='strategies',
+        null=True,
+        blank=False,  # Obligatoire dans le formulaire
+        help_text="Asset cible que cette stratégie trade"
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     
@@ -43,8 +55,13 @@ class Strategy(TimeStampedModel):
         ordering = ['name']
         verbose_name = 'Strategy'
         verbose_name_plural = 'Strategies'
+        indexes = [
+            models.Index(fields=['all_asset', 'is_active']),
+        ]
     
     def __str__(self):
+        if self.all_asset:
+            return f"{self.name} ({self.all_asset.symbol})"
         return self.name
 
 

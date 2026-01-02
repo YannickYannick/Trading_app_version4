@@ -1,0 +1,240 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .allasset-actions {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 20px 0;
+    }
+    .allasset-actions h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #417690;
+    }
+    .action-group {
+        margin-bottom: 20px;
+    }
+    .action-group:last-child {
+        margin-bottom: 0;
+    }
+    .action-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    .action-controls {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+    .action-select {
+        flex: 1;
+        min-width: 150px;
+    }
+    .action-button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: background 0.2s;
+    }
+    .action-button:hover {
+        opacity: 0.9;
+    }
+    .btn-validate {
+        background: #417690;
+        color: white;
+    }
+    .btn-sync {
+        background: #28a745;
+        color: white;
+    }
+    .btn-loading {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .message-box {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        display: none;
+    }
+    .message-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .message-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+{% if original and original.all_asset %}
+<div class="allasset-actions">
+    <h3>Actions rapides pour l'asset : {{ original.all_asset.symbol }}</h3>
+    
+    <!-- Bouton Validation Yahoo -->
+    <div class="action-group">
+        <label>Valider le symbole Yahoo Finance</label>
+        <div class="action-controls">
+            <button type="button" class="action-button btn-validate" id="validate-yahoo-btn">
+                🔍 Valider symbole Yahoo
+            </button>
+        </div>
+        <div id="validate-yahoo-message" class="message-box"></div>
+    </div>
+    
+    <!-- Bouton Charger historique -->
+    <div class="action-group">
+        <label>Charger l'historique des prix</label>
+        <div class="action-controls">
+            <select id="duration-select" class="action-select">
+                <option value="30">1 mois</option>
+                <option value="90">3 mois</option>
+                <option value="180">6 mois</option>
+                <option value="365" selected>1 an</option>
+                <option value="730">2 ans</option>
+                <option value="1825">5 ans</option>
+            </select>
+            <select id="interval-select" class="action-select">
+                <option value="1d" selected>1 jour</option>
+                <option value="1wk">1 semaine</option>
+                <option value="1mo">1 mois</option>
+            </select>
+            <button type="button" class="action-button btn-sync" id="sync-history-btn">
+                📊 Charger l'historique
+            </button>
+        </div>
+        <div id="sync-history-message" class="message-box"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const allAssetId = {{ original.all_asset.id|default:"null" }};
+    if (!allAssetId) return;
+    
+    const validateBtn = document.getElementById('validate-yahoo-btn');
+    const syncBtn = document.getElementById('sync-history-btn');
+    const validateMessage = document.getElementById('validate-yahoo-message');
+    const syncMessage = document.getElementById('sync-history-message');
+    
+    function showMessage(element, message, type) {
+        element.textContent = message;
+        element.className = 'message-box message-' + type;
+        element.style.display = 'block';
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 5000);
+    }
+    
+    // Validation Yahoo
+    validateBtn.addEventListener('click', async function() {
+        validateBtn.disabled = true;
+        validateBtn.classList.add('btn-loading');
+        validateBtn.textContent = '⏳ Validation en cours...';
+        validateMessage.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/all-assets/${allAssetId}/validate_single_yahoo/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessage(validateMessage, 
+                    `✅ ${data.message || 'Symbole Yahoo validé: ' + data.yahoo_symbol}`, 
+                    'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showMessage(validateMessage, 
+                    `❌ Erreur: ${data.error || data.message || 'Validation échouée'}`, 
+                    'error');
+            }
+        } catch (error) {
+            showMessage(validateMessage, 
+                `❌ Erreur: ${error.message}`, 
+                'error');
+        } finally {
+            validateBtn.disabled = false;
+            validateBtn.classList.remove('btn-loading');
+            validateBtn.textContent = '🔍 Valider symbole Yahoo';
+        }
+    });
+    
+    // Synchronisation historique
+    syncBtn.addEventListener('click', async function() {
+        const days = document.getElementById('duration-select').value;
+        const interval = document.getElementById('interval-select').value;
+        
+        syncBtn.disabled = true;
+        syncBtn.classList.add('btn-loading');
+        syncBtn.textContent = '⏳ Chargement...';
+        syncMessage.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/all-assets/${allAssetId}/sync_price_history/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    days: parseInt(days),
+                    interval: interval
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessage(syncMessage, 
+                    `✅ ${data.records} enregistrements de prix synchronisés avec succès`, 
+                    'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showMessage(syncMessage, 
+                    `❌ Erreur: ${data.error || data.message || 'Synchronisation échouée'}`, 
+                    'error');
+            }
+        } catch (error) {
+            showMessage(syncMessage, 
+                `❌ Erreur: ${error.message}`, 
+                'error');
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.classList.remove('btn-loading');
+            syncBtn.textContent = '📊 Charger l\'historique';
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}
+

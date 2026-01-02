@@ -204,15 +204,26 @@ class BrokerAccountSerializer(serializers.ModelSerializer):
 
 class StrategySerializer(serializers.ModelSerializer):
     """Serializer pour les stratégies."""
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
     
     class Meta:
         model = Strategy
         fields = [
-            'id', 'name', 'description', 'risk_level',
-            'max_position_size', 'max_daily_loss', 'parameters',
+            'id', 'name', 'description', 'all_asset', 'all_asset_symbol', 'all_asset_name',
+            'risk_level', 'max_position_size', 'max_daily_loss', 'parameters',
             'is_active', 'is_automated', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'all_asset_symbol', 'all_asset_name']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Définir le queryset pour all_asset
+        from apps.trading.models import AllAssets
+        self.fields['all_asset'] = serializers.PrimaryKeyRelatedField(
+            queryset=AllAssets.objects.all(),
+            required=True
+        )
     
     def validate_max_position_size(self, value):
         """Valider que la taille max est entre 0 et 100%."""

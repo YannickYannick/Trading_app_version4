@@ -225,36 +225,492 @@ class AllAssetPriceHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(Position)
 class PositionAdmin(admin.ModelAdmin):
-    list_display = ['asset', 'user', 'side', 'quantity', 'entry_price', 'current_price', 'is_open', 'opened_at']
+    list_display = ['all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'user', 'side', 'quantity', 'entry_price', 'current_price', 'is_open', 'opened_at']
     list_filter = ['side', 'is_open', 'broker']
-    search_fields = ['asset__symbol', 'user__username']
+    search_fields = ['all_asset__symbol', 'all_asset__name', 'all_asset__symbole_yahoo', 'user__username']
     ordering = ['-opened_at']
+    change_form_template = 'admin/trading/position/change_form.html'
+    actions = ['validate_yahoo_bulk', 'sync_history_bulk']
+    
+    def all_asset_symbol(self, obj):
+        """Affiche le symbole de l'AllAsset."""
+        return obj.all_asset.symbol if obj.all_asset else '-'
+    all_asset_symbol.short_description = 'Symbole'
+    
+    def all_asset_name(self, obj):
+        """Affiche le nom de l'AllAsset."""
+        return obj.all_asset.name if obj.all_asset else '-'
+    all_asset_name.short_description = 'Nom'
+    
+    def all_asset_yahoo_symbol(self, obj):
+        """Affiche le symbole Yahoo de l'AllAsset."""
+        return obj.all_asset.symbole_yahoo if obj.all_asset and obj.all_asset.symbole_yahoo else '-'
+    all_asset_yahoo_symbol.short_description = 'Symbole Yahoo'
+    
+    def validate_yahoo_bulk(self, request, queryset):
+        """Action en lot : Valider les symboles Yahoo pour les AllAssets uniques."""
+        from apps.trading.services.yahoo_validator import validate_single_asset
+        from apps.trading.utils.yahoo_config import ValidationStatus
+        from apps.trading.constants import DEFAULT_PRICE_TOLERANCE_PERCENT
+        from apps.trading.services.broker_service import BrokerService
+        from apps.trading.models import BrokerAccount
+        from django.utils import timezone
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for position in queryset:
+            if position.all_asset:
+                all_assets.add(position.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les positions sélectionnées.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        
+        for all_asset in all_assets:
+            try:
+                broker_config = {}
+                if all_asset.platform == 'SAXO':
+                    saxo_account = BrokerAccount.objects.filter(
+                        broker_type='SAXO',
+                        user=request.user,
+                        is_active=True
+                    ).first()
+                    if saxo_account:
+                        try:
+                            broker_service = BrokerService(request.user)
+                            broker = broker_service.get_broker_instance(saxo_account, use_cache=True)
+                            if broker.authenticate():
+                                broker_config['access_token'] = broker.access_token
+                                broker_config['base_url'] = broker.base_url
+                        except Exception as e:
+                            logger.warning(f"Could not get valid Saxo token for {all_asset.symbol}: {e}")
+                
+                result = validate_single_asset(
+                    all_asset,
+                    broker_config=broker_config,
+                    tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
+                )
+                
+                # Sauvegarder le résultat si validé
+                status_str = str(result.status) if result.status else ''
+                is_validated = (
+                    status_str == ValidationStatus.VALIDATED_Y4 or
+                    status_str == ValidationStatus.VALIDATED_Y3 or
+                    status_str == ValidationStatus.VALIDATED_Y0
+                )
+                if is_validated:
+                    all_asset.symbole_yahoo = result.yahoo_symbol
+                    all_asset.yahoo_validation_method = result.method
+                    all_asset.yahoo_validated_at = timezone.now()
+                    all_asset.save(update_fields=[
+                        'symbole_yahoo',
+                        'yahoo_validation_method',
+                        'yahoo_validated_at'
+                    ])
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la validation Yahoo pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Validation Yahoo terminée : {success_count} réussie(s), {error_count} erreur(s) sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    validate_yahoo_bulk.short_description = "🔍 Valider les symboles Yahoo des AllAssets sélectionnés"
+    
+    def sync_history_bulk(self, request, queryset):
+        """Action en lot : Synchroniser l'historique des prix pour les AllAssets uniques."""
+        from apps.trading.services.sync.all_asset_price_sync_service import AllAssetPriceSyncService
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        sync_service = AllAssetPriceSyncService()
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for position in queryset:
+            if position.all_asset:
+                all_assets.add(position.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les positions sélectionnées.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        total_records = 0
+        
+        for all_asset in all_assets:
+            try:
+                result = sync_service.sync_from_yahoo_finance(all_asset, days=365, interval='1d')
+                if result.get('success'):
+                    success_count += 1
+                    total_records += result.get('records', 0)
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la synchronisation pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Synchronisation terminée : {success_count} réussie(s), {error_count} erreur(s), {total_records} enregistrements sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    sync_history_bulk.short_description = "📊 Synchroniser l'historique des prix des AllAssets sélectionnés"
 
 
 @admin.register(Trade)
 class TradeAdmin(admin.ModelAdmin):
-    list_display = ['asset', 'user', 'trade_type', 'quantity', 'price', 'fees', 'executed_at']
+    list_display = ['all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'user', 'trade_type', 'quantity', 'price', 'fees', 'executed_at']
     list_filter = ['trade_type', 'broker', 'executed_at']
-    search_fields = ['asset__symbol', 'user__username']
+    search_fields = ['all_asset__symbol', 'all_asset__name', 'all_asset__symbole_yahoo', 'user__username']
     ordering = ['-executed_at']
+    change_form_template = 'admin/trading/trade/change_form.html'
+    actions = ['validate_yahoo_bulk', 'sync_history_bulk']
+    
+    def all_asset_symbol(self, obj):
+        """Affiche le symbole de l'AllAsset."""
+        return obj.all_asset.symbol if obj.all_asset else '-'
+    all_asset_symbol.short_description = 'Symbole'
+    
+    def all_asset_name(self, obj):
+        """Affiche le nom de l'AllAsset."""
+        return obj.all_asset.name if obj.all_asset else '-'
+    all_asset_name.short_description = 'Nom'
+    
+    def all_asset_yahoo_symbol(self, obj):
+        """Affiche le symbole Yahoo de l'AllAsset."""
+        return obj.all_asset.symbole_yahoo if obj.all_asset and obj.all_asset.symbole_yahoo else '-'
+    all_asset_yahoo_symbol.short_description = 'Symbole Yahoo'
 
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['asset', 'user', 'order_type', 'side', 'status', 'quantity', 'price', 'created_at']
+    list_display = ['all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'user', 'order_type', 'side', 'status', 'quantity', 'price', 'created_at']
     list_filter = ['order_type', 'side', 'status', 'broker']
-    search_fields = ['asset__symbol', 'user__username']
+    search_fields = ['all_asset__symbol', 'all_asset__name', 'all_asset__symbole_yahoo', 'user__username']
     ordering = ['-created_at']
+    autocomplete_fields = ['all_asset']
+    change_form_template = 'admin/trading/order/change_form.html'
+    actions = ['validate_yahoo_bulk', 'sync_history_bulk']
+    
+    def all_asset_symbol(self, obj):
+        """Affiche le symbole de l'AllAsset."""
+        return obj.all_asset.symbol if obj.all_asset else '-'
+    all_asset_symbol.short_description = 'Symbole'
+    
+    def all_asset_name(self, obj):
+        """Affiche le nom de l'AllAsset."""
+        return obj.all_asset.name if obj.all_asset else '-'
+    all_asset_name.short_description = 'Nom'
+    
+    def all_asset_yahoo_symbol(self, obj):
+        """Affiche le symbole Yahoo de l'AllAsset."""
+        return obj.all_asset.symbole_yahoo if obj.all_asset and obj.all_asset.symbole_yahoo else '-'
+    all_asset_yahoo_symbol.short_description = 'Symbole Yahoo'
+    
+    def validate_yahoo_bulk(self, request, queryset):
+        """Action en lot : Valider les symboles Yahoo pour les AllAssets uniques."""
+        from apps.trading.services.yahoo_validator import validate_single_asset
+        from apps.trading.utils.yahoo_config import ValidationStatus
+        from apps.trading.constants import DEFAULT_PRICE_TOLERANCE_PERCENT
+        from apps.trading.services.broker_service import BrokerService
+        from apps.trading.models import BrokerAccount
+        from django.utils import timezone
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for order in queryset:
+            if order.all_asset:
+                all_assets.add(order.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les ordres sélectionnés.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        
+        for all_asset in all_assets:
+            try:
+                broker_config = {}
+                if all_asset.platform == 'SAXO':
+                    saxo_account = BrokerAccount.objects.filter(
+                        broker_type='SAXO',
+                        user=request.user,
+                        is_active=True
+                    ).first()
+                    if saxo_account:
+                        try:
+                            broker_service = BrokerService(request.user)
+                            broker = broker_service.get_broker_instance(saxo_account, use_cache=True)
+                            if broker.authenticate():
+                                broker_config['access_token'] = broker.access_token
+                                broker_config['base_url'] = broker.base_url
+                        except Exception as e:
+                            logger.warning(f"Could not get valid Saxo token for {all_asset.symbol}: {e}")
+                
+                result = validate_single_asset(
+                    all_asset,
+                    broker_config=broker_config,
+                    tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
+                )
+                
+                # Sauvegarder le résultat si validé
+                status_str = str(result.status) if result.status else ''
+                is_validated = (
+                    status_str == ValidationStatus.VALIDATED_Y4 or
+                    status_str == ValidationStatus.VALIDATED_Y3 or
+                    status_str == ValidationStatus.VALIDATED_Y0
+                )
+                if is_validated:
+                    all_asset.symbole_yahoo = result.yahoo_symbol
+                    all_asset.yahoo_validation_method = result.method
+                    all_asset.yahoo_validated_at = timezone.now()
+                    all_asset.save(update_fields=[
+                        'symbole_yahoo',
+                        'yahoo_validation_method',
+                        'yahoo_validated_at'
+                    ])
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la validation Yahoo pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Validation Yahoo terminée : {success_count} réussie(s), {error_count} erreur(s) sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    validate_yahoo_bulk.short_description = "🔍 Valider les symboles Yahoo des AllAssets sélectionnés"
+    
+    def sync_history_bulk(self, request, queryset):
+        """Action en lot : Synchroniser l'historique des prix pour les AllAssets uniques."""
+        from apps.trading.services.sync.all_asset_price_sync_service import AllAssetPriceSyncService
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        sync_service = AllAssetPriceSyncService()
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for order in queryset:
+            if order.all_asset:
+                all_assets.add(order.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les ordres sélectionnés.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        total_records = 0
+        
+        for all_asset in all_assets:
+            try:
+                result = sync_service.sync_from_yahoo_finance(all_asset, days=365, interval='1d')
+                if result.get('success'):
+                    success_count += 1
+                    total_records += result.get('records', 0)
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la synchronisation pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Synchronisation terminée : {success_count} réussie(s), {error_count} erreur(s), {total_records} enregistrements sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    sync_history_bulk.short_description = "📊 Synchroniser l'historique des prix des AllAssets sélectionnés"
 
 
 # ============== STRATEGIES ==============
 
 @admin.register(Strategy)
 class StrategyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'user', 'risk_level', 'is_active', 'is_automated', 'created_at']
-    list_filter = ['risk_level', 'is_active', 'is_automated']
-    search_fields = ['name', 'user__username']
+    list_display = ['name', 'user', 'all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol', 'risk_level', 'is_active', 'is_automated', 'created_at']
+    list_filter = ['risk_level', 'is_active', 'is_automated', 'all_asset__platform']
+    search_fields = ['name', 'user__username', 'all_asset__symbol', 'all_asset__name', 'all_asset__symbole_yahoo']
     ordering = ['name']
+    autocomplete_fields = ['all_asset']
+    change_form_template = 'admin/trading/strategy/change_form.html'
+    actions = ['validate_yahoo_bulk', 'sync_history_bulk']
+    
+    fieldsets = (
+        ('Informations générales', {
+            'fields': ('name', 'user', 'all_asset', 'description')
+        }),
+        ('Configuration', {
+            'fields': ('risk_level', 'max_position_size', 'max_daily_loss', 'parameters')
+        }),
+        ('Statut', {
+            'fields': ('is_active', 'is_automated')
+        }),
+        ('Dates', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def all_asset_symbol(self, obj):
+        """Affiche le symbole de l'AllAsset."""
+        return obj.all_asset.symbol if obj.all_asset else '-'
+    all_asset_symbol.short_description = 'Symbole'
+    
+    def all_asset_name(self, obj):
+        """Affiche le nom de l'AllAsset."""
+        return obj.all_asset.name if obj.all_asset else '-'
+    all_asset_name.short_description = 'Nom'
+    
+    def all_asset_yahoo_symbol(self, obj):
+        """Affiche le symbole Yahoo de l'AllAsset."""
+        return obj.all_asset.symbole_yahoo if obj.all_asset and obj.all_asset.symbole_yahoo else '-'
+    all_asset_yahoo_symbol.short_description = 'Symbole Yahoo'
+    
+    def validate_yahoo_bulk(self, request, queryset):
+        """Action en lot : Valider les symboles Yahoo pour les AllAssets uniques."""
+        from apps.trading.services.yahoo_validator import validate_single_asset
+        from apps.trading.utils.yahoo_config import ValidationStatus
+        from apps.trading.constants import DEFAULT_PRICE_TOLERANCE_PERCENT
+        from apps.trading.services.broker_service import BrokerService
+        from apps.trading.models import BrokerAccount
+        from django.utils import timezone
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for strategy in queryset:
+            if strategy.all_asset:
+                all_assets.add(strategy.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les stratégies sélectionnées.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        
+        for all_asset in all_assets:
+            try:
+                broker_config = {}
+                if all_asset.platform == 'SAXO':
+                    saxo_account = BrokerAccount.objects.filter(
+                        broker_type='SAXO',
+                        user=request.user,
+                        is_active=True
+                    ).first()
+                    if saxo_account:
+                        try:
+                            broker_service = BrokerService(request.user)
+                            broker = broker_service.get_broker_instance(saxo_account, use_cache=True)
+                            if broker.authenticate():
+                                broker_config['access_token'] = broker.access_token
+                                broker_config['base_url'] = broker.base_url
+                        except Exception as e:
+                            logger.warning(f"Could not get valid Saxo token for {all_asset.symbol}: {e}")
+                
+                result = validate_single_asset(
+                    all_asset,
+                    broker_config=broker_config,
+                    tolerance_percent=DEFAULT_PRICE_TOLERANCE_PERCENT
+                )
+                
+                # Sauvegarder le résultat si validé
+                status_str = str(result.status) if result.status else ''
+                is_validated = (
+                    status_str == ValidationStatus.VALIDATED_Y4 or
+                    status_str == ValidationStatus.VALIDATED_Y3 or
+                    status_str == ValidationStatus.VALIDATED_Y0
+                )
+                if is_validated:
+                    all_asset.symbole_yahoo = result.yahoo_symbol
+                    all_asset.yahoo_validation_method = result.method
+                    all_asset.yahoo_validated_at = timezone.now()
+                    all_asset.save(update_fields=[
+                        'symbole_yahoo',
+                        'yahoo_validation_method',
+                        'yahoo_validated_at'
+                    ])
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la validation Yahoo pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Validation Yahoo terminée : {success_count} réussie(s), {error_count} erreur(s) sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    validate_yahoo_bulk.short_description = "🔍 Valider les symboles Yahoo des AllAssets sélectionnés"
+    
+    def sync_history_bulk(self, request, queryset):
+        """Action en lot : Synchroniser l'historique des prix pour les AllAssets uniques."""
+        from apps.trading.services.sync.all_asset_price_sync_service import AllAssetPriceSyncService
+        from django.contrib import messages
+        import logging
+        
+        logger = logging.getLogger('trading.admin')
+        sync_service = AllAssetPriceSyncService()
+        all_assets = set()
+        
+        # Collecter les AllAssets uniques
+        for strategy in queryset:
+            if strategy.all_asset:
+                all_assets.add(strategy.all_asset)
+        
+        if not all_assets:
+            self.message_user(request, "Aucun AllAsset trouvé dans les stratégies sélectionnées.", messages.WARNING)
+            return
+        
+        success_count = 0
+        error_count = 0
+        total_records = 0
+        
+        for all_asset in all_assets:
+            try:
+                result = sync_service.sync_from_yahoo_finance(all_asset, days=365, interval='1d')
+                if result.get('success'):
+                    success_count += 1
+                    total_records += result.get('records', 0)
+                else:
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la synchronisation pour {all_asset.symbol}: {e}")
+                error_count += 1
+        
+        self.message_user(
+            request,
+            f"Synchronisation terminée : {success_count} réussie(s), {error_count} erreur(s), {total_records} enregistrements sur {len(all_assets)} AllAsset(s) unique(s).",
+            messages.SUCCESS if error_count == 0 else messages.WARNING
+        )
+    sync_history_bulk.short_description = "📊 Synchroniser l'historique des prix des AllAssets sélectionnés"
 
 
 @admin.register(StrategyPerformance)

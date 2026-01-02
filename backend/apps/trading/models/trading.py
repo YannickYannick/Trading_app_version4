@@ -182,8 +182,25 @@ class Order(TimeStampedModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='orders'
     )
+    
+    # ForeignKey DIRECT vers AllAssets (source de vérité - nom exact du broker)
+    all_asset = models.ForeignKey(
+        'AllAssets',
+        on_delete=models.CASCADE,
+        related_name='orders',
+        null=True,  # Temporairement nullable pour migration
+        blank=False,  # Obligatoire dans le formulaire
+        help_text="Asset depuis le catalogue universel AllAssets (nom exact du broker)"
+    )
+    
+    # Asset devient optionnel (pour compatibilité et enrichissement futur)
     asset = models.ForeignKey(
-        'Asset', on_delete=models.CASCADE, related_name='orders'
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders',
+        help_text="Asset enrichi optionnel (pour données supplémentaires)"
     )
     broker = models.ForeignKey(
         'Broker', on_delete=models.CASCADE, related_name='orders'
@@ -216,5 +233,6 @@ class Order(TimeStampedModel):
         verbose_name_plural = 'Orders'
     
     def __str__(self):
-        return f"{self.side} {self.quantity} {self.asset.symbol} ({self.status})"
+        symbol = self.all_asset.symbol if self.all_asset else (self.asset.symbol if self.asset else 'Unknown')
+        return f"{self.side} {self.quantity} {symbol} ({self.status})"
 
