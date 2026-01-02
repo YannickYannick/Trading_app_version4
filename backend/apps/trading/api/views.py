@@ -407,7 +407,18 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         format_type = request.query_params.get('format', 'list')  # 'json' ou 'list'
         
         # Récupérer l'historique depuis le champ JSONB
-        if not all_asset.has_price_history:
+        price_history = all_asset.price_history_json or {}
+        
+        # Vérifier si l'historique existe réellement (double vérification)
+        # has_price_history peut être False si price_history_json est {} ou None
+        # mais on vérifie directement ici pour être sûr
+        if not price_history or len(price_history) == 0:
+            logger = logging.getLogger('trading.api.assets')
+            logger.debug(
+                f"AllAsset {all_asset.id} ({all_asset.symbol}): "
+                f"No price history - has_price_history={all_asset.has_price_history}, "
+                f"price_history_json type={type(price_history)}, length={len(price_history) if price_history else 0}"
+            )
             return Response({
                 'all_asset_id': all_asset.id,
                 'all_asset_symbol': all_asset.symbol,
@@ -415,8 +426,6 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'message': 'No price history available',
                 'results': []
             })
-        
-        price_history = all_asset.price_history_json or {}
         
         # Debug: logger le contenu de price_history_json
         logger = logging.getLogger('trading.api.assets')

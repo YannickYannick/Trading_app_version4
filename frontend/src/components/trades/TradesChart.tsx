@@ -188,12 +188,22 @@ const TradesChart: React.FC<TradesChartProps> = ({
         chartRef.current.timeScale().fitContent()
       }
       
-      // Si aucune série n'a été créée, afficher un message d'erreur
+      // Si aucune série n'a été créée, afficher un message d'erreur avec détails
       if (priceSeriesRefs.current.size === 0) {
-        console.warn(`[TradesChart] No series created. Histories:`, histories)
-        setError('Aucun historique de prix disponible pour les assets sélectionnés')
+        const assetsWithoutHistory = histories
+          .filter(({ history }) => !history || !history.results || history.results.length === 0)
+          .map(({ assetId }) => assetId)
+        
+        console.warn(`[TradesChart] No series created. Assets without history:`, assetsWithoutHistory)
+        console.warn(`[TradesChart] Full histories data:`, histories)
+        
+        if (assetsWithoutHistory.length === selectedAssets.length) {
+          setError('Aucun historique de prix disponible pour les assets sélectionnés. Utilisez le bouton "Charger l\'historique" pour synchroniser.')
+        } else {
+          setError(`Aucun historique pour ${assetsWithoutHistory.length} asset(s) sur ${selectedAssets.length}`)
+        }
       } else {
-        console.log(`[TradesChart] Created ${priceSeriesRefs.current.size} series`)
+        console.log(`[TradesChart] Created ${priceSeriesRefs.current.size} series successfully`)
       }
 
       // Supprimer les séries pour les assets non sélectionnés
