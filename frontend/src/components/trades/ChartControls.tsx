@@ -35,13 +35,20 @@ const ChartControls: React.FC<ChartControlsProps> = ({
       })
   }, [allAssetsInTrades, allAssetsMap])
 
-  const handleAssetToggle = (assetId: number) => {
-    // Prévenir tout comportement par défaut (comme le submit de formulaire)
-    // ... (pas besoin de event ici, mais on peut ajouter preventDefault si nécessaire)
-    if (selectedAssets.includes(assetId)) {
-      onSelectedAssetsChange(selectedAssets.filter((id) => id !== assetId))
+  const handleAssetToggle = (assetId: number, newChecked: boolean) => {
+    // Utiliser directement la valeur newChecked de l'event pour éviter les problèmes de closure
+    if (newChecked) {
+      // Sélectionner (checkbox vient d'être cochée)
+      onSelectedAssetsChange((prev) => {
+        // Vérifier qu'il n'est pas déjà dans la liste pour éviter les doublons
+        if (prev.includes(assetId)) {
+          return prev
+        }
+        return [...prev, assetId]
+      })
     } else {
-      onSelectedAssetsChange([...selectedAssets, assetId])
+      // Désélectionner (checkbox vient d'être décochée)
+      onSelectedAssetsChange((prev) => prev.filter((id) => id !== assetId))
     }
   }
 
@@ -98,9 +105,14 @@ const ChartControls: React.FC<ChartControlsProps> = ({
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) => {
-                      e.preventDefault()
+                      // Ne pas utiliser preventDefault ici, car cela empêche la checkbox de se mettre à jour
+                      // Utiliser la valeur actuelle de la checkbox depuis l'event
+                      const newChecked = e.target.checked
+                      handleAssetToggle(asset.id, newChecked)
+                    }}
+                    onClick={(e) => {
+                      // Empêcher la propagation pour éviter les clics multiples
                       e.stopPropagation()
-                      handleAssetToggle(asset.id)
                     }}
                   />
                   <span className="asset-label">
