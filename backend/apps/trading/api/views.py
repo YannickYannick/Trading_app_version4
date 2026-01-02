@@ -533,7 +533,7 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'all_asset_symbol': all_asset.symbol,
                 'count': len(prices_list),
                 'format': 'json',
-                'data': price_history
+                'data': all_asset.price_history_json or {}
             })
         else:
             # Format liste (compatible avec le frontend)
