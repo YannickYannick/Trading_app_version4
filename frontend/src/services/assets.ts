@@ -217,13 +217,13 @@ export const assetService = {
    */
   async getYahooCurrentPrice(allAssetId: number): Promise<number | null> {
     // Vérifier le cache
-    const cached = this._priceCache.get(allAssetId)
-    if (cached && Date.now() - cached.timestamp < this._cacheTimeout) {
+    const cached = priceCache.get(allAssetId)
+    if (cached && Date.now() - cached.timestamp < CACHE_TIMEOUT) {
       return cached.price
     }
 
     // Vérifier si une requête est déjà en cours pour cet asset
-    const inFlight = this._inFlightRequests.get(allAssetId)
+    const inFlight = inFlightRequests.get(allAssetId)
     if (inFlight) {
       return inFlight
     }
@@ -244,8 +244,8 @@ export const assetService = {
         
         if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
           const price = response.data.price
-          this._priceCache.set(allAssetId, { price, timestamp: Date.now() })
-          this._inFlightRequests.delete(allAssetId)
+          priceCache.set(allAssetId, { price, timestamp: Date.now() })
+          inFlightRequests.delete(allAssetId)
           return price
         }
         
@@ -263,8 +263,8 @@ export const assetService = {
           // Prendre le premier résultat (le plus récent)
           if (historyResponse.data.results && historyResponse.data.results.length > 0) {
             const price = historyResponse.data.results[0].close || null
-            this._priceCache.set(allAssetId, { price, timestamp: Date.now() })
-            this._inFlightRequests.delete(allAssetId)
+            priceCache.set(allAssetId, { price, timestamp: Date.now() })
+            inFlightRequests.delete(allAssetId)
             return price
           }
         } catch (historyError) {
@@ -272,8 +272,8 @@ export const assetService = {
         }
         
         // Mettre en cache null pour éviter les requêtes répétées
-        this._priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
-        this._inFlightRequests.delete(allAssetId)
+        priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
+        inFlightRequests.delete(allAssetId)
         return null
       } catch (error: any) {
         // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
@@ -285,21 +285,21 @@ export const assetService = {
           error?.response?.status === 400
         ) {
           // Mettre en cache null pour éviter les requêtes répétées (cache court pour réessayer plus tard si le symbole est validé)
-          this._priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
-          this._inFlightRequests.delete(allAssetId)
+          priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
+          inFlightRequests.delete(allAssetId)
           return null
         }
         // Logger seulement les erreurs inattendues (500, 503, etc.)
         if (error?.response?.status >= 500) {
           console.error(`Error fetching Yahoo price for AllAsset ${allAssetId}:`, error)
         }
-        this._inFlightRequests.delete(allAssetId)
+        inFlightRequests.delete(allAssetId)
         return null
       }
     })()
 
     // Stocker la promesse pour déduplication
-    this._inFlightRequests.set(allAssetId, requestPromise)
+    inFlightRequests.set(allAssetId, requestPromise)
     
     return requestPromise
   },
