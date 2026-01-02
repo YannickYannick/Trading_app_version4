@@ -48,55 +48,68 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   useEffect(() => {
     if (!chartContainerRef.current) return
 
-    const containerWidth = chartContainerRef.current.clientWidth
-    if (containerWidth === 0) {
-      console.warn('[StrategyVisualizationChart] Container has no width')
-      return
-    }
-
-    // Nettoyer l'ancien graphique
-    if (chartRef.current) {
-      chartRef.current.remove()
-      chartRef.current = null
-    }
-
-    // Créer le graphique
-    const chart = createChart(chartContainerRef.current, {
-      width: containerWidth,
-      height: 600,
-      layout: {
-        background: { color: '#ffffff' },
-        textColor: '#333',
-      },
-      grid: {
-        vertLines: { color: '#f0f0f0' },
-        horzLines: { color: '#f0f0f0' },
-      },
-      timeScale: {
-        borderColor: '#e0e0e0',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      crosshair: {
-        mode: 1,
-      },
-    })
-
-    chartRef.current = chart
-
-    // Gestion du resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        })
+    // Utiliser requestAnimationFrame pour s'assurer que le conteneur a sa largeur
+    const initChart = () => {
+      if (!chartContainerRef.current) return
+      
+      const containerWidth = chartContainerRef.current.clientWidth
+      if (containerWidth === 0) {
+        // Réessayer au prochain frame si pas de largeur
+        requestAnimationFrame(initChart)
+        return
       }
+
+      // Nettoyer l'ancien graphique
+      if (chartRef.current) {
+        chartRef.current.remove()
+        chartRef.current = null
+      }
+
+      // Créer le graphique
+      const chart = createChart(chartContainerRef.current, {
+        width: containerWidth,
+        height: 600,
+        layout: {
+          background: { color: '#ffffff' },
+          textColor: '#333',
+        },
+        grid: {
+          vertLines: { color: '#f0f0f0' },
+          horzLines: { color: '#f0f0f0' },
+        },
+        timeScale: {
+          borderColor: '#e0e0e0',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+        crosshair: {
+          mode: 1,
+        },
+      })
+
+      chartRef.current = chart
+
+      // Gestion du resize
+      const handleResize = () => {
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+          })
+        }
+      }
+
+      window.addEventListener('resize', handleResize)
+      
+      // Stocker le handler pour le cleanup
+      ;(chartRef.current as any)._resizeHandler = handleResize
     }
 
-    window.addEventListener('resize', handleResize)
+    requestAnimationFrame(initChart)
 
     return () => {
-      window.removeEventListener('resize', handleResize)
+      if (chartRef.current && (chartRef.current as any)._resizeHandler) {
+        window.removeEventListener('resize', (chartRef.current as any)._resizeHandler)
+      }
       if (chartRef.current) {
         chartRef.current.remove()
         chartRef.current = null
@@ -468,7 +481,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         }
       })
     })
-  }, [priceHistory, strategy, parameters, trades])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceHistory.length, strategy?.id, parametersString, trades.length])
 
   // Créer la série de prix
   useEffect(() => {
