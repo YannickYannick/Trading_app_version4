@@ -300,66 +300,64 @@ const TradesChart: React.FC<TradesChartProps> = ({
         }
       })
 
-      // ✅ LA SOLUTION ROBUSTE : Appeler fitContent() UNE SEULE FOIS, à la toute fin
-      // Après que TOUTES les séries ont reçu leurs données
-      // Le "Forced reflow" indique qu'on doit forcer un recalcul du layout
-      // Utiliser plusieurs requestAnimationFrame + forcer un reflow explicite
+      // ✅ LA SOLUTION ROBUSTE : Recalculer la taille du graphique puis fitContent()
+      // Le conteneur est maintenant toujours visible (visibility: hidden au lieu de display: none)
+      // Donc on peut forcer TradingView à recalculer sa taille avec applyOptions
       
-      // Forcer un reflow en lisant une propriété du DOM (offsetWidth/offsetHeight)
-      // Cela garantit que le navigateur a calculé le layout avant fitContent()
-      if (chartContainerRef.current) {
-        // Force reflow: lire les dimensions force le navigateur à recalculer le layout
-        void chartContainerRef.current.offsetWidth
-        void chartContainerRef.current.offsetHeight
-      }
-      
-      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM a sa taille finale
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (chartRef.current && priceSeriesRefs.current.size > 0) {
-              try {
-                const timeScale = chartRef.current.timeScale()
-                
-                // 🔒 Étape 1 : Reset de l'échelle (si disponible) pour partir sur une base propre
-                // Cela élimine 95% des cas où il faut zoomer manuellement
-                if (typeof timeScale.resetTimeScale === 'function') {
-                  timeScale.resetTimeScale()
-                  console.log('[TradesChart] Time scale reset')
-                }
-                
-                // 🔒 Étape 2 : Forcer un nouveau reflow avant fitContent
-                // Cela garantit que le navigateur a le layout à jour
-                if (chartContainerRef.current) {
-                  void chartContainerRef.current.offsetWidth
-                }
-                
-                // 🔒 Étape 3 : Fit content UNE SEULE FOIS, après toutes les données
-                timeScale.fitContent()
-                console.log('[TradesChart] Time scale fitContent() called after all data loaded (with forced reflow)')
-                
-                // Ajouter les marqueurs APRÈS l'ajustement d'échelle
-                updateMarkersForSeries()
-                
-                // 🔒 Étape 4 : Un dernier ajustement après les marqueurs avec reflow forcé
-                requestAnimationFrame(() => {
-                  if (chartRef.current && chartContainerRef.current) {
-                    // Forcer un nouveau reflow
-                    void chartContainerRef.current.offsetWidth
-                    
-                    try {
-                      chartRef.current.timeScale().fitContent()
-                      console.log('[TradesChart] Time scale final adjustment after markers (with forced reflow)')
-                    } catch (err) {
-                      console.error('[TradesChart] Error in final fitContent after markers:', err)
-                    }
-                  }
+          if (chartRef.current && chartContainerRef.current && priceSeriesRefs.current.size > 0) {
+            try {
+              const containerWidth = chartContainerRef.current.clientWidth
+              console.log(`[TradesChart] Container width: ${containerWidth}px`)
+              
+              // 🔒 Étape 1 : Forcer TradingView à recalculer sa taille (officiel)
+              // Cela garantit que le graphique a la bonne largeur avant fitContent()
+              if (containerWidth > 0) {
+                chartRef.current.applyOptions({
+                  width: containerWidth,
                 })
-              } catch (err) {
-                console.error('[TradesChart] Error fitting content:', err)
+                console.log('[TradesChart] Chart width updated to', containerWidth, 'px')
+              } else {
+                console.warn('[TradesChart] Container has no width, cannot resize chart')
               }
+              
+              // 🔒 Étape 2 : Reset de l'échelle (si disponible) pour partir sur une base propre
+              const timeScale = chartRef.current.timeScale()
+              if (typeof timeScale.resetTimeScale === 'function') {
+                timeScale.resetTimeScale()
+                console.log('[TradesChart] Time scale reset')
+              }
+              
+              // 🔒 Étape 3 : Fit content UNE SEULE FOIS, après toutes les données et le resize
+              timeScale.fitContent()
+              console.log('[TradesChart] Time scale fitContent() called after resize and data loaded')
+              
+              // Ajouter les marqueurs APRÈS l'ajustement d'échelle
+              updateMarkersForSeries()
+              
+              // 🔒 Étape 4 : Un dernier ajustement après les marqueurs
+              requestAnimationFrame(() => {
+                if (chartRef.current && chartContainerRef.current) {
+                  // Recalculer la taille au cas où elle aurait changé
+                  const finalWidth = chartContainerRef.current.clientWidth
+                  if (finalWidth > 0 && finalWidth !== containerWidth) {
+                    chartRef.current.applyOptions({ width: finalWidth })
+                  }
+                  
+                  try {
+                    chartRef.current.timeScale().fitContent()
+                    console.log('[TradesChart] Time scale final adjustment after markers')
+                  } catch (err) {
+                    console.error('[TradesChart] Error in final fitContent after markers:', err)
+                  }
+                }
+              })
+            } catch (err) {
+              console.error('[TradesChart] Error fitting content:', err)
             }
-          }, 50) // Délai réduit car on force le reflow explicitement
+          }
         })
       })
       
