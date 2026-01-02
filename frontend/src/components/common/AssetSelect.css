@@ -100,3 +100,21 @@
   font-size: 0.875rem;
 }
 
+.asset-select-loading {
+  padding: 1rem;
+  text-align: center;
+  color: var(--primary-color, #3b82f6);
+  font-size: 0.875rem;
+}
+
+.asset-select-loading::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+

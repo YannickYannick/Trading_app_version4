@@ -1,40 +1,105 @@
 /**
- * Composant de sélection d'asset avec recherche
+ * Composant de sélection d'asset avec recherche et autocomplétion
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { AllAsset } from '@types'
+import { assetService } from '@services/assets'
 import './AssetSelect.css'
 
 interface AssetSelectProps {
   value: number | null
-  options: AllAsset[]
+  options?: AllAsset[] // Options statiques (optionnel)
   onChange: (value: number | null) => void
   onBlur?: () => void
   placeholder?: string
+  useApiAutocomplete?: boolean // Si true, utilise l'API pour l'autocomplétion
 }
 
 export default function AssetSelect({
   value,
-  options,
+  options = [],
   onChange,
   onBlur,
-  placeholder = 'Rechercher un asset...'
+  placeholder = 'Rechercher un asset...',
+  useApiAutocomplete = true,
 }: AssetSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [filteredOptions, setFilteredOptions] = useState<AllAsset[]>(options)
+  const [loading, setLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Filtrer les options selon le terme de recherche
-  const filteredOptions = options.filter(asset => {
-    if (!searchTerm) return true
-    const term = searchTerm.toLowerCase()
-    return (
-      asset.symbol.toLowerCase().includes(term) ||
-      asset.name.toLowerCase().includes(term) ||
-      (asset.symbole_yahoo && asset.symbole_yahoo.toLowerCase().includes(term))
-    )
-  })
+  // Recherche avec API si activée
+  const searchAssets = useCallback(async (term: string) => {
+    if (!term || term.length < 2) {
+      setFilteredOptions(options)
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Utiliser l'API d'autocomplétion si disponible
+      const results = await assetService.searchAllAssets(term)
+      setFilteredOptions(results)
+    } catch (err) {
+      console.error('Erreur lors de la recherche d\'assets:', err)
+      // Fallback sur les options locales
+      const filtered = options.filter(asset => {
+        const searchLower = term.toLowerCase()
+        return (
+          asset.symbol.toLowerCase().includes(searchLower) ||
+          asset.name.toLowerCase().includes(searchLower) ||
+          (asset.symbole_yahoo && asset.symbole_yahoo.toLowerCase().includes(searchLower))
+        )
+      })
+      setFilteredOptions(filtered)
+    } finally {
+      setLoading(false)
+    }
+  }, [options, useApiAutocomplete])
+
+  // Gérer la recherche avec debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (useApiAutocomplete && isOpen) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchAssets(searchTerm)
+      }, 300) // Debounce de 300ms
+    } else if (!useApiAutocomplete) {
+      // Filtrer localement
+      if (!searchTerm) {
+        setFilteredOptions(options)
+      } else {
+        const filtered = options.filter(asset => {
+          const term = searchTerm.toLowerCase()
+          return (
+            asset.symbol.toLowerCase().includes(term) ||
+            asset.name.toLowerCase().includes(term) ||
+            (asset.symbole_yahoo && asset.symbole_yahoo.toLowerCase().includes(term))
+          )
+        })
+        setFilteredOptions(filtered)
+      }
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm, isOpen, useApiAutocomplete, searchAssets, options])
+
+  // Mettre à jour les options filtrées quand options change
+  useEffect(() => {
+    if (!useApiAutocomplete && !searchTerm) {
+      setFilteredOptions(options)
+    }
+  }, [options, useApiAutocomplete, searchTerm])
 
   // Trouver l'asset sélectionné
   const selectedAsset = options.find(a => a.id === value)
