@@ -349,30 +349,25 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const metrics = calculatePerformanceMetrics(simulated)
     setPerformanceMetrics(metrics)
     
-    // Filtrer seulement les signaux BUY/SELL (pas HOLD)
-    const buySellSignals = signals.filter(s => s.signal !== 'HOLD')
-    
-    // Créer des marqueurs pour les signaux avec plus d'informations
-    const signalMarkers: MarkerData[] = buySellSignals.map(signal => {
-      // Trouver le trade simulé correspondant si disponible
-      const relatedTrade = simulated.find(t => 
-        t.entryTime === signal.time && t.side === signal.signal
-      )
-      
-      let text = `${signal.signal} @ ${signal.price.toFixed(2)}`
-      if (relatedTrade && relatedTrade.status === 'CLOSED' && relatedTrade.pnl !== null) {
-        const pnlSign = relatedTrade.pnl >= 0 ? '+' : ''
-        text = `${signal.signal} @ ${signal.price.toFixed(2)} (${pnlSign}${relatedTrade.pnl.toFixed(2)})`
-      }
-      
-      return {
-        time: signal.time as Time,
-        position: signal.signal === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
-        color: signal.signal === 'BUY' ? '#10b981' : '#ef4444',
-        shape: signal.signal === 'BUY' ? ('arrowUp' as const) : ('arrowDown' as const),
-        text,
-      }
-    })
+    // Ne montrer que les signaux qui ont déclenché un trade (entry points)
+    // Cela évite d'afficher trop de marqueurs
+    const signalMarkers: MarkerData[] = simulated
+      .filter(trade => trade.status === 'CLOSED' || trade.status === 'OPEN')
+      .map(trade => {
+        let text = `${trade.side} @ ${trade.entryPrice.toFixed(2)}`
+        if (trade.status === 'CLOSED' && trade.pnl !== null) {
+          const pnlSign = trade.pnl >= 0 ? '+' : ''
+          text = `${trade.side} @ ${trade.entryPrice.toFixed(2)} (${pnlSign}${trade.pnl.toFixed(2)})`
+        }
+        
+        return {
+          time: trade.entryTime as Time,
+          position: trade.side === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
+          color: trade.side === 'BUY' ? '#10b981' : '#ef4444',
+          shape: trade.side === 'BUY' ? ('arrowUp' as const) : ('arrowDown' as const),
+          text,
+        }
+      })
 
     // Ajouter les marqueurs des trades réels
     const tradeMarkers: MarkerData[] = trades

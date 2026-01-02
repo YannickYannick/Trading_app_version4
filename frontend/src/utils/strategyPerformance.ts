@@ -39,7 +39,8 @@ export function simulateTradesFromSignals(
   prices: number[],
   dates: string[],
   orderSize: number = 1.0,
-  stopLoss?: number
+  stopLoss?: number,
+  minQuantity: number = 0
 ): TradeSimulation[] {
   const trades: TradeSimulation[] = []
   let currentPosition: TradeSimulation | null = null
@@ -89,14 +90,15 @@ export function simulateTradesFromSignals(
         currentPosition = null
       }
 
-      // Ouvrir une position BUY
+      // Ouvrir une position BUY (avec quantité minimale)
+      const buyQuantity = Math.max(orderSize, minQuantity)
       currentPosition = {
         entryTime: signal.time,
         entryPrice: price,
         exitTime: null,
         exitPrice: null,
         side: 'BUY',
-        quantity: orderSize,
+        quantity: buyQuantity,
         pnl: null,
         pnlPercent: null,
         status: 'OPEN',
@@ -113,14 +115,15 @@ export function simulateTradesFromSignals(
         currentPosition = null
       }
 
-      // Ouvrir une position SELL (short)
+      // Ouvrir une position SELL (short) (avec quantité minimale)
+      const sellQuantity = Math.max(orderSize, minQuantity)
       currentPosition = {
         entryTime: signal.time,
         entryPrice: price,
         exitTime: null,
         exitPrice: null,
         side: 'SELL',
-        quantity: orderSize,
+        quantity: sellQuantity,
         pnl: null,
         pnlPercent: null,
         status: 'OPEN',
