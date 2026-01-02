@@ -621,7 +621,11 @@ const TradesChart: React.FC<TradesChartProps> = ({
       <div 
         ref={chartContainerRef} 
         className="trades-chart"
-        style={{ display: (loading || error || selectedAssets.length === 0) ? 'none' : 'block' }}
+        style={{ 
+          visibility: (loading || error || selectedAssets.length === 0) ? 'hidden' : 'visible',
+          height: '500px', // Hauteur fixe pour que le conteneur ait toujours une taille
+          width: '100%'
+        }}
       />
       <div className="trades-chart-legend">
         <div className="legend-item">
