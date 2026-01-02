@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@utils/format'
 import type { Trade, AllAsset } from '@types'
 import TradesChart from '@components/trades/TradesChart'
 import ChartControls from '@components/trades/ChartControls'
+import PriceHistoryTable from '@components/trades/PriceHistoryTable'
 import './Trades.css'
 
 export default function Trades() {

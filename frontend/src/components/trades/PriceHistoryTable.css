@@ -1,0 +1,53 @@
+.price-history-table-container {
+  margin-top: 20px;
+}
+
+.price-history-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.price-history-table-header h3 {
+  margin: 0;
+  color: var(--text-color-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.price-history-table-count {
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
+}
+
+.price-history-table-loading,
+.price-history-table-error,
+.price-history-table-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+.price-history-table-error {
+  color: var(--danger-color);
+}
+
+.price-history-table-hint {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--text-color-light);
+}
+
+.price-history-table {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.price-close {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
