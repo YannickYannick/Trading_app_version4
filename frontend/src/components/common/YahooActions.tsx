@@ -2,7 +2,7 @@
  * Composant YahooActions - Boutons pour validation Yahoo et synchronisation historique
  */
 import { useState } from 'react'
-import { Button } from './Button'
+import Button from './Button'
 import { assetService } from '@services/assets'
 import './YahooActions.css'
 
