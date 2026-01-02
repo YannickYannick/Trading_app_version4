@@ -81,15 +81,13 @@ export default function StrategyParametersPanel({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Initialiser les paramètres locaux
+  // Initialiser les paramètres locaux (uniquement quand la stratégie change)
   useEffect(() => {
     if (strategy && strategy.algorithm_type) {
       const params: Record<string, any> = {}
       
-      // Charger depuis currentParameters ou depuis strategy
-      if (Object.keys(currentParameters).length > 0) {
-        Object.assign(params, currentParameters)
-      } else if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
+      // Charger depuis strategy.algorithm_parameters
+      if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
         strategy.algorithm_parameters.forEach(param => {
           let value: any = param.value
           if (param.param_type === 'int') {
@@ -112,14 +110,25 @@ export default function StrategyParametersPanel({
       })
 
       setLocalParameters(params)
-      // Initialiser currentParameters aussi
-      Object.keys(params).forEach(key => {
-        if (!currentParameters[key]) {
-          onParameterChange(key, params[key])
-        }
-      })
+      
+      // Initialiser currentParameters UNIQUEMENT si elles sont vides ou différentes
+      // Comparer les paramètres pour éviter les appels inutiles
+      const paramsChanged = Object.keys(params).some(key => 
+        currentParameters[key] !== params[key]
+      ) || Object.keys(currentParameters).length === 0
+      
+      if (paramsChanged && Object.keys(params).length > 0) {
+        // Initialiser tous les paramètres en une seule fois via un objet complet
+        // Le parent doit gérer la mise à jour en batch
+        Object.keys(params).forEach(key => {
+          if (currentParameters[key] !== params[key]) {
+            onParameterChange(key, params[key])
+          }
+        })
+      }
     }
-  }, [strategy, currentParameters, onParameterChange])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strategy?.id, strategy?.algorithm_type]) // Utiliser uniquement strategy.id pour éviter les re-renders
 
   const handleParameterChange = (key: string, value: any) => {
     setLocalParameters(prev => ({ ...prev, [key]: value }))
