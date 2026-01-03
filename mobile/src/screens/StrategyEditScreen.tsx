@@ -139,8 +139,8 @@ export const StrategyEditScreen = () => {
             dates,
             numericParams.order_size || 1.0,
             numericParams.stop_loss,
-            numericParams.min_quantity,
-            numericParams.max_quantity,
+            minQuantity ? Number(minQuantity) : 0,
+            maxQuantity ? Number(maxQuantity) : undefined,
             numericParams.budget
         )
         const metrics = calculatePerformanceMetrics(simulated)
@@ -217,7 +217,7 @@ export const StrategyEditScreen = () => {
             }))
 
         return { indicators, markers, metrics, simulated }
-    }, [priceHistory, parameters, strategy.algorithm_type])
+    }, [priceHistory, parameters, strategy.algorithm_type, minQuantity, maxQuantity])
 
     const simulatedTrades = chartData?.simulated || []
 
