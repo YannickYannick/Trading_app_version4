@@ -295,8 +295,24 @@ export const StrategyEditScreen = () => {
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            // Helper to determine param type
+            const getParamType = (key: string, value: any): 'str' | 'int' | 'float' | 'bool' => {
+                if (typeof value === 'boolean' || value === 'true' || value === 'false') return 'bool'
+                if (!isNaN(Number(value))) {
+                    return String(value).includes('.') ? 'float' : 'int'
+                }
+                return 'str'
+            }
+
+            // Convert parameters object to algorithm_parameters_data array format (WRITE ONLY field)
+            const algorithmParamsCheck = Object.entries(parameters).map(([key, value]) => ({
+                key,
+                value: String(value),
+                param_type: getParamType(key, value)
+            }))
+
             await strategiesService.update(strategy.id, {
-                parameters: parameters,
+                algorithm_parameters_data: algorithmParamsCheck, // Use the correct write-only field
                 algorithm_type: strategy.algorithm_type,
                 name: strategy.name,
                 all_asset: typeof strategy.all_asset === 'object' ? strategy.all_asset?.id : strategy.all_asset,
@@ -305,6 +321,7 @@ export const StrategyEditScreen = () => {
             })
             Alert.alert('Succès', 'Stratégie mise à jour')
         } catch (e) {
+            console.error('Save error:', e)
             Alert.alert('Erreur', 'Impossible de sauvegarder')
         } finally {
             setIsSaving(false)
