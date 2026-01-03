@@ -1,21 +1,17 @@
 /**
- * Service pour les Brokers (shared)
+ * Service pour les Brokers
  */
-import type { AxiosInstance } from 'axios'
-import type {
-  ApiResponse,
-  Broker,
-  BrokerAccount,
-  BrokerSyncLog,
-} from '../types'
+import apiClient from './api/client'
+import type { ApiResponse, Broker, BrokerAccount, BrokerSyncLog, ApiError } from '@types'
 
 export interface BrokerAccountCreateData {
+  // Identifiants
   name: string
   broker?: number | null
   broker_type: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
   account_id?: string
   environment?: 'live' | 'simulation'
-  
+
   // Credentials Saxo
   saxo_client_id?: string
   saxo_client_secret?: string
@@ -24,13 +20,13 @@ export interface BrokerAccountCreateData {
   saxo_access_token?: string
   saxo_refresh_token?: string
   saxo_token_expires_at?: string | null
-  
+
   // Credentials Binance
   binance_api_key?: string
   binance_api_secret?: string
   binance_testnet?: boolean
-  
-  // Credentials génériques
+
+  // Credentials génériques (pour compatibilité)
   api_key?: string
   api_secret?: string
   client_id?: string
@@ -39,11 +35,11 @@ export interface BrokerAccountCreateData {
   refresh_token?: string
   token_expires_at?: string | null
   extra_credentials?: Record<string, any>
-  
+
   // Auto-refresh
   auto_refresh_enabled?: boolean
   auto_refresh_frequency?: number
-  
+
   // Statut
   is_active?: boolean
   is_demo?: boolean
@@ -61,415 +57,418 @@ export interface SyncRequest {
   force?: boolean
 }
 
-/**
- * Factory function pour créer le service brokers
- */
-export function createBrokerService(apiClient: AxiosInstance) {
-  return {
-    /**
-     * Récupérer tous les brokers
-     */
-    async getAll(): Promise<ApiResponse<Broker>> {
-      const response = await apiClient.get<ApiResponse<Broker>>('/brokers/')
-      return response.data
-    },
+export class BrokersService {
+  private api: any
 
-    /**
-     * Récupérer un broker par ID
-     */
-    async getById(id: number): Promise<Broker> {
-      const response = await apiClient.get<Broker>(`/brokers/${id}/`)
-      return response.data
-    },
+  constructor(apiClient: any) {
+    // Handle both ApiClient instance or direct axios instance (for backward compat if needed)
+    this.api = apiClient.getInstance ? apiClient.getInstance() : apiClient
+  }
+  /**
+   * Récupérer tous les brokers
+   */
+  async getAll(): Promise<ApiResponse<Broker>> {
+    const response = await this.api.get('/brokers/')
+    return response.data
+  }
 
-    /**
-     * Récupérer tous les comptes broker
-     */
-    async getAccounts(): Promise<ApiResponse<BrokerAccount>> {
-      const response = await apiClient.get<ApiResponse<BrokerAccount>>('/broker-accounts/')
-      return response.data
-    },
+  /**
+   * Récupérer un broker par ID
+   */
+  async getById(id: number): Promise<Broker> {
+    const response = await this.api.get(`/brokers/${id}/`)
+    return response.data
+  }
 
-    /**
-     * Récupérer un compte broker par ID
-     */
-    async getAccountById(id: number): Promise<BrokerAccount> {
-      const response = await apiClient.get<BrokerAccount>(`/broker-accounts/${id}/`)
-      return response.data
-    },
+  /**
+   * Récupérer tous les comptes broker
+   */
+  async getAccounts(): Promise<ApiResponse<BrokerAccount>> {
+    const response = await this.api.get('/broker-accounts/')
+    return response.data
+  }
 
-    /**
-     * Créer un compte broker
-     */
-    async createAccount(data: BrokerAccountCreateData): Promise<BrokerAccount> {
-      const response = await apiClient.post<BrokerAccount>('/broker-accounts/', data)
-      return response.data
-    },
+  /**
+   * Récupérer un compte broker par ID
+   */
+  async getAccountById(id: number): Promise<BrokerAccount> {
+    const response = await this.api.get(`/broker-accounts/${id}/`)
+    return response.data
+  }
 
-    /**
-     * Mettre à jour un compte broker
-     */
-    async updateAccount(id: number, data: Partial<BrokerAccountCreateData>): Promise<BrokerAccount> {
-      const response = await apiClient.patch<BrokerAccount>(`/broker-accounts/${id}/`, data)
-      return response.data
-    },
+  /**
+   * Créer un compte broker
+   */
+  async createAccount(data: BrokerAccountCreateData): Promise<BrokerAccount> {
+    const response = await this.api.post('/broker-accounts/', data)
+    return response.data
+  }
 
-    /**
-     * Supprimer un compte broker
-     */
-    async deleteAccount(id: number): Promise<void> {
-      await apiClient.delete(`/broker-accounts/${id}/`)
-    },
+  /**
+   * Mettre à jour un compte broker
+   */
+  async updateAccount(id: number, data: Partial<BrokerAccountCreateData>): Promise<BrokerAccount> {
+    const response = await this.api.patch(`/broker-accounts/${id}/`, data)
+    return response.data
+  }
 
-    /**
-     * Tester la connexion à un broker
-     */
-    async testConnection(accountId: number): Promise<TestConnectionResponse> {
-      const response = await apiClient.post<TestConnectionResponse>(
-        `/broker-accounts/${accountId}/test-connection/`
-      )
-      return response.data
-    },
+  /**
+   * Supprimer un compte broker
+   */
+  async deleteAccount(id: number): Promise<void> {
+    await this.api.delete(`/broker-accounts/${id}/`)
+  }
 
-    /**
-     * Récupérer le solde EUR d'un compte broker
-     */
-    async getBalanceEur(accountId: number): Promise<{
-      success: boolean
-      balance_eur: number
-      currency: string
-      all_balances: Record<string, number>
-      timestamp?: string
-      error?: string
-    }> {
-      const response = await apiClient.get(`/broker-accounts/${accountId}/balance-eur/`)
-      return response.data
-    },
+  /**
+   * Tester la connexion à un broker
+   */
+  async testConnection(accountId: number): Promise<TestConnectionResponse> {
+    const response = await this.api.post(
+      `/broker-accounts/${accountId}/test-connection/`
+    )
+    return response.data
+  }
 
-    /**
-     * Rafraîchir le solde d'un compte broker
-     */
-    async refreshBalance(accountId: number): Promise<{
-      success: boolean
-      balance_eur: number
-      currency: string
-      all_balances: Record<string, number>
-      account: BrokerAccount
-      error?: string
-    }> {
-      const response = await apiClient.post(`/broker-accounts/${accountId}/refresh-balance/`)
-      return response.data
-    },
+  /**
+   * Récupérer le solde EUR d'un compte broker
+   */
+  async getBalanceEur(accountId: number): Promise<{
+    success: boolean
+    balance_eur: number
+    currency: string
+    all_balances: Record<string, number>
+    timestamp?: string
+    error?: string
+  }> {
+    const response = await this.api.get(`/broker-accounts/${accountId}/balance-eur/`)
+    return response.data
+  }
 
-    /**
-     * Récupérer les credentials (masqués) d'un compte broker
-     */
-    async getCredentials(accountId: number): Promise<{
-      broker_type: string
-      credentials_dict: Record<string, any>
-      raw_fields: Record<string, any>
-      has_api_key: boolean
-      has_api_secret: boolean
-      testnet: boolean
-      environment: string
-    }> {
-      const response = await apiClient.get(`/broker-accounts/${accountId}/credentials/`)
-      return response.data
-    },
+  /**
+   * Rafraîchir le solde d'un compte broker
+   */
+  async refreshBalance(accountId: number): Promise<{
+    success: boolean
+    balance_eur: number
+    currency: string
+    all_balances: Record<string, number>
+    account: BrokerAccount
+    error?: string
+  }> {
+    const response = await this.api.post(`/broker-accounts/${accountId}/refresh-balance/`)
+    return response.data
+  }
 
-    /**
-     * Obtenir l'URL d'authentification Saxo (OAuth2)
-     */
-    async getSaxoAuthUrl(accountId: number): Promise<{ auth_url: string; state: string }> {
-      const response = await apiClient.get(`/broker-accounts/${accountId}/saxo-auth-url/`)
-      return response.data
-    },
+  /**
+   * Récupérer les credentials (masqués) d'un compte broker
+   */
+  async getCredentials(accountId: number): Promise<{
+    broker_type: string
+    credentials_dict: Record<string, any>
+    raw_fields: Record<string, any>
+    has_api_key: boolean
+    has_api_secret: boolean
+    testnet: boolean
+    environment: string
+  }> {
+    const response = await this.api.get(`/broker-accounts/${accountId}/credentials/`)
+    return response.data
+  }
 
-    /**
-     * Échanger le code d'autorisation Saxo contre des tokens
-     */
-    async exchangeSaxoAuthCode(accountId: number, code: string, state?: string): Promise<BrokerAccount> {
-      const response = await apiClient.post(`/broker-accounts/${accountId}/saxo-exchange-code/`, {
-        code,
-        state,
-      })
-      return response.data
-    },
+  /**
+   * Obtenir l'URL d'authentification Saxo (OAuth2)
+   */
+  async getSaxoAuthUrl(accountId: number): Promise<{ auth_url: string; state: string }> {
+    const response = await this.api.get(
+      `/broker-accounts/${accountId}/saxo-auth-url/`
+    )
+    return response.data
+  }
 
-    /**
-     * Rafraîchir le token Saxo
-     */
-    async refreshSaxoToken(accountId: number): Promise<BrokerAccount> {
-      const response = await apiClient.post(`/broker-accounts/${accountId}/saxo-refresh-token/`)
-      return response.data
-    },
+  /**
+   * Échanger le code d'autorisation Saxo contre des tokens
+   */
+  async exchangeSaxoAuthCode(accountId: number, code: string, state?: string): Promise<BrokerAccount> {
+    const response = await this.api.post(`/broker-accounts/${accountId}/saxo-exchange-code/`, {
+      code,
+      state,
+    })
+    return response.data
+  }
 
-    /**
-     * Supprimer les tokens Saxo
-     */
-    async deleteSaxoTokens(accountId: number): Promise<BrokerAccount> {
-      const response = await apiClient.post(`/broker-accounts/${accountId}/saxo-delete-tokens/`)
-      return response.data
-    },
+  /**
+   * Rafraîchir le token Saxo
+   */
+  async refreshSaxoToken(accountId: number): Promise<BrokerAccount> {
+    const response = await this.api.post(`/broker-accounts/${accountId}/saxo-refresh-token/`)
+    return response.data
+  }
 
-    /**
-     * Récupérer les assets depuis Saxo
-     */
-    async getSaxoAssets(
-      accountId: number,
-      options?: {
-        asset_type?: string
-        keywords?: string
-        limit?: number
-      }
-    ): Promise<{
-      success: boolean
-      count: number
-      assets: Array<{
-        symbol: string
-        name: string
-        asset_type: string
-        exchange: string
-        currency: string
-        is_tradable: boolean
-        broker_id: string | null
-      }>
-      error?: string
-    }> {
-      const params = new URLSearchParams()
-      if (options?.asset_type) params.append('asset_type', options.asset_type)
-      if (options?.keywords) params.append('keywords', options.keywords)
-      if (options?.limit) params.append('limit', options.limit.toString())
+  /**
+   * Supprimer les tokens Saxo
+   */
+  async deleteSaxoTokens(accountId: number): Promise<BrokerAccount> {
+    const response = await this.api.post(`/broker-accounts/${accountId}/saxo-delete-tokens/`)
+    return response.data
+  }
 
-      try {
-        const response = await apiClient.get(`/broker-accounts/${accountId}/saxo-assets/?${params.toString()}`)
-        return response.data
-      } catch (error: any) {
-        return {
-          success: false,
-          count: 0,
-          assets: [],
-          error: error.response?.data?.error || error.message || 'Failed to fetch Saxo assets',
-        }
-      }
-    },
-
-    /**
-     * Récupérer les positions depuis Saxo
-     */
-    async getSaxoPositions(accountId: number): Promise<{
-      success: boolean
-      count: number
-      positions: Array<{
-        symbol: string
-        quantity: number
-        entry_price: number
-        current_price: number | null
-        unrealized_pnl: number | null
-        currency: string
-        side: string
-        broker_id: string | null
-      }>
-      error?: string
-    }> {
-      try {
-        const response = await apiClient.get(`/broker-accounts/${accountId}/saxo-positions/`)
-        return response.data
-      } catch (error: any) {
-        return {
-          success: false,
-          count: 0,
-          positions: [],
-          error: error.response?.data?.error || error.message || 'Failed to fetch Saxo positions',
-        }
-      }
-    },
-
-    /**
-     * Récupérer les transactions depuis Saxo
-     */
-    async getSaxoTransactions(
-      accountId: number,
-      options?: {
-        from_date?: string
-        to_date?: string
-        limit?: number
-      }
-    ): Promise<{
-      success: boolean
-      count: number
-      transactions: Array<any>
-      error?: string
-    }> {
-      const params = new URLSearchParams()
-      if (options?.from_date) params.append('from_date', options.from_date)
-      if (options?.to_date) params.append('to_date', options.to_date)
-      if (options?.limit) params.append('limit', options.limit.toString())
-
-      try {
-        const response = await apiClient.get(`/broker-accounts/${accountId}/saxo-transactions/?${params.toString()}`)
-        return response.data
-      } catch (error: any) {
-        return {
-          success: false,
-          count: 0,
-          transactions: [],
-          error: error.response?.data?.error || error.message || 'Failed to fetch Saxo transactions',
-        }
-      }
-    },
-
-    /**
-     * Récupérer les assets depuis Binance
-     */
-    async getBinanceAssets(
-      accountId: number,
-      options?: {
-        asset_type?: string
-        keywords?: string
-        limit?: number
-      }
-    ): Promise<{
-      success: boolean
-      count: number
-      assets: Array<{
-        symbol: string
-        name: string
-        asset_type: string
-        exchange: string
-        currency: string
-        is_tradable: boolean
-        broker_id: string | null
-      }>
-      error?: string
-    }> {
-      const params = new URLSearchParams()
-      if (options?.asset_type) params.append('asset_type', options.asset_type)
-      if (options?.keywords) params.append('keywords', options.keywords)
-      if (options?.limit) params.append('limit', options.limit.toString())
-
-      try {
-        const response = await apiClient.get(`/broker-accounts/${accountId}/binance-assets/?${params.toString()}`)
-        return response.data
-      } catch (error: any) {
-        return {
-          success: false,
-          count: 0,
-          assets: [],
-          error: error.response?.data?.error || error.message || 'Failed to fetch Binance assets',
-        }
-      }
-    },
-
-    /**
-     * Récupérer les positions depuis Binance
-     */
-    async getBinancePositions(accountId: number): Promise<{
-      success: boolean
-      count: number
-      positions: Array<{
-        symbol: string
-        quantity: number
-        entry_price: number | null
-        current_price: number | null
-        unrealized_pnl: number | null
-        currency: string
-        side: string
-        broker_id: string | null
-      }>
-      error?: string
-    }> {
-      try {
-        const response = await apiClient.get(`/broker-accounts/${accountId}/binance-positions/`)
-        return response.data
-      } catch (error: any) {
-        return {
-          success: false,
-          count: 0,
-          positions: [],
-          error: error.response?.data?.error || error.message || 'Failed to fetch Binance positions',
-        }
-      }
-    },
-
-    /**
-     * Synchroniser les données depuis un broker
-     */
-    async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {
-      const response = await apiClient.post<{
-        success: boolean
-        message: string
-        error?: string
-        sync_log: BrokerSyncLog
-        details?: any
-      }>(
-        `/broker-accounts/${accountId}/sync/`,
-        syncRequest,
-        {
-          timeout: 600000, // 10 minutes
-        }
-      )
-      return response.data.sync_log
-    },
-
-    /**
-     * Récupérer les logs de synchronisation
-     */
-    async getSyncLogs(accountId?: number): Promise<ApiResponse<BrokerSyncLog>> {
-      const params = accountId ? { broker_account: accountId } : {}
-      const response = await apiClient.get<ApiResponse<BrokerSyncLog>>('/broker-sync-logs/', {
-        params,
-      })
-      return response.data
-    },
-
-    /**
-     * Récupérer le dernier log de synchronisation
-     */
-    async getLastSyncLog(accountId: number, syncType?: string): Promise<BrokerSyncLog | null> {
-      const params: Record<string, any> = { broker_account: accountId }
-      if (syncType) {
-        params.sync_type = syncType
-      }
-      
-      const response = await apiClient.get<ApiResponse<BrokerSyncLog>>('/broker-sync-logs/', {
-        params: { ...params, page_size: 1, ordering: '-started_at' },
-      })
-      
-      return response.data.results[0] || null
-    },
-
-    /**
-     * Valider les symboles Yahoo Finance pour tous les assets
-     */
-    async validateYahooSymbols(options?: {
-      reset?: boolean
+  /**
+   * Récupérer les assets depuis Saxo
+   */
+  async getSaxoAssets(
+    accountId: number,
+    options?: {
+      asset_type?: string
+      keywords?: string
       limit?: number
-      platform?: string
-      onlyExistingAssets?: boolean
-    }): Promise<{
-      success: boolean
-      message: string
-      processed: number
-      validated: number
-      failed: number
-      not_found: number
-      details: {
-        y4_matches: number
-        y3_matches: number
-        y0_matches: number
-      }
-      error?: string
-    }> {
-      const response = await apiClient.post(
-        '/all-assets/validate-yahoo-symbols/',
-        options || {},
-        {
-          timeout: 600000, // 10 minutes
-        }
-      )
+    }
+  ): Promise<{
+    success: boolean
+    count: number
+    assets: Array<{
+      symbol: string
+      name: string
+      asset_type: string
+      exchange: string
+      currency: string
+      is_tradable: boolean
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    const params = new URLSearchParams()
+    if (options?.asset_type) params.append('asset_type', options.asset_type)
+    if (options?.keywords) params.append('keywords', options.keywords)
+    if (options?.limit) params.append('limit', options.limit.toString())
+
+    try {
+      const response = await this.api.get(`/broker-accounts/${accountId}/saxo-assets/?${params.toString()}`)
       return response.data
-    },
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        assets: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Saxo assets',
+      }
+    }
+  }
+
+  /**
+   * Récupérer les positions depuis Saxo
+   */
+  async getSaxoPositions(accountId: number): Promise<{
+    success: boolean
+    count: number
+    positions: Array<{
+      symbol: string
+      quantity: number
+      entry_price: number
+      current_price: number | null
+      unrealized_pnl: number | null
+      currency: string
+      side: string
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    try {
+      const response = await this.api.get(`/broker-accounts/${accountId}/saxo-positions/`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        positions: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Saxo positions',
+      }
+    }
+  }
+
+  /**
+   * Récupérer les transactions depuis Saxo (hist/v1/transactions)
+   */
+  async getSaxoTransactions(
+    accountId: number,
+    options?: {
+      from_date?: string
+      to_date?: string
+      limit?: number
+    }
+  ): Promise<{
+    success: boolean
+    count: number
+    transactions: Array<any>
+    error?: string
+  }> {
+    const params = new URLSearchParams()
+    if (options?.from_date) params.append('from_date', options.from_date)
+    if (options?.to_date) params.append('to_date', options.to_date)
+    if (options?.limit) params.append('limit', options.limit.toString())
+
+    try {
+      const response = await this.api.get(`/broker-accounts/${accountId}/saxo-transactions/?${params.toString()}`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        transactions: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Saxo transactions',
+      }
+    }
+  }
+
+  /**
+   * Récupérer les assets depuis Binance
+   */
+  async getBinanceAssets(
+    accountId: number,
+    options?: {
+      asset_type?: string
+      keywords?: string
+      limit?: number
+    }
+  ): Promise<{
+    success: boolean
+    count: number
+    assets: Array<{
+      symbol: string
+      name: string
+      asset_type: string
+      exchange: string
+      currency: string
+      is_tradable: boolean
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    const params = new URLSearchParams()
+    if (options?.asset_type) params.append('asset_type', options.asset_type)
+    if (options?.keywords) params.append('keywords', options.keywords)
+    if (options?.limit) params.append('limit', options.limit.toString())
+
+    try {
+      const response = await this.api.get(`/broker-accounts/${accountId}/binance-assets/?${params.toString()}`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        assets: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Binance assets',
+      }
+    }
+  }
+
+  /**
+   * Récupérer les positions depuis Binance
+   */
+  async getBinancePositions(accountId: number): Promise<{
+    success: boolean
+    count: number
+    positions: Array<{
+      symbol: string
+      quantity: number
+      entry_price: number | null
+      current_price: number | null
+      unrealized_pnl: number | null
+      currency: string
+      side: string
+      broker_id: string | null
+    }>
+    error?: string
+  }> {
+    try {
+      const response = await this.api.get(`/broker-accounts/${accountId}/binance-positions/`)
+      return response.data
+    } catch (error: any) {
+      return {
+        success: false,
+        count: 0,
+        positions: [],
+        error: error.response?.data?.error || error.message || 'Failed to fetch Binance positions',
+      }
+    }
+  }
+
+  /**
+   * Synchroniser les données depuis un broker
+   * Timeout augmenté à 10 minutes pour les synchronisations longues (ex: 20k+ assets)
+   */
+  async sync(accountId: number, syncRequest: SyncRequest): Promise<BrokerSyncLog> {
+    const response = await this.api.post(
+      `/broker-accounts/${accountId}/sync/`,
+      syncRequest,
+      {
+        timeout: 600000, // 10 minutes (600000 ms) pour les synchronisations longues
+      }
+    )
+    // Le backend retourne { success, message, sync_log, ... }, on retourne le sync_log
+    return response.data.sync_log
+  }
+
+  /**
+   * Récupérer les logs de synchronisation
+   */
+  async getSyncLogs(accountId?: number): Promise<ApiResponse<BrokerSyncLog>> {
+    const params = accountId ? { broker_account: accountId } : {}
+    const response = await this.api.get('/broker-sync-logs/', {
+      params,
+    })
+    return response.data
+  }
+
+  /**
+   * Récupérer le dernier log de synchronisation
+   */
+  async getLastSyncLog(accountId: number, syncType?: string): Promise<BrokerSyncLog | null> {
+    const params: Record<string, any> = { broker_account: accountId }
+    if (syncType) {
+      params.sync_type = syncType
+    }
+
+    const response = await this.api.get('/broker-sync-logs/', {
+      params: { ...params, page_size: 1, ordering: '-started_at' },
+    })
+
+    return response.data.results[0] || null
+  }
+
+  /**
+   * Valider les symboles Yahoo Finance pour tous les assets
+   */
+  async validateYahooSymbols(options?: {
+    reset?: boolean
+    limit?: number
+    platform?: string
+    onlyExistingAssets?: boolean
+  }): Promise<{
+    success: boolean
+    message: string
+    processed: number
+    validated: number
+    failed: number
+    not_found: number
+    details: {
+      y4_matches: number
+      y3_matches: number
+      y0_matches: number
+    }
+    error?: string
+  }> {
+    const response = await this.api.post(
+      '/all-assets/validate-yahoo-symbols/',
+      options || {},
+      {
+        timeout: 600000, // 10 minutes pour la validation Yahoo (peut prendre du temps)
+      }
+    )
+    return response.data
   }
 }
+
+
+
+
 

@@ -534,3 +534,5 @@ const TradesChart = ({ trades, selectedAssets }) => {
 
 **Dernière mise à jour** : Basé sur l'expérience du projet Trading App v4
 
+
+

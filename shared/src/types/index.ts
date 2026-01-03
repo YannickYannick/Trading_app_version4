@@ -163,6 +163,9 @@ export interface Strategy {
   portfolio_quantity?: number
   target_min_quantity?: number
   target_max_quantity?: number
+  min_quantity?: number
+  max_quantity?: number
+  budget?: number
   broker_account?: { id: number; name: string }
   broker_account_id?: number
   broker_name?: string
@@ -184,6 +187,11 @@ export interface Strategy {
     value: string
     param_type: 'int' | 'float' | 'str' | 'bool'
     description?: string
+  }>
+  algorithm_parameters_data?: Array<{
+    key: string
+    value: string
+    param_type: 'int' | 'float' | 'str' | 'bool'
   }>
 }
 
@@ -220,7 +228,7 @@ export interface BrokerAccount {
   account_id: string
   environment: 'live' | 'simulation'
   environment_display?: string
-  
+
   // Credentials Saxo
   saxo_client_id?: string | null
   saxo_client_secret?: string | null
@@ -229,12 +237,12 @@ export interface BrokerAccount {
   saxo_access_token?: string | null
   saxo_refresh_token?: string | null
   saxo_token_expires_at?: string | null
-  
+
   // Credentials Binance
   binance_api_key?: string | null
   binance_api_secret?: string | null
   binance_testnet?: boolean
-  
+
   // Credentials génériques
   api_key?: string
   api_secret?: string
@@ -244,11 +252,11 @@ export interface BrokerAccount {
   refresh_token?: string
   token_expires_at?: string | null
   extra_credentials?: Record<string, any>
-  
+
   // Auto-refresh
   auto_refresh_enabled?: boolean
   auto_refresh_frequency?: number
-  
+
   // Balance et statut
   balance?: number | null
   currency?: string
@@ -257,11 +265,11 @@ export interface BrokerAccount {
   is_active: boolean
   is_demo?: boolean
   is_sandbox: boolean
-  
+
   // Timestamps
   created_at?: string
   updated_at?: string
-  
+
   user: number
 }
 
@@ -286,6 +294,13 @@ export interface ApiResponse<T> {
   next: string | null
   previous: string | null
   results: T[]
+}
+
+export interface ApiError {
+  error: string
+  code?: string
+  details?: Record<string, any>
+  message?: string
 }
 
 // ============================================================================
@@ -362,7 +377,7 @@ export interface OrderChild {
   quantity: number
   filled_quantity: number
   price: number | null
-  stop_price?: number | null
+  stop_price: number | null
   order_type: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
   status: 'PENDING' | 'OPEN' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED' | 'REJECTED' | 'EXPIRED'
   broker_name: string | null
@@ -416,4 +431,6 @@ export interface PaginationParams {
   search?: string
   ordering?: string
 }
+
+
 

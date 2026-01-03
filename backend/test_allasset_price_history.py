@@ -116,3 +116,5 @@ if __name__ == '__main__':
         test_allasset_price_history(asset.id)
         print()
 
+
+

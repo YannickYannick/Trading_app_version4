@@ -6,7 +6,7 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', '*']
 
 # Database - Utilise la config de base.py (PostgreSQL ou SQLite selon USE_SUPABASE)
 # Ne pas override ici !
@@ -34,7 +34,7 @@ CORS_ALLOWED_ORIGINS = [
 
 # Option alternative : autoriser toutes les origines en dev
 # ⚠️ Moins sécurisé mais plus simple pour le développement
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 # URLs exposées dans les réponses CORS
 CORS_EXPOSE_HEADERS = [

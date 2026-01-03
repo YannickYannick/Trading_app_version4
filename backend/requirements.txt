@@ -1,6 +1,8 @@
 # Django et dépendances de base
 Django>=6.0
 python-decouple>=3.8
+gunicorn>=21.2.0
+waitress>=3.0.0
 
 # API REST
 djangorestframework>=3.16.0

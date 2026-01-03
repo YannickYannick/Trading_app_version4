@@ -17,3 +17,5 @@ export interface ErrorState {
 
 export type ErrorType = 'network' | 'auth' | 'client' | 'server' | 'validation' | 'unknown'
 
+
+

@@ -53,3 +53,5 @@ pip install numpy pandas
 - Vérifier les logs pour voir l'erreur exacte
 - Vérifier que la base de données est accessible
 
+
+

@@ -1037,9 +1037,9 @@ class TradeViewSet(viewsets.ModelViewSet):
         since = timezone.now() - timedelta(days=days)
         recent_trades = trades.filter(executed_at__gte=since)
         
-        # Utiliser 'side' si disponible, sinon 'trade_type'
-        buy_trades = recent_trades.filter(Q(side='BUY') | Q(trade_type='BUY'))
-        sell_trades = recent_trades.filter(Q(side='SELL') | Q(trade_type='SELL'))
+        # Utiliser 'trade_type' (le modèle Trade n'a pas de champ side)
+        buy_trades = recent_trades.filter(trade_type='BUY')
+        sell_trades = recent_trades.filter(trade_type='SELL')
         
         # Calculer le win_rate si possible
         # Vérifier si le modèle Trade a un champ pour calculer win/loss

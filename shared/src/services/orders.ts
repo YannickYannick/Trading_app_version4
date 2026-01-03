@@ -1,8 +1,8 @@
 /**
- * Service pour les Orders (shared)
+ * Service pour les Orders
  */
-import type { AxiosInstance } from 'axios'
-import type { ApiResponse, Order } from '../types'
+import apiClient from './api/client'
+import type { ApiResponse, Order, ApiError } from '@types'
 
 export interface OrderFilters {
   status?: 'PENDING' | 'FILLED' | 'CANCELLED' | 'REJECTED'
@@ -33,7 +33,7 @@ export interface PlaceOrderData {
   price?: string
   stop_price?: string
   asset_id?: number
-  all_asset_id?: number
+  all_asset_id?: number  // ID AllAssets (prioritaire sur symbol pour la recherche)
 }
 
 export interface SyncOrdersData {
@@ -60,50 +60,79 @@ export interface AssetPriceResponse {
   }
 }
 
-/**
- * Factory function pour créer le service orders
- */
-export function createOrderService(apiClient: AxiosInstance) {
-  return {
-    async getAll(filters?: OrderFilters): Promise<ApiResponse<Order>> {
-      const response = await apiClient.get<ApiResponse<Order>>('/orders/', {
-        params: filters,
-      })
-      return response.data
-    },
+export const orderService = {
+  /**
+   * Récupérer tous les ordres
+   */
+  async getAll(filters?: OrderFilters): Promise<ApiResponse<Order>> {
+    const response = await apiClient.get<ApiResponse<Order>>('/orders/', {
+      params: filters,
+    })
+    return response.data
+  },
 
-    async getById(id: number): Promise<Order> {
-      const response = await apiClient.get<Order>(`/orders/${id}/`)
-      return response.data
-    },
+  /**
+   * Récupérer un ordre par ID
+   */
+  async getById(id: number): Promise<Order> {
+    const response = await apiClient.get<Order>(`/orders/${id}/`)
+    return response.data
+  },
 
-    async getPending(filters?: Omit<OrderFilters, 'status'>): Promise<Order[]> {
-      const response = await apiClient.get<ApiResponse<Order>>('/orders/', {
-        params: { ...filters, status: 'PENDING' },
-      })
-      return response.data.results
-    },
+  /**
+   * Récupérer les ordres en attente
+   */
+  async getPending(filters?: Omit<OrderFilters, 'status'>): Promise<Order[]> {
+    const response = await apiClient.get<ApiResponse<Order>>('/orders/', {
+      params: { ...filters, status: 'PENDING' },
+    })
+    return response.data.results
+  },
 
-    async create(data: OrderCreateData): Promise<Order> {
-      const response = await apiClient.post<Order>('/orders/', data)
-      return response.data
-    },
+  /**
+   * Créer un ordre
+   */
+  async create(data: OrderCreateData): Promise<Order> {
+    const response = await apiClient.post<Order>('/orders/', data)
+    return response.data
+  },
 
-    async update(id: number, data: Partial<Order>): Promise<Order> {
-      const response = await apiClient.patch<Order>(`/orders/${id}/`, data)
-      return response.data
-    },
+  /**
+   * Mettre à jour un ordre
+   */
+  async update(id: number, data: Partial<Order>): Promise<Order> {
+    const response = await apiClient.patch<Order>(`/orders/${id}/`, data)
+    return response.data
+  },
 
-    async cancel(id: number): Promise<Order> {
-      const response = await apiClient.post<Order>(`/orders/${id}/cancel/`)
-      return response.data
-    },
+  /**
+   * Annuler un ordre
+   */
+  async cancel(id: number): Promise<Order> {
+    const response = await apiClient.post<Order>(`/orders/${id}/cancel/`)
+    return response.data
+  },
 
-    async delete(id: number): Promise<void> {
-      await apiClient.delete(`/orders/${id}/`)
-    },
+  /**
+   * Supprimer un ordre
+   */
+  async delete(id: number): Promise<void> {
+    await apiClient.delete(`/orders/${id}/`)
+  },
 
-    async placeOrder(data: PlaceOrderData): Promise<{
+  /**
+   * Placer un ordre directement via le broker
+   */
+  async placeOrder(data: PlaceOrderData): Promise<{
+    success: boolean
+    message: string
+    order: Order
+    broker_result?: {
+      order_id: string
+      message: string
+    }
+  }> {
+    const response = await apiClient.post<{
       success: boolean
       message: string
       order: Order
@@ -111,12 +140,23 @@ export function createOrderService(apiClient: AxiosInstance) {
         order_id: string
         message: string
       }
-    }> {
-      const response = await apiClient.post('/orders/place/', data)
-      return response.data
-    },
+    }>('/orders/place/', data)
+    return response.data
+  },
 
-    async placeBrokerOrder(id: number): Promise<{
+  /**
+   * Placer un ordre existant (PENDING) via le broker
+   */
+  async placeBrokerOrder(id: number): Promise<{
+    success: boolean
+    message: string
+    order: Order
+    broker_result?: {
+      order_id: string
+      message: string
+    }
+  }> {
+    const response = await apiClient.post<{
       success: boolean
       message: string
       order: Order
@@ -124,39 +164,60 @@ export function createOrderService(apiClient: AxiosInstance) {
         order_id: string
         message: string
       }
-    }> {
-      const response = await apiClient.post(`/orders/${id}/place_broker/`)
-      return response.data
-    },
+    }>(`/orders/${id}/place_broker/`)
+    return response.data
+  },
 
-    async cancelBrokerOrder(id: number): Promise<{
+  /**
+   * Annuler un ordre chez le broker
+   */
+  async cancelBrokerOrder(id: number): Promise<{
+    success: boolean
+    message: string
+    order: Order
+  }> {
+    const response = await apiClient.post<{
       success: boolean
       message: string
       order: Order
-    }> {
-      const response = await apiClient.post(`/orders/${id}/cancel_broker/`)
-      return response.data
-    },
+    }>(`/orders/${id}/cancel_broker/`)
+    return response.data
+  },
 
-    async syncOrders(data: SyncOrdersData): Promise<{
+  /**
+   * Synchroniser les ordres depuis un broker
+   */
+  async syncOrders(data: SyncOrdersData): Promise<{
+    success: boolean
+    message: string
+    created: number
+    updated: number
+    errors: string[]
+  }> {
+    const response = await apiClient.post<{
       success: boolean
       message: string
       created: number
       updated: number
       errors: string[]
-    }> {
-      const response = await apiClient.post('/orders/sync/', data)
-      return response.data
-    },
+    }>('/orders/sync/', data)
+    return response.data
+  },
 
-    async getAssetPrice(data: {
-      broker_account_id: number
-      symbol: string
-      all_asset_id?: number
-    }): Promise<AssetPriceResponse> {
-      const response = await apiClient.post('/orders/get_asset_price/', data)
-      return response.data
-    },
-  }
+  /**
+   * Récupérer le prix d'un actif depuis le broker ET Yahoo (en parallèle)
+   */
+  async getAssetPrice(data: {
+    broker_account_id: number
+    symbol: string
+    all_asset_id?: number
+  }): Promise<AssetPriceResponse> {
+    const response = await apiClient.post<AssetPriceResponse>('/orders/get_asset_price/', data)
+    return response.data
+  },
 }
+
+export default orderService
+
+
 

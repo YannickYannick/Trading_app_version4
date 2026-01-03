@@ -1,20 +1,17 @@
 {
-  "name": "shared",
+  "name": "@trading-app/shared",
   "version": "1.0.0",
-  "description": "Shared types and services for Trading App",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": ["typescript", "shared", "trading"],
-  "author": "",
-  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "jwt-decode": "^4.0.0"
+  },
   "devDependencies": {
-    "typescript": "~5.6.2"
-  },
-  "peerDependencies": {
-    "axios": "^1.7.9"
+    "typescript": "^5.0.0"
   }
 }
 

@@ -35,3 +35,5 @@ Si ce message n'apparaît pas, c'est que le routage DRF ne trouve toujours pas l
 - Vérifier les permissions utilisateur
 - Vérifier que le ViewSet est bien enregistré dans le router
 
+
+

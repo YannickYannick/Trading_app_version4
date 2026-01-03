@@ -84,3 +84,5 @@ def test_prices_endpoint_with_auth():
 if __name__ == '__main__':
     test_prices_endpoint_with_auth()
 
+
+
