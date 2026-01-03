@@ -153,3 +153,5 @@ Ces templates étendent `admin/change_form.html` et ajoutent une section "Action
    - Si un objet n'a pas d'AllAsset associé, il est ignoré silencieusement
    - Un message d'avertissement est affiché si aucun AllAsset n'est trouvé dans la sélection
 
+
+

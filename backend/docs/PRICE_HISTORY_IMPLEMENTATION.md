@@ -346,3 +346,5 @@ L'implémentation de l'historique des prix a nécessité :
 
 Le système est maintenant fonctionnel et prêt pour la production, avec une base solide pour les futures améliorations.
 
+
+

@@ -1,8 +1,5 @@
-/**
- * Service pour les Strategies (shared)
- */
-import type { AxiosInstance } from 'axios'
-import type { ApiResponse, Strategy, StrategyPerformance } from '../types'
+import { ApiClient } from '../services/auth'
+import type { Strategy, StrategyPerformance, ApiResponse } from '../types'
 
 export interface StrategyFilters {
   is_active?: boolean
@@ -22,61 +19,92 @@ export interface StrategyCreateData {
   is_active?: boolean
   is_automated?: boolean
   strategy_type?: string
+  algorithm_type?: string
+  all_asset_id?: number
 }
 
-/**
- * Factory function pour créer le service strategies
- */
-export function createStrategyService(apiClient: AxiosInstance) {
-  return {
-    async getAll(filters?: StrategyFilters): Promise<ApiResponse<Strategy>> {
-      const response = await apiClient.get<ApiResponse<Strategy>>('/strategies/', {
-        params: filters,
-      })
-      return response.data
-    },
+export class StrategiesService {
+  private api: any
 
-    async getById(id: number): Promise<Strategy> {
-      const response = await apiClient.get<Strategy>(`/strategies/${id}/`)
-      return response.data
-    },
+  constructor(apiClient: ApiClient) {
+    this.api = apiClient.getInstance()
+  }
 
-    async getActive(): Promise<Strategy[]> {
-      const response = await apiClient.get<ApiResponse<Strategy>>('/strategies/', {
-        params: { is_active: true },
-      })
-      return response.data.results
-    },
+  /**
+   * Récupérer toutes les stratégies
+   */
+  async getAll(filters?: StrategyFilters): Promise<ApiResponse<Strategy>> {
+    const response = await this.api.get('/strategies/', {
+      params: filters,
+    })
+    return response.data
+  }
 
-    async create(data: StrategyCreateData): Promise<Strategy> {
-      const response = await apiClient.post<Strategy>('/strategies/', data)
-      return response.data
-    },
+  /**
+   * Récupérer une stratégie par ID
+   */
+  async getById(id: number): Promise<Strategy> {
+    const response = await this.api.get(`/strategies/${id}/`)
+    return response.data
+  }
 
-    async update(id: number, data: Partial<Strategy>): Promise<Strategy> {
-      const response = await apiClient.patch<Strategy>(`/strategies/${id}/`, data)
-      return response.data
-    },
+  /**
+   * Récupérer les stratégies actives
+   */
+  async getActive(): Promise<Strategy[]> {
+    const response = await this.api.get('/strategies/', {
+      params: { is_active: true },
+    })
+    return response.data.results
+  }
 
-    async toggleActive(id: number, isActive: boolean): Promise<Strategy> {
-      return this.update(id, { is_active: isActive })
-    },
+  /**
+   * Créer une stratégie
+   */
+  async create(data: StrategyCreateData): Promise<Strategy> {
+    const response = await this.api.post('/strategies/', data)
+    return response.data
+  }
 
-    async delete(id: number): Promise<void> {
-      await apiClient.delete(`/strategies/${id}/`)
-    },
+  /**
+   * Mettre à jour une stratégie
+   */
+  async update(id: number, data: Partial<Strategy>): Promise<Strategy> {
+    const response = await this.api.patch(`/strategies/${id}/`, data)
+    return response.data
+  }
 
-    async getPerformance(strategyId: number): Promise<ApiResponse<StrategyPerformance>> {
-      const response = await apiClient.get<ApiResponse<StrategyPerformance>>(
-        `/strategies/${strategyId}/performance/`
-      )
-      return response.data
-    },
+  /**
+   * Activer/Désactiver une stratégie
+   */
+  async toggleActive(id: number, isActive: boolean): Promise<Strategy> {
+    return this.update(id, { is_active: isActive })
+  }
 
-    async getAllPerformance(): Promise<ApiResponse<StrategyPerformance>> {
-      const response = await apiClient.get<ApiResponse<StrategyPerformance>>('/strategy-performance/')
-      return response.data
-    },
+  /**
+   * Supprimer une stratégie
+   */
+  async delete(id: number): Promise<void> {
+    await this.api.delete(`/strategies/${id}/`)
+  }
+
+  /**
+   * Récupérer les performances d'une stratégie
+   */
+  async getPerformance(strategyId: number): Promise<ApiResponse<StrategyPerformance>> {
+    const response = await this.api.get(
+      `/strategies/${strategyId}/performance/`
+    )
+    return response.data
+  }
+
+  /**
+   * Récupérer toutes les performances
+   */
+  async getAllPerformance(): Promise<ApiResponse<StrategyPerformance>> {
+    const response = await this.api.get('/strategy-performance/')
+    return response.data
   }
 }
+
 

@@ -372,3 +372,5 @@ Position reçue: Symbol="UIC_99999", UIC=99999
 - [Documentation API Saxo - Instrument Details](saxo_instrument_details_api.md)
 - [Documentation API Saxo - Positions](https://www.developer.saxo/openapi/referencedocs/port/v1/positions/getpositions)
 
+
+

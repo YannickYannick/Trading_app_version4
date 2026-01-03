@@ -407,3 +407,5 @@ class AlgorithmFactory:
         """Retourne la liste des algorithmes supportés"""
         return list(cls._algorithms.keys())
 
+
+

@@ -35,3 +35,5 @@ if method:
 else:
     print("❌ Méthode prices non trouvée")
 
+
+

@@ -1,236 +1,60 @@
-/**
- * Service pour les Assets (shared)
- */
-import type { AxiosInstance } from 'axios'
-import type {
-  ApiResponse,
-  Asset,
-  AllAsset,
-  AssetWithChildren,
-  AssetsOverviewResponse,
-} from '../types'
+import { ApiClient } from '../services/auth'
+import type { AllAsset, ApiResponse } from '../types'
 
-export interface AssetFilters {
-  platform?: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
-  asset_type?: string
-  search?: string
-  is_tradable?: boolean
-  page?: number
-  page_size?: number
-  ordering?: string
-}
+export class AssetsService {
+  private api: any
 
-export interface AllAssetFilters {
-  platform?: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
-  asset_type?: string
-  search?: string
-  symbole_yahoo?: string
-  page?: number
-  page_size?: number
-}
+  constructor(apiClient: ApiClient) {
+    this.api = apiClient.getInstance()
+  }
 
-/**
- * Factory function pour créer le service assets
- */
-export function createAssetService(apiClient: AxiosInstance) {
-  return {
-    async getAllAssets(filters?: AllAssetFilters): Promise<ApiResponse<AllAsset>> {
-      const response = await apiClient.get<ApiResponse<AllAsset>>('/all-assets/', {
-        params: filters,
-      })
-      return response.data
-    },
+  /**
+   * Rechercher des actifs (AllAsset)
+   */
+  async search(query: string): Promise<ApiResponse<AllAsset>> {
+    const response = await this.api.get('/all-assets/', {
+      params: { search: query, page_size: 20 },
+    })
+    return response.data
+  }
 
-    async getAllAssetById(id: number): Promise<AllAsset> {
-      const response = await apiClient.get<AllAsset>(`/all-assets/${id}/`)
-      return response.data
-    },
+  /**
+   * Récupérer un actif par ID
+   */
+  async getById(id: number): Promise<AllAsset> {
+    const response = await this.api.get(`/all-assets/${id}/`)
+    return response.data
+  }
 
-    async searchAllAssets(query: string): Promise<AllAsset[]> {
-      const response = await apiClient.get<ApiResponse<AllAsset>>('/all-assets/', {
-        params: { search: query },
-      })
-      return response.data.results
-    },
+  /**
+   * Récupérer l'historique des prix
+   */
+  async getPriceHistory(id: number, days: number = 30, format: 'list' | 'dict' = 'list'): Promise<any> {
+    console.log(`[AssetsService] Fetching history for asset ${id} at /all-assets/${id}/prices/`)
+    const response = await this.api.get(`/all-assets/${id}/prices/`, {
+      params: { days, output_format: format }
+    })
+    return response.data
+  }
 
-    async getAssets(filters?: AssetFilters): Promise<ApiResponse<Asset>> {
-      const response = await apiClient.get<ApiResponse<Asset>>('/assets/', {
-        params: filters,
-      })
-      return response.data
-    },
+  /**
+   * Valider le symbole Yahoo (POST)
+   */
+  async validateYahooSymbol(id: number): Promise<any> {
+    const response = await this.api.post(`/all-assets/${id}/validate_single_yahoo/`)
+    return response.data
+  }
 
-    async getAssetById(id: number): Promise<Asset> {
-      const response = await apiClient.get<Asset>(`/assets/${id}/`)
-      return response.data
-    },
-
-    async getAssetBySymbol(symbol: string): Promise<Asset> {
-      const response = await apiClient.get<Asset>(`/assets/by-symbol/${symbol}/`)
-      return response.data
-    },
-
-    async searchAssets(query: string, filters?: Omit<AssetFilters, 'search'>): Promise<Asset[]> {
-      const response = await apiClient.get<ApiResponse<Asset>>('/assets/', {
-        params: { ...filters, search: query },
-      })
-      return response.data.results
-    },
-
-    async createAsset(data: Partial<Asset>): Promise<Asset> {
-      const response = await apiClient.post<Asset>('/assets/', data)
-      return response.data
-    },
-
-    async updateAsset(id: number, data: Partial<Asset>): Promise<Asset> {
-      const response = await apiClient.patch<Asset>(`/assets/${id}/`, data)
-      return response.data
-    },
-
-    async updatePrice(id: number, price: number): Promise<Asset> {
-      return this.updateAsset(id, { current_price: price })
-    },
-
-    async deleteAsset(id: number): Promise<void> {
-      await apiClient.delete(`/assets/${id}/`)
-    },
-
-    async getPricesBatch(assetIds: number[]): Promise<Record<number, number | null>> {
-      const response = await apiClient.post<Record<number, number | null>>('/assets/batch-prices/', {
-        asset_ids: assetIds,
-      })
-      return response.data
-    },
-
-    async autocompleteAllAssets(query: string, platform?: string): Promise<{
-      id: number
-      symbol: string
-      name: string
-      platform: string
-      asset_type: string
-      currency: string
-      market: string
-      text: string
-      saxo_uic?: number
-    }[]> {
-      const params: any = { q: query }
-      if (platform) {
-        params.platform = platform
-      }
-      const response = await apiClient.get<{ results: any[] }>('/all-assets/autocomplete/', {
-        params,
-      })
-      return response.data.results
-    },
-
-    async getAssetsOverview(includeEmpty: boolean = true): Promise<AssetWithChildren[]> {
-      const response = await apiClient.get<AssetsOverviewResponse>('/assets/overview/', {
-        params: { include_empty: includeEmpty ? 'true' : 'false' },
-      })
-      
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Erreur lors de la récupération des données')
-      }
-      
-      return response.data.data
-    },
-
-    async getAssetsOverviewActive(): Promise<AssetWithChildren[]> {
-      return this.getAssetsOverview(false)
-    },
-
-    async validateYahoo(allAssetId: number): Promise<{ success: boolean; message?: string; yahoo_symbol?: string; error?: string }> {
-      const response = await apiClient.post(
-        `/all-assets/${allAssetId}/validate_single_yahoo/`,
-        {}
-      )
-      return response.data
-    },
-
-    async syncPriceHistory(
-      allAssetId: number,
-      days: number = 365,
-      interval: string = '1d'
-    ): Promise<{ success: boolean; records?: number; message?: string; error?: string }> {
-      const response = await apiClient.post(
-        `/all-assets/${allAssetId}/sync_price_history/`,
-        { days, interval }
-      )
-      return response.data
-    },
-
-    async getYahooCurrentPrice(allAssetId: number): Promise<number | null> {
-      try {
-        const response = await apiClient.get(`/all-assets/${allAssetId}/current_price/`)
-        
-        if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
-          return response.data.price
-        }
-        
-        // Fallback: essayer depuis l'historique
-        try {
-          const historyResponse = await apiClient.get(`/all-assets/${allAssetId}/prices/`, {
-            params: { days: 1, format: 'list' },
-          })
-          
-          if (historyResponse.data.results && historyResponse.data.results.length > 0) {
-            return historyResponse.data.results[0].close || null
-          }
-        } catch (historyError) {
-          // Ignorer
-        }
-        
-        return null
-      } catch (error: any) {
-        if (
-          error?.silent ||
-          error?.response?.status === 404 ||
-          error?.response?.status === 400
-        ) {
-          return null
-        }
-        throw error
-      }
-    },
-
-    async getPriceHistory(
-      allAssetId: number,
-      days: number = 365,
-      format: 'list' | 'json' = 'list'
-    ): Promise<{
-      all_asset_id: number
-      all_asset_symbol: string
-      count: number
-      results: Array<{
-        date: string
-        close: number
-        open: number
-        high: number
-        low: number
-        volume: number
-        close_price?: number
-        open_price?: number
-        high_price?: number
-        low_price?: number
-      }>
-    }> {
-      try {
-        const response = await apiClient.get(`/all-assets/${allAssetId}/prices/`, {
-          params: { days, output_format: format },
-        })
-        return response.data
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
-          return {
-            all_asset_id: allAssetId,
-            all_asset_symbol: '',
-            count: 0,
-            results: [],
-          }
-        }
-        throw error
-      }
-    },
+  /**
+   * Synchroniser l'historique des prix (POST)
+   */
+  async syncPriceHistory(id: number, days: number = 365): Promise<any> {
+    const response = await this.api.post(`/all-assets/${id}/sync_price_history/`, {
+      days,
+      interval: '1d'
+    })
+    return response.data
   }
 }
+
 

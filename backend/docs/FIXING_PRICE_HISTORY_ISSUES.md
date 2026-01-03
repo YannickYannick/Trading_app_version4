@@ -248,3 +248,5 @@ useEffect(() => {
 - **Utiliser des dépendances stables** dans les `useEffect` pour éviter les boucles infinies
 - **Éviter les noms de paramètres réservés** dans les frameworks (comme `format` dans DRF)
 
+
+

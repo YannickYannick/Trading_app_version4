@@ -150,20 +150,20 @@ On part sur une structure classique à 4 onglets pour commencer :
 - Adapter depuis `frontend/src/hooks/useAuth.ts`
 - Utiliser `AsyncStorage` et services mobile
 
-### Phase 4 : Navigation et écrans de base
-#### 4.1 Créer la navigation principale
+### Phase 4 : Navigation et écrans de base [DONE]
+#### 4.1 Créer la navigation principale [DONE]
 - Créer `mobile/src/navigation/AppNavigator.tsx`
 - Stack navigator : `AuthStack` et `MainStack`
 - Bottom tabs pour Dashboard, Trades, Positions, Brokers, Settings
 
-#### 4.2 Écrans d'authentification
+#### 4.2 Écrans d'authentification [DONE]
 - `mobile/src/screens/auth/LoginScreen.tsx`
 - Formulaire username/password
 - Utiliser `useAuth` hook
 - Navigation vers Dashboard après login
 - `mobile/src/screens/auth/RegisterScreen.tsx` (optionnel)
 
-#### 4.3 Écran Dashboard
+#### 4.3 Écran Dashboard [DONE]
 - `mobile/src/screens/DashboardScreen.tsx`
 - Résumé positions (total PnL, nombre positions)
 - Liste trades récents
@@ -261,7 +261,7 @@ On part sur une structure classique à 4 onglets pour commencer :
 - `shared/src/services/trades.ts`
 - `shared/src/services/positions.ts`
 - `shared/src/services/orders.ts`
-- `shared/src/services/strategies.ts`
+- `shared/src/services/strategies.ts` [DONE]
 - `shared/src/services/auth.ts`
 - `mobile/package.json`
 - `mobile/app.json`

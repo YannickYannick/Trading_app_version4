@@ -26,3 +26,5 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "All done! You can now restart your Django server." -ForegroundColor Green
 
+
+

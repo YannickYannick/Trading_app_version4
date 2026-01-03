@@ -244,3 +244,5 @@ Le paramètre `stop_loss` peut être utilisé pour gérer le risque, même si l'
 
 
 
+
+

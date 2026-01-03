@@ -48,3 +48,5 @@ print("="*70)
 print("URL attendue: /api/all-assets/101173/prices/")
 print("Vérifiez que cette URL est bien dans la liste ci-dessus\n")
 
+
+

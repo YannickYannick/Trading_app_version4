@@ -6,6 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # Charge les variables d'environnement depuis .env
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config_django.settings.development')
     try:
         from django.core.management import execute_from_command_line
