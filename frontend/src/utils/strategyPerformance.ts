@@ -40,10 +40,16 @@ export function simulateTradesFromSignals(
   dates: string[],
   orderSize: number = 1.0,
   stopLoss?: number,
-  minQuantity: number = 0
+  minQuantity: number = 0,
+  maxQuantity?: number,
+  budget?: number
 ): TradeSimulation[] {
   const trades: TradeSimulation[] = []
   let currentPosition: TradeSimulation | null = null
+  // Track if we've ever had a position - used to determine if short selling is allowed
+  // Short selling (starting with SELL) is only allowed if minQuantity < 0
+  let hasHadPosition = false
+  const allowShortSelling = minQuantity < 0
 
   // Créer un map pour accéder rapidement aux prix par date
   const priceMap = new Map<string, number>()
@@ -113,7 +119,12 @@ export function simulateTradesFromSignals(
         pnlPercent: null,
         status: 'OPEN',
       }
+      hasHadPosition = true // Mark that we've had a position
     } else if (signal.signal === 'SELL' && (!currentPosition || currentPosition.side === 'BUY')) {
+      // Check if we're allowed to open a SELL position
+      // If no position ever existed, SELL is only allowed if short selling is enabled (minQuantity < 0)
+      const canOpenShort = hasHadPosition || allowShortSelling
+
       // Fermer la position BUY si elle existe
       if (currentPosition && currentPosition.status === 'OPEN') {
         currentPosition.exitTime = signal.time
@@ -123,30 +134,33 @@ export function simulateTradesFromSignals(
         currentPosition.pnlPercent = ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100
         trades.push({ ...currentPosition })
         currentPosition = null
+        hasHadPosition = true // We've had a position now
       }
 
-      // Ouvrir une position SELL (short) (avec quantité minimale/maximale et budget)
-      let sellQuantity = Math.max(orderSize, minQuantity)
-      if (maxQuantity && sellQuantity > maxQuantity) {
-        sellQuantity = maxQuantity
-      }
-      // Si budget défini, ajuster la quantité selon le budget disponible
-      if (budget && budget > 0) {
-        const maxQuantityFromBudget = budget / price
-        if (maxQuantityFromBudget < sellQuantity) {
-          sellQuantity = Math.max(minQuantity, maxQuantityFromBudget)
+      // Ouvrir une position SELL (short) seulement si autorisé
+      if (canOpenShort) {
+        let sellQuantity = Math.max(orderSize, Math.abs(minQuantity))
+        if (maxQuantity && sellQuantity > maxQuantity) {
+          sellQuantity = maxQuantity
         }
-      }
-      currentPosition = {
-        entryTime: signal.time,
-        entryPrice: price,
-        exitTime: null,
-        exitPrice: null,
-        side: 'SELL',
-        quantity: sellQuantity,
-        pnl: null,
-        pnlPercent: null,
-        status: 'OPEN',
+        // Si budget défini, ajuster la quantité selon le budget disponible
+        if (budget && budget > 0) {
+          const maxQuantityFromBudget = budget / price
+          if (maxQuantityFromBudget < sellQuantity) {
+            sellQuantity = Math.max(Math.abs(minQuantity), maxQuantityFromBudget)
+          }
+        }
+        currentPosition = {
+          entryTime: signal.time,
+          entryPrice: price,
+          exitTime: null,
+          exitPrice: null,
+          side: 'SELL',
+          quantity: sellQuantity,
+          pnl: null,
+          pnlPercent: null,
+          status: 'OPEN',
+        }
       }
     }
   }

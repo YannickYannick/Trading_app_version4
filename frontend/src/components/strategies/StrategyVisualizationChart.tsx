@@ -31,12 +31,12 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  
+
   // Références aux séries
   const priceSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   const indicatorSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
   const markersRef = useRef<ReturnType<typeof createSeriesMarkers> | null>(null)
-  
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([])
@@ -51,7 +51,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Utiliser requestAnimationFrame pour s'assurer que le conteneur a sa largeur
     const initChart = () => {
       if (!chartContainerRef.current) return
-      
+
       const containerWidth = chartContainerRef.current.clientWidth
       if (containerWidth === 0) {
         // Réessayer au prochain frame si pas de largeur
@@ -99,9 +99,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       }
 
       window.addEventListener('resize', handleResize)
-      
-      // Stocker le handler pour le cleanup
-      ;(chartRef.current as any)._resizeHandler = handleResize
+
+        // Stocker le handler pour le cleanup
+        ; (chartRef.current as any)._resizeHandler = handleResize
     }
 
     requestAnimationFrame(initChart)
@@ -129,13 +129,13 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       setError(null)
 
       try {
-        const assetId = typeof strategy.all_asset === 'number' 
-          ? strategy.all_asset 
+        const assetId = typeof strategy.all_asset === 'number'
+          ? strategy.all_asset
           : strategy.all_asset.id
 
         // Charger l'historique des prix
         const historyResponse = await assetService.getPriceHistory(assetId, 365, 'list')
-        
+
         const priceData: PriceHistoryPoint[] = (historyResponse.results || [])
           .map((point: any) => ({
             time: point.date?.split('T')[0] || point.date,
@@ -145,7 +145,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
             low: point.low,
           }))
           .filter((p: PriceHistoryPoint) => p.value > 0 && p.time)
-          .sort((a: PriceHistoryPoint, b: PriceHistoryPoint) => 
+          .sort((a: PriceHistoryPoint, b: PriceHistoryPoint) =>
             (a.time as string).localeCompare(b.time as string)
           )
 
@@ -386,7 +386,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
     // Calculer les signaux
     const signals = calculateStrategySignals(algorithmType, prices, dates, strategyParams)
-    
+
     // Simuler les trades basés sur les signaux
     const orderSize = strategyParams.order_size || 1.0
     const stopLoss = strategyParams.stop_loss
@@ -395,11 +395,11 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const budget = strategyParams.budget
     const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity, maxQuantity, budget)
     setSimulatedTrades(simulated)
-    
+
     // Calculer les métriques de performance
     const metrics = calculatePerformanceMetrics(simulated)
     setPerformanceMetrics(metrics)
-    
+
     // Afficher les signaux qui ont déclenché un trade (entry points) + tous les signaux BUY/SELL importants
     // Pour éviter trop de marqueurs, on montre:
     // 1. Les entry points des trades simulés
@@ -412,7 +412,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           const pnlSign = trade.pnl >= 0 ? '+' : ''
           text = `${trade.side} @ ${trade.entryPrice.toFixed(2)} (${pnlSign}${trade.pnl.toFixed(2)})`
         }
-        
+
         return {
           time: trade.entryTime as Time,
           position: trade.side === 'BUY' ? ('belowBar' as const) : ('aboveBar' as const),
@@ -421,7 +421,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           text,
         }
       })
-    
+
     // Aussi afficher les signaux BUY/SELL (limiter si trop nombreux)
     const buySellSignals = signals.filter(s => s.signal !== 'HOLD')
     const maxSignalsToShow = 50 // Limiter à 50 signaux max
@@ -441,9 +441,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         const tradeDate = trade.executed_at || trade.timestamp
         if (!tradeDate) return null
 
-        const dateStr = typeof tradeDate === 'string' 
-          ? tradeDate.split('T')[0] 
-          : tradeDate instanceof Date 
+        const dateStr = typeof tradeDate === 'string'
+          ? tradeDate.split('T')[0]
+          : tradeDate instanceof Date
             ? tradeDate.toISOString().split('T')[0]
             : null
 
@@ -466,28 +466,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       })
       .filter((m): m is MarkerData => m !== null)
 
-    // Combiner les marqueurs : entry points prioritaires + signaux + trades réels
-    // Éviter les doublons en utilisant un Set pour les dates
-    const markerMap = new Map<string, MarkerData>()
-    
-    // Ajouter les entry points (priorité 1)
-    entryPointMarkers.forEach(m => {
-      markerMap.set(m.time as string, m)
-    })
-    
-    // Ajouter les signaux (ne pas écraser les entry points)
-    signalMarkers.forEach(m => {
-      if (!markerMap.has(m.time as string)) {
-        markerMap.set(m.time as string, m)
-      }
-    })
-    
-    // Ajouter les trades réels (priorité 2)
-    tradeMarkers.forEach(m => {
-      markerMap.set(m.time as string, m)
-    })
-    
-    const allMarkers = Array.from(markerMap.values())
+    // N'afficher que les trades simulés (entry points) pour garder le graphique propre
+    const allMarkers = entryPointMarkers
 
     // Mettre à jour les marqueurs (uniquement si la série de prix existe)
     if (allMarkers.length > 0 && priceSeriesRef.current) {
@@ -622,6 +602,47 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       {loading && (
         <div className="chart-loading">
           <p>Chargement des données...</p>
+        </div>
+      )}
+
+      {/* Tableau des trades simulés */}
+      {simulatedTrades.length > 0 && (
+        <div className="simulated-trades-section">
+          <h4>Trades simulés ({simulatedTrades.length})</h4>
+          <div className="simulated-trades-table-wrapper">
+            <table className="simulated-trades-table">
+              <thead>
+                <tr>
+                  <th>Date entrée</th>
+                  <th>Type</th>
+                  <th>Prix entrée</th>
+                  <th>Date sortie</th>
+                  <th>Prix sortie</th>
+                  <th>Quantité</th>
+                  <th>PnL</th>
+                  <th>PnL %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {simulatedTrades.map((trade, index) => (
+                  <tr key={index} className={trade.pnl !== null ? (trade.pnl >= 0 ? 'positive-row' : 'negative-row') : ''}>
+                    <td>{trade.entryTime}</td>
+                    <td className={trade.side === 'BUY' ? 'buy-side' : 'sell-side'}>{trade.side}</td>
+                    <td>{trade.entryPrice.toFixed(2)}</td>
+                    <td>{trade.exitTime || '-'}</td>
+                    <td>{trade.exitPrice?.toFixed(2) || '-'}</td>
+                    <td>{trade.quantity.toFixed(2)}</td>
+                    <td className={trade.pnl !== null ? (trade.pnl >= 0 ? 'positive' : 'negative') : ''}>
+                      {trade.pnl !== null ? (trade.pnl >= 0 ? '+' : '') + trade.pnl.toFixed(2) : '-'}
+                    </td>
+                    <td className={trade.pnlPercent !== null ? (trade.pnlPercent >= 0 ? 'positive' : 'negative') : ''}>
+                      {trade.pnlPercent !== null ? (trade.pnlPercent >= 0 ? '+' : '') + trade.pnlPercent.toFixed(2) + '%' : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

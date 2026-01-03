@@ -1026,7 +1026,7 @@ export default function Strategies() {
           </div>
 
           {selectedStrategyForVisualization ? (
-            <div style={{ display: 'flex', gap: '0', height: '600px' }}>
+            <div style={{ display: 'flex', gap: '0' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <StrategyVisualizationChart
                   strategy={selectedStrategyForVisualization}

@@ -18,38 +18,32 @@ Ajout d'un sélecteur dropdown pour choisir un AllAsset dans les colonnes "Symbo
 - **Auto-positionnement** : Le dropdown s'ouvre vers le haut si pas assez d'espace en bas
 - **Scroll horizontal** : Le tableau reste scrollable horizontalement pour accéder à toutes les colonnes
 
-## Problèmes résolus
+## Visualisation des stratégies
 
-### 1. Dropdown coupé par les lignes du tableau
+### Tableau des trades simulés
 
-**Problème** : Le dropdown était masqué par les lignes suivantes du tableau.
+Un tableau affiche tous les trades simulés sous le graphique avec :
+- Date entrée / sortie
+- Type (BUY/SELL avec couleurs)
+- Prix entrée / sortie
+- Quantité
+- PnL (absolue et %)
 
-**Solution** : Ajout d'une classe `.asset-select-open` avec `z-index: 9998` quand le dropdown est ouvert.
+### Contrôle du short selling
 
-### 2. Texte illisible sur fond blanc
-
-**Problème** : Le thème sombre utilisait des couleurs claires invisibles sur fond blanc.
-
-**Solution** : Couleurs fixes dans `AssetSelect.css` :
-- Fond : `#ffffff`
-- Symboles : `#111827` (noir)
-- Noms : `#6b7280` (gris)
-
-### 3. Dropdown ouvert vers le haut si pas d'espace
-
-**Solution** : Détection automatique de l'espace disponible et classe `.asset-select-dropdown-upward`.
-
-### 4. Recherche dans toute la base
-
-**Solution** : `useApiAutocomplete={true}` pour utiliser l'API de recherche plutôt que la liste locale.
+| `min_quantity` | Peut commencer par SELL ? |
+|---------------|---------------------------|
+| `>= 0` | ❌ Non - Premier trade doit être BUY |
+| `< 0` | ✅ Oui - Short selling autorisé |
 
 ## Fichiers modifiés
 
 | Fichier | Modification |
 |---------|--------------|
 | `frontend/src/pages/Strategies.tsx` | Colonnes avec `cellType: 'asset_select'`, mise à jour optimiste |
-| `frontend/src/pages/Strategies.css` | `overflow-x: auto` pour scroll horizontal, `min-height: 400px` |
+| `frontend/src/pages/Strategies.css` | `overflow-x: auto` pour scroll horizontal |
 | `frontend/src/components/common/AssetSelect.tsx` | Classe `.asset-select-open`, détection upward |
-| `frontend/src/components/common/AssetSelect.css` | Styles dropdown, couleurs fixes, `.asset-select-dropdown-upward` |
-| `frontend/src/components/common/Table.tsx` | `useApiAutocomplete={true}` |
-| `frontend/src/styles/index.css` | Ordre des @import corrigé |
+| `frontend/src/components/common/AssetSelect.css` | Styles dropdown, couleurs fixes |
+| `frontend/src/components/strategies/StrategyVisualizationChart.tsx` | Tableau des trades simulés, marqueurs simplifiés |
+| `frontend/src/components/strategies/StrategyVisualizationChart.css` | Styles du tableau des trades |
+| `frontend/src/utils/strategyPerformance.ts` | Contrôle short selling via min_quantity |

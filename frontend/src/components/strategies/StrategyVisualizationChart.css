@@ -68,3 +68,81 @@
   color: var(--color-danger, #ef4444);
 }
 
+/* Tableau des trades simulés */
+.simulated-trades-section {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: var(--border-radius-md, 0.375rem);
+  overflow: hidden;
+}
+
+.simulated-trades-section h4 {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary, #f9fafb);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simulated-trades-table-wrapper {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.simulated-trades-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.simulated-trades-table th,
+.simulated-trades-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simulated-trades-table th {
+  background: var(--bg-tertiary, #f3f4f6);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  position: sticky;
+  top: 0;
+}
+
+.simulated-trades-table tbody tr:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.02));
+}
+
+.simulated-trades-table .positive-row {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.simulated-trades-table .negative-row {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.simulated-trades-table .buy-side {
+  color: var(--color-success, #10b981);
+  font-weight: 600;
+}
+
+.simulated-trades-table .sell-side {
+  color: var(--color-danger, #ef4444);
+  font-weight: 600;
+}
+
+.simulated-trades-table .positive {
+  color: var(--color-success, #10b981);
+  font-weight: 500;
+}
+
+.simulated-trades-table .negative {
+  color: var(--color-danger, #ef4444);
+  font-weight: 500;
+}

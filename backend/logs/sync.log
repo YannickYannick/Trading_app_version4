@@ -5513,3 +5513,9 @@ apps.trading.brokers.base.AuthenticationError: Authentication failed: Refresh to
 [INFO    ] 2026-01-02 19:35:14 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for UIC_14042319
 [INFO    ] 2026-01-02 19:35:14 | trading.sync.PositionSyncService | _log_complete:115 | 🏁 positions sync completed: 0 created, 6 updated (2.06s)
 [INFO    ] 2026-01-03 00:26:40 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 250 price records for AAPL:xnas (Yahoo: AAPL, Total days: 251)
+[INFO    ] 2026-01-03 01:47:21 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:133 | No Yahoo symbol for GOOGL:xnas, trying Saxo fallback directly...
+[INFO    ] 2026-01-03 01:47:52 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:133 | No Yahoo symbol for TSLA:xnas, trying Saxo fallback directly...
+[INFO    ] 2026-01-03 01:49:28 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:133 | No Yahoo symbol for TSLA:xnas, trying Saxo fallback directly...
+[INFO    ] 2026-01-03 01:49:39 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 250 price records for TSLA:xnas (Yahoo: TSLA, Total days: 250)
+[INFO    ] 2026-01-03 01:49:47 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 250 price records for AAPB:xnas (Yahoo: AAPB, Total days: 251)
+[INFO    ] 2026-01-03 01:49:55 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 250 price records for GOOGL:xnas (Yahoo: GOOGL, Total days: 250)
