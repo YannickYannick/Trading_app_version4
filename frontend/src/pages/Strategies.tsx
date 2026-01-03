@@ -32,20 +32,20 @@ export default function Strategies() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Options pour les selects
   const [assets, setAssets] = useState<AllAsset[]>([])
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccount[]>([])
   const [loadingOptions, setLoadingOptions] = useState(true)
-  
+
   // Colonnes visibles
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
-  
+
   // Modal pour éditer les paramètres d'algorithme
   const [algorithmParamsModalOpen, setAlgorithmParamsModalOpen] = useState(false)
   const [selectedStrategyForParams, setSelectedStrategyForParams] = useState<Strategy | null>(null)
-  
+
   // Graphique de visualisation de stratégie
   const [selectedStrategyForVisualization, setSelectedStrategyForVisualization] = useState<Strategy | null>(null)
   const [previewParameters, setPreviewParameters] = useState<Record<string, any>>({})
@@ -56,8 +56,8 @@ export default function Strategies() {
       setLoading(true)
       setError(null)
       const response = await strategyService.getAll()
-      const strategiesList = Array.isArray(response) 
-        ? response 
+      const strategiesList = Array.isArray(response)
+        ? response
         : (response.results || response.data || [])
       setStrategies(strategiesList)
     } catch (err: any) {
@@ -71,7 +71,7 @@ export default function Strategies() {
   const loadOptions = async () => {
     try {
       setLoadingOptions(true)
-      const assetsResponse = await assetServiceUtil.getAllAssets({ page_size: 1000 })
+      const assetsResponse = await assetServiceUtil.getAllAssets({ page_size: 10000 })
       setAssets(assetsResponse.results || [])
       const brokersResponse = await brokerService.getAccounts()
       setBrokerAccounts(brokersResponse.results || [])
@@ -103,13 +103,13 @@ export default function Strategies() {
             return null
           })
           .filter((id): id is number => id !== null && id !== undefined)
-        
+
         // Charger les prix en parallèle (limité à 10 à la fois)
         const batches = []
         for (let i = 0; i < allAssetIds.length; i += 10) {
           batches.push(allAssetIds.slice(i, i + 10))
         }
-        
+
         for (const batch of batches) {
           const results = await Promise.allSettled(
             batch.map(async (id) => {
@@ -117,17 +117,17 @@ export default function Strategies() {
               return { id, price }
             })
           )
-          
+
           results.forEach((result) => {
             if (result.status === 'fulfilled') {
               priceMap[result.value.id] = result.value.price
             }
           })
         }
-        
+
         setYahooPrices(priceMap)
       }
-      
+
       loadYahooPrices()
     }
   }, [strategies])
@@ -135,17 +135,17 @@ export default function Strategies() {
   const handleCellEdit = async (newValue: any, row: Strategy, key: string) => {
     try {
       const updateData: any = {}
-      
+
       if (key === 'yahoo_symbol') {
         // Mettre à jour le symbole Yahoo de l'AllAsset associé
         const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id
           ? row.all_asset.id
           : (typeof row.all_asset === 'number' ? row.all_asset : null)
-        
+
         if (allAssetId && newValue !== null && newValue !== undefined) {
           try {
             // Mise à jour optimiste de l'état local
-            setStrategies(prevStrategies => 
+            setStrategies(prevStrategies =>
               prevStrategies.map(strategy => {
                 if (strategy.id === row.id) {
                   const updated: Strategy = { ...strategy }
@@ -158,10 +158,10 @@ export default function Strategies() {
                 return strategy
               })
             )
-            
+
             // Sauvegarde asynchrone
             await assetServiceUtil.updateAllAsset(allAssetId, { symbole_yahoo: newValue })
-            
+
             // Recharger pour avoir les données à jour
             loadStrategies()
           } catch (err: any) {
@@ -183,32 +183,32 @@ export default function Strategies() {
         const params = { ...(row.parameters || {}) }
         params[key] = newValue ? parseFloat(newValue) : null
         updateData['parameters'] = params
-      } else if (key === 'max_position_size' || key === 'max_daily_loss' || 
-                 key === 'target_min_quantity' || key === 'target_max_quantity' ||
-                 key === 'check_frequency') {
+      } else if (key === 'max_position_size' || key === 'max_daily_loss' ||
+        key === 'target_min_quantity' || key === 'target_max_quantity' ||
+        key === 'check_frequency') {
         updateData[key] = newValue ? parseFloat(newValue) : null
       } else if (key === 'is_active' || key === 'is_automated') {
         updateData[key] = Boolean(newValue)
       } else {
         updateData[key] = newValue
       }
-      
+
       // Mise à jour optimiste de l'état local avant la sauvegarde
-      setStrategies(prevStrategies => 
+      setStrategies(prevStrategies =>
         prevStrategies.map(strategy => {
           if (strategy.id === row.id) {
             const updated: Strategy = { ...strategy }
-            
+
             // Mettre à jour les champs directs
-            if (key === 'asset_id' || key === 'name' || key === 'description' || 
-                key === 'algorithm_type' || key === 'execution_mode' || 
-                key === 'check_frequency' || key === 'max_position_size' || 
-                key === 'max_daily_loss' || key === 'target_min_quantity' || 
-                key === 'target_max_quantity' || key === 'risk_level' ||
-                key === 'is_active' || key === 'is_automated') {
+            if (key === 'asset_id' || key === 'name' || key === 'description' ||
+              key === 'algorithm_type' || key === 'execution_mode' ||
+              key === 'check_frequency' || key === 'max_position_size' ||
+              key === 'max_daily_loss' || key === 'target_min_quantity' ||
+              key === 'target_max_quantity' || key === 'risk_level' ||
+              key === 'is_active' || key === 'is_automated') {
               if (key === 'target_min_quantity' || key === 'target_max_quantity' ||
-                  key === 'max_position_size' || key === 'max_daily_loss' || 
-                  key === 'check_frequency') {
+                key === 'max_position_size' || key === 'max_daily_loss' ||
+                key === 'check_frequency') {
                 updated[key as keyof Strategy] = newValue ? parseFloat(newValue) : null
               } else if (key === 'is_active' || key === 'is_automated') {
                 updated[key as keyof Strategy] = Boolean(newValue) as any
@@ -216,51 +216,65 @@ export default function Strategies() {
                 updated[key as keyof Strategy] = newValue
               }
             }
-            
+
             // Mettre à jour les champs imbriqués
             if (key === 'price_min' || key === 'price_max') {
               updated.parameters = { ...(updated.parameters || {}), [key]: newValue ? parseFloat(newValue) : null }
             }
-            
+
             if (key === 'asset_id' && newValue) {
               const asset = assets.find(a => a.id === parseInt(newValue))
               if (asset) {
                 updated.asset = { id: asset.id, symbol: asset.symbol, name: asset.name }
               }
             }
-            
+
             if (key === 'broker_account_id' && newValue) {
               const broker = brokerAccounts.find(b => b.id === parseInt(newValue))
               if (broker) {
                 updated.broker_name = broker.broker?.name || broker.account_name
               }
             }
-            
+
             // Pour les ranges (quantity_range, price_range)
             if (key === 'quantity_range' && typeof newValue === 'object') {
               updated.target_min_quantity = newValue.min ? parseFloat(newValue.min) : null
               updated.target_max_quantity = newValue.max ? parseFloat(newValue.max) : null
             }
-            
+
             if (key === 'price_range' && typeof newValue === 'object') {
               updated.parameters = { ...(updated.parameters || {}) }
               updated.parameters.price_min = newValue.min ? parseFloat(newValue.min) : null
               updated.parameters.price_max = newValue.max ? parseFloat(newValue.max) : null
             }
-            
+
+            // Mise à jour optimiste pour all_asset
+            if (key === 'all_asset' && newValue) {
+              const selectedAsset = assets.find(a => a.id === parseInt(newValue))
+              if (selectedAsset) {
+                updated.all_asset = selectedAsset.id
+                updated.all_asset_symbol = selectedAsset.symbol
+                updated.all_asset_yahoo_symbol = selectedAsset.symbole_yahoo || null
+              } else {
+                // Si l'asset n'est pas dans la liste locale, on met juste l'ID
+                updated.all_asset = parseInt(newValue)
+              }
+            }
+
             return updated
           }
           return strategy
         })
       )
-      
+
       // Sauvegarde asynchrone en arrière-plan (sans bloquer l'UI)
-      strategyService.update(row.id, updateData).catch((err: any) => {
-        console.error('Erreur lors de la sauvegarde:', err)
-        // En cas d'erreur, recharger pour restaurer l'état correct
-        loadStrategies()
-        alert(err.response?.data?.error || 'Erreur lors de la sauvegarde. Les données ont été restaurées.')
-      })
+      strategyService.update(row.id, updateData)
+        .catch((err: any) => {
+          console.error('Erreur lors de la sauvegarde:', err)
+          // En cas d'erreur, recharger pour restaurer l'état correct
+          loadStrategies()
+          alert(err.response?.data?.error || 'Erreur lors de la sauvegarde. Les données ont été restaurées.')
+        })
     } catch (err: any) {
       console.error('Erreur lors de la mise à jour:', err)
       // En cas d'erreur immédiate, recharger
@@ -273,20 +287,20 @@ export default function Strategies() {
   const handleToggleActive = async (strategy: Strategy) => {
     try {
       const newActiveState = !strategy.is_active
-      
+
       // Mise à jour optimiste de l'état local
-      setStrategies(prevStrategies => 
-        prevStrategies.map(s => 
+      setStrategies(prevStrategies =>
+        prevStrategies.map(s =>
           s.id === strategy.id ? { ...s, is_active: newActiveState } : s
         )
       )
-      
+
       // Sauvegarde asynchrone en arrière-plan
       strategyService.toggleActive(strategy.id, newActiveState).catch((err: any) => {
         console.error('Erreur lors du toggle:', err)
         // En cas d'erreur, restaurer l'état
-        setStrategies(prevStrategies => 
-          prevStrategies.map(s => 
+        setStrategies(prevStrategies =>
+          prevStrategies.map(s =>
             s.id === strategy.id ? { ...s, is_active: !newActiveState } : s
           )
         )
@@ -317,10 +331,10 @@ export default function Strategies() {
         is_active: false,
         is_automated: false,
       })
-      
+
       // Ajouter la nouvelle stratégie à l'état local sans recharger
       setStrategies(prevStrategies => [newStrategy, ...prevStrategies])
-      
+
       // Focus sur la ligne créée après un court délai
       setTimeout(() => {
         const element = document.querySelector(`[data-strategy-id="${newStrategy.id}"]`)
@@ -336,42 +350,42 @@ export default function Strategies() {
   // Fonction pour formater les paramètres selon l'algorithme
   const formatAlgorithmParameters = (strategy: Strategy): string => {
     if (!strategy.algorithm_type) return '-'
-    
+
     // Utiliser algorithm_parameters si disponible (nouveau système)
     if (strategy.algorithm_parameters && strategy.algorithm_parameters.length > 0) {
       const params = strategy.algorithm_parameters
         .map(param => {
           let displayValue = param.value
-          
+
           // Convertir selon le type
           if (param.param_type === 'float' || param.param_type === 'int') {
             const numValue = parseFloat(param.value)
             if (!isNaN(numValue)) {
-              displayValue = param.param_type === 'int' 
-                ? numValue.toString() 
+              displayValue = param.param_type === 'int'
+                ? numValue.toString()
                 : numValue.toFixed(2)
             }
           } else if (param.param_type === 'bool') {
             displayValue = param.value.toLowerCase() === 'true' ? 'Oui' : 'Non'
           }
-          
+
           return `${param.key}: ${displayValue}`
         })
         .join(', ')
-      
+
       return params
     }
-    
+
     // Fallback vers parameters (ancien système)
     if (strategy.parameters && Object.keys(strategy.parameters).length > 0) {
       const params = Object.entries(strategy.parameters)
         .filter(([key]) => !['price_min', 'price_max'].includes(key)) // Exclure les prix qui ont leur propre colonne
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ')
-      
+
       return params || '-'
     }
-    
+
     return '-'
   }
 
@@ -379,8 +393,8 @@ export default function Strategies() {
   const allColumnsData: ColumnOption[] = [
     { key: 'name', label: 'Nom', defaultVisible: true },
     { key: 'description', label: 'Description', defaultVisible: true },
-    { key: 'all_asset_symbol', label: 'Symbole AllAsset', defaultVisible: true },
-    { key: 'yahoo_symbol', label: 'Symbole Yahoo', defaultVisible: true },
+    { key: 'all_asset', label: 'Symbole AllAsset', defaultVisible: true },
+    { key: 'yahoo_symbol_selector', label: 'Symbole Yahoo', defaultVisible: true },
     { key: 'yahoo_price', label: 'Prix Yahoo', defaultVisible: true },
     { key: 'asset_id', label: 'Asset', defaultVisible: true },
     { key: 'algorithm_type', label: 'Algorithme', defaultVisible: true },
@@ -448,7 +462,9 @@ export default function Strategies() {
       label: 'Symbole AllAsset',
       editable: true,
       cellType: 'asset_select' as const,
+      assetOptions: assets,
       align: 'center' as const,
+      minWidth: '200px',
       onCellEdit: handleCellEdit,
       render: (_value: any, row: Strategy) => (
         <span className="all-asset-symbol">
@@ -457,11 +473,17 @@ export default function Strategies() {
       ),
     },
     {
-      key: 'yahoo_symbol',
+      key: 'yahoo_symbol_selector',
       label: 'Symbole Yahoo',
       editable: true,
+      cellType: 'asset_select' as const,
+      assetOptions: assets,
       align: 'center' as const,
-      onCellEdit: handleCellEdit,
+      minWidth: '200px',
+      onCellEdit: async (value: any, row: Strategy) => {
+        // Quand on change via le sélecteur Yahoo, on met à jour all_asset
+        await handleCellEdit(value, row, 'all_asset')
+      },
       render: (_value: any, row: Strategy) => {
         const allAsset = typeof row.all_asset === 'object' ? row.all_asset : null
         const yahooSymbol = row.all_asset_yahoo_symbol || allAsset?.symbole_yahoo
@@ -473,8 +495,8 @@ export default function Strategies() {
       label: 'Prix Yahoo',
       align: 'center' as const,
       render: (_value: any, row: Strategy) => {
-        const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id 
-          ? row.all_asset.id 
+        const allAssetId = typeof row.all_asset === 'object' && row.all_asset?.id
+          ? row.all_asset.id
           : (typeof row.all_asset === 'number' ? row.all_asset : null)
         const price = allAssetId ? yahooPrices[allAssetId] : null
         return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
@@ -516,9 +538,9 @@ export default function Strategies() {
       render: (_value: any, row: Strategy) => {
         const formatted = formatAlgorithmParameters(row)
         return (
-          <span 
-            className="text-muted small" 
-            style={{ 
+          <span
+            className="text-muted small"
+            style={{
               fontSize: '0.75rem',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -549,9 +571,9 @@ export default function Strategies() {
       align: 'center' as const,
       selectOptions: [
         { value: '', label: '- Sélectionner -' },
-        ...brokerAccounts.map(account => ({ 
-          value: account.id, 
-          label: account.broker?.name || account.account_name || `Compte ${account.id}` 
+        ...brokerAccounts.map(account => ({
+          value: account.id,
+          label: account.broker?.name || account.account_name || `Compte ${account.id}`
         }))
       ],
       onCellEdit: handleCellEdit,
@@ -592,11 +614,11 @@ export default function Strategies() {
         const minQty = parseFloat(row.target_min_quantity?.toString() || '0')
         const maxQty = parseFloat(row.target_max_quantity?.toString() || '0')
         return (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '2px', 
-            fontSize: '0.875rem', 
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            fontSize: '0.875rem',
             lineHeight: '1.3',
             width: '100%',
             height: '100%',
@@ -636,11 +658,11 @@ export default function Strategies() {
         const priceMin = row.parameters?.price_min
         const priceMax = row.parameters?.price_max
         return (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '2px', 
-            fontSize: '0.875rem', 
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            fontSize: '0.875rem',
             lineHeight: '1.3',
             width: '100%',
             height: '100%',
@@ -841,29 +863,29 @@ export default function Strategies() {
           <Button
             variant="danger"
             size="small"
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      if (window.confirm(`Supprimer la stratégie "${row.name}" ?`)) {
-                        try {
-                          // Suppression optimiste : retirer de l'affichage immédiatement
-                          setStrategies(prevStrategies => 
-                            prevStrategies.filter(s => s.id !== row.id)
-                          )
-                          
-                          // Suppression asynchrone en arrière-plan
-                          strategyService.delete(row.id).catch((err: any) => {
-                            console.error('Erreur lors de la suppression:', err)
-                            // En cas d'erreur, restaurer l'élément
-                            loadStrategies()
-                            alert(err.response?.data?.error || 'Erreur lors de la suppression')
-                          })
-                        } catch (err) {
-                          // En cas d'erreur immédiate, recharger
-                          loadStrategies()
-                          alert('Erreur lors de la suppression')
-                        }
-                      }
-                    }}
+            onClick={async (e) => {
+              e.stopPropagation()
+              if (window.confirm(`Supprimer la stratégie "${row.name}" ?`)) {
+                try {
+                  // Suppression optimiste : retirer de l'affichage immédiatement
+                  setStrategies(prevStrategies =>
+                    prevStrategies.filter(s => s.id !== row.id)
+                  )
+
+                  // Suppression asynchrone en arrière-plan
+                  strategyService.delete(row.id).catch((err: any) => {
+                    console.error('Erreur lors de la suppression:', err)
+                    // En cas d'erreur, restaurer l'élément
+                    loadStrategies()
+                    alert(err.response?.data?.error || 'Erreur lors de la suppression')
+                  })
+                } catch (err) {
+                  // En cas d'erreur immédiate, recharger
+                  loadStrategies()
+                  alert('Erreur lors de la suppression')
+                }
+              }
+            }}
             title="Supprimer"
           >
             🗑️
@@ -913,10 +935,10 @@ export default function Strategies() {
               {strategies.length} stratégie{strategies.length > 1 ? 's' : ''} trouvée{strategies.length > 1 ? 's' : ''}
             </div>
           )}
-          <Table 
-            data={strategies} 
-            columns={columns} 
-            visibleColumns={visibleColumns.length > 0 ? visibleColumns : undefined} 
+          <Table
+            data={strategies}
+            columns={columns}
+            visibleColumns={visibleColumns.length > 0 ? visibleColumns : undefined}
           />
           {strategies.length === 0 && (
             <div className="empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
@@ -935,7 +957,7 @@ export default function Strategies() {
           )}
         </Card>
       )}
-      
+
       {/* Modal pour éditer les paramètres d'algorithme */}
       <AlgorithmParametersModal
         isOpen={algorithmParamsModalOpen}

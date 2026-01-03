@@ -1,8 +1,10 @@
 .strategies-page {
   padding: 2rem;
-  max-width: 100%; /* Le sidebar est maintenant en haut, pas besoin de réserver d'espace sur les côtés */
+  max-width: 100%;
+  /* Le sidebar est maintenant en haut, pas besoin de réserver d'espace sur les côtés */
   width: 100%;
   box-sizing: border-box;
+  /* Enable horizontal scrolling */
 }
 
 .strategies-header {
@@ -89,11 +91,13 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+  /* Restored horizontal scroll - dropdown uses position:fixed now */
+  min-height: 400px;
 }
 
 .strategies-page .table {
   width: 100%;
-  table-layout: auto; /* Permet au tableau de s'adapter automatiquement */
+  table-layout: auto;
 }
 
 /* Responsive */
@@ -129,4 +133,3 @@
 .strategies-hint strong {
   font-weight: 600;
 }
-

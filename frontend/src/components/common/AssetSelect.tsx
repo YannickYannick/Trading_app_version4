@@ -27,9 +27,11 @@ export default function AssetSelect({
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredOptions, setFilteredOptions] = useState<AllAsset[]>(options)
   const [loading, setLoading] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false) // Track if dropdown should open upward
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Type pour les résultats d'autocomplétion
   type AutocompleteAsset = {
@@ -132,7 +134,7 @@ export default function AssetSelect({
 
   // Trouver l'asset sélectionné (dans options ou filteredOptions)
   const selectedAsset = options.find(a => a.id === value) || filteredOptions.find(a => a.id === value)
-  
+
   // Charger l'asset sélectionné depuis l'API si nécessaire
   useEffect(() => {
     if (value && !selectedAsset && useApiAutocomplete) {
@@ -168,10 +170,19 @@ export default function AssetSelect({
     }
   }, [isOpen, onBlur])
 
-  // Focus sur l'input quand on ouvre
+  // Focus sur l'input quand on ouvre + detect position
   useEffect(() => {
-    if (isOpen && inputRef.current) {
+    if (isOpen && inputRef.current && containerRef.current) {
       inputRef.current.focus()
+
+      // Detect if dropdown should open upward
+      const rect = containerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const dropdownHeight = 300 // Max height of dropdown
+
+      // Open upward if not enough space below but enough space above
+      setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow)
     }
   }, [isOpen])
 
@@ -182,7 +193,7 @@ export default function AssetSelect({
   }
 
   return (
-    <div className="asset-select" ref={containerRef}>
+    <div className={`asset-select ${isOpen ? 'asset-select-open' : ''}`} ref={containerRef}>
       <div
         className="asset-select-trigger"
         onClick={() => setIsOpen(!isOpen)}
@@ -196,7 +207,10 @@ export default function AssetSelect({
       </div>
 
       {isOpen && (
-        <div className="asset-select-dropdown">
+        <div
+          ref={dropdownRef}
+          className={`asset-select-dropdown ${openUpward ? 'asset-select-dropdown-upward' : ''}`}
+        >
           <input
             ref={inputRef}
             type="text"
@@ -215,35 +229,35 @@ export default function AssetSelect({
               </div>
             ) : (
               // Afficher les résultats d'autocomplétion si disponibles (même format que PlaceOrderModal)
-              (autocompleteResults.length > 0 
+              (autocompleteResults.length > 0
                 ? autocompleteResults.map((asset) => (
-                    <div
-                      key={asset.id}
-                      className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
-                      onClick={() => handleSelect(asset.id)}
-                      onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
-                    >
-                      <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
-                      <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
-                      {asset.platform && (
-                        <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
-                      )}
-                    </div>
-                  ))
-                : filteredOptions.slice(0, 100).map((asset) => (
-                    <div
-                      key={asset.id}
-                      className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
-                      onClick={() => handleSelect(asset.id)}
-                      onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
-                    >
-                      <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
-                      <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
-                      {asset.platform && (
-                        <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
-                      )}
-                    </div>
-                  ))
+                  <div
+                    key={asset.id}
+                    className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
+                    onClick={() => handleSelect(asset.id)}
+                    onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
+                  >
+                    <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
+                    <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
+                    {asset.platform && (
+                      <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
+                    )}
+                  </div>
+                ))
+                : filteredOptions.slice(0, 500).map((asset) => (
+                  <div
+                    key={asset.id}
+                    className={`asset-select-option autocomplete-item ${value === asset.id ? 'selected' : ''}`}
+                    onClick={() => handleSelect(asset.id)}
+                    onMouseDown={(e) => e.preventDefault()} // Empêcher le blur
+                  >
+                    <div className="asset-select-option-symbol autocomplete-symbol">{asset.symbol}</div>
+                    <div className="asset-select-option-name autocomplete-name">{asset.name}</div>
+                    {asset.platform && (
+                      <div className="asset-select-option-platform autocomplete-platform">{asset.platform}</div>
+                    )}
+                  </div>
+                ))
               )
             )}
           </div>

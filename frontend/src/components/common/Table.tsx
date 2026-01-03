@@ -50,7 +50,7 @@ function EditableCell<T extends Record<string, any>>({
 }) {
   const [isEditing, setIsEditing] = useState(false)
   // Pour les selects, utiliser la valeur du row directement pour avoir la bonne clé
-  const initialValue = column.cellType === 'select' && column.key 
+  const initialValue = column.cellType === 'select' && column.key
     ? String(row[column.key] || value || '')
     : value
   const [editValue, setEditValue] = useState(initialValue)
@@ -81,10 +81,10 @@ function EditableCell<T extends Record<string, any>>({
         setEditValue(String(row[column.key] || value || ''))
       } else if (column.cellType === 'range' && column.rangeFields) {
         // Pour les ranges, initialiser avec les valeurs min et max
-        const minValue = column.rangeFields.min.includes('.') 
+        const minValue = column.rangeFields.min.includes('.')
           ? row[column.rangeFields.min.split('.')[0]]?.[column.rangeFields.min.split('.')[1]]
           : row[column.rangeFields.min]
-        const maxValue = column.rangeFields.max.includes('.') 
+        const maxValue = column.rangeFields.max.includes('.')
           ? row[column.rangeFields.max.split('.')[0]]?.[column.rangeFields.max.split('.')[1]]
           : row[column.rangeFields.max]
         setEditValue({
@@ -99,7 +99,7 @@ function EditableCell<T extends Record<string, any>>({
 
   const handleBlur = async (e?: React.FocusEvent) => {
     if (!isEditing) return
-    
+
     // Pour les cellules de type range, vérifier si le focus reste dans le conteneur
     if (column.cellType === 'range' && e?.relatedTarget && containerRef.current) {
       // Si le focus va vers un autre élément dans le même conteneur, ne pas fermer l'édition
@@ -107,22 +107,22 @@ function EditableCell<T extends Record<string, any>>({
         return
       }
     }
-    
+
     setIsEditing(false)
     // Pour les ranges, vérifier si les valeurs ont changé
     let hasChanged = false
     if (column.cellType === 'range' && column.rangeFields && typeof editValue === 'object') {
-      const currentMin = column.rangeFields.min.includes('.') 
+      const currentMin = column.rangeFields.min.includes('.')
         ? row[column.rangeFields.min.split('.')[0]]?.[column.rangeFields.min.split('.')[1]]
         : row[column.rangeFields.min]
-      const currentMax = column.rangeFields.max.includes('.') 
+      const currentMax = column.rangeFields.max.includes('.')
         ? row[column.rangeFields.max.split('.')[0]]?.[column.rangeFields.max.split('.')[1]]
         : row[column.rangeFields.max]
       hasChanged = editValue.min !== currentMin || editValue.max !== currentMax
     } else {
       hasChanged = editValue !== value
     }
-    
+
     if (hasChanged && onEdit) {
       try {
         await onEdit(editValue, row, column.key)
@@ -130,10 +130,10 @@ function EditableCell<T extends Record<string, any>>({
         console.error('Erreur lors de l\'édition:', error)
         // Revenir à la valeur originale en cas d'erreur
         if (column.cellType === 'range' && column.rangeFields) {
-          const minValue = column.rangeFields.min.includes('.') 
+          const minValue = column.rangeFields.min.includes('.')
             ? row[column.rangeFields.min.split('.')[0]]?.[column.rangeFields.min.split('.')[1]]
             : row[column.rangeFields.min]
-          const maxValue = column.rangeFields.max.includes('.') 
+          const maxValue = column.rangeFields.max.includes('.')
             ? row[column.rangeFields.max.split('.')[0]]?.[column.rangeFields.max.split('.')[1]]
             : row[column.rangeFields.max]
           setEditValue({ min: minValue || '', max: maxValue || '' })
@@ -152,10 +152,10 @@ function EditableCell<T extends Record<string, any>>({
       // Sauvegarder les modifications
       let hasChanged = false
       if (column.cellType === 'range' && column.rangeFields && typeof editValue === 'object') {
-        const currentMin = column.rangeFields.min.includes('.') 
+        const currentMin = column.rangeFields.min.includes('.')
           ? row[column.rangeFields.min.split('.')[0]]?.[column.rangeFields.min.split('.')[1]]
           : row[column.rangeFields.min]
-        const currentMax = column.rangeFields.max.includes('.') 
+        const currentMax = column.rangeFields.max.includes('.')
           ? row[column.rangeFields.max.split('.')[0]]?.[column.rangeFields.max.split('.')[1]]
           : row[column.rangeFields.max]
         hasChanged = editValue.min !== currentMin || editValue.max !== currentMax
@@ -168,10 +168,10 @@ function EditableCell<T extends Record<string, any>>({
     } else if (e.key === 'Escape') {
       // Revenir à la valeur originale
       if (column.cellType === 'range' && column.rangeFields) {
-        const minValue = column.rangeFields.min.includes('.') 
+        const minValue = column.rangeFields.min.includes('.')
           ? row[column.rangeFields.min.split('.')[0]]?.[column.rangeFields.min.split('.')[1]]
           : row[column.rangeFields.min]
-        const maxValue = column.rangeFields.max.includes('.') 
+        const maxValue = column.rangeFields.max.includes('.')
           ? row[column.rangeFields.max.split('.')[0]]?.[column.rangeFields.max.split('.')[1]]
           : row[column.rangeFields.max]
         setEditValue({ min: minValue || '', max: maxValue || '' })
@@ -222,11 +222,11 @@ function EditableCell<T extends Record<string, any>>({
   // Rendu de l'input d'édition
   if (column.cellType === 'range' && column.rangeFields && typeof editValue === 'object') {
     return (
-      <div 
+      <div
         ref={containerRef}
-        style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
           gap: '4px',
           width: '100%',
           height: '100%',
@@ -285,6 +285,7 @@ function EditableCell<T extends Record<string, any>>({
         }}
         onBlur={handleBlur}
         placeholder="Rechercher un asset..."
+        useApiAutocomplete={true}
       />
     )
   }
@@ -370,7 +371,7 @@ export default function Table<T extends Record<string, any>>({
   const displayColumns = visibleColumns && visibleColumns.length > 0
     ? columns.filter(col => visibleColumns.includes(col.key))
     : columns
-  
+
   return (
     <div className="table-wrapper">
       <table className={clsx('table', compact && 'table-compact', className)}>
@@ -387,7 +388,7 @@ export default function Table<T extends Record<string, any>>({
               if (column.maxWidth) {
                 style.maxWidth = typeof column.maxWidth === 'number' ? `${column.maxWidth}px` : column.maxWidth
               }
-              
+
               return (
                 <th
                   key={column.key}
@@ -412,7 +413,7 @@ export default function Table<T extends Record<string, any>>({
         <tbody>
           {data.length === 0 ? (
             <tr>
-                    <td colSpan={displayColumns.length} className="table-empty">
+              <td colSpan={displayColumns.length} className="table-empty">
                 Aucune donnée disponible
               </td>
             </tr>
@@ -451,7 +452,7 @@ export default function Table<T extends Record<string, any>>({
                     if (column.maxWidth) {
                       cellStyle.maxWidth = typeof column.maxWidth === 'number' ? `${column.maxWidth}px` : column.maxWidth
                     }
-                    
+
                     return (
                       <td
                         key={column.key}

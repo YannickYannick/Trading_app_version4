@@ -1,5 +1,6 @@
 .table-wrapper {
-  overflow-x: auto;
+  overflow-x: visible;
+  /* Changed from auto to allow dropdowns to overflow */
   border-radius: var(--border-radius-lg);
   max-width: 100%;
 }
@@ -7,18 +8,23 @@
 .table {
   width: 100%;
   max-width: 100%;
-  table-layout: auto; /* Passer à auto pour une meilleure adaptation */
+  table-layout: auto;
+  /* Passer à auto pour une meilleure adaptation */
   border-collapse: collapse;
 }
 
 .table th,
 .table td {
   padding: 0.75rem;
-  text-align: center; /* Par défaut, centrer toutes les cellules */
+  text-align: center;
+  /* Par défaut, centrer toutes les cellules */
   border-bottom: 1px solid var(--color-border, #e5e7eb);
-  overflow: hidden;
+  /* REMOVED: overflow: hidden; - to allow dropdowns to overflow */
   text-overflow: ellipsis;
-  vertical-align: middle; /* Aligner verticalement au centre */
+  vertical-align: middle;
+  /* Aligner verticalement au centre */
+  position: relative;
+  /* Added to create positioning context for dropdowns */
 }
 
 .table td {
@@ -104,4 +110,3 @@
 .table-cell-input[type="number"] {
   text-align: right;
 }
-

@@ -1,11 +1,12 @@
+/* Import variables and components */
+@import './variables.css';
+@import './components.css';
+
 /* Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Import variables and components */
-@import './variables.css';
-@import './components.css';
 
 /* Variables */
 :root {
