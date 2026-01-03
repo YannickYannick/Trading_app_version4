@@ -24,7 +24,7 @@ export const useDashboardData = () => {
             setIsLoading(true)
             setError(null)
 
-            // Fetch summary stats in parallel
+            // 1. Fetch initial data
             const [stats, positionsSummary, recentTrades, brokersRes] = await Promise.all([
                 tradesService.getStatistics(),
                 positionsService.getSummary(),
@@ -32,9 +32,34 @@ export const useDashboardData = () => {
                 brokersService.getAccounts()
             ])
 
-            const accounts = brokersRes.results || []
-            // Calculate total capital from broker accounts (sum of balance_eur)
-            const totalCapital = accounts.reduce((sum: number, acc: any) => sum + (Number(acc.balance_eur) || 0), 0)
+            let accounts = brokersRes.results || []
+
+            // 2. Refresh balances for each account (parallel)
+            // This ensures we have the latest balance from the broker (API)
+            const updatedAccountsPromises = accounts.map(async (account) => {
+                try {
+                    // Only refresh if active
+                    if (account.is_active) {
+                        const balanceRes = await brokersService.refreshBalance(account.id)
+                        if (balanceRes.success) {
+                            return {
+                                ...account,
+                                balance_eur: balanceRes.balance_eur,
+                                currency: balanceRes.currency
+                            }
+                        }
+                    }
+                    return account
+                } catch (err) {
+                    console.warn(`Failed to refresh balance for account ${account.id}`, err)
+                    return account
+                }
+            })
+
+            const updatedAccounts = await Promise.all(updatedAccountsPromises)
+
+            // 3. Calculate total capital from FRESH balances
+            const totalCapital = updatedAccounts.reduce((sum: number, acc: any) => sum + (Number(acc.balance_eur) || 0), 0)
 
             setData({
                 summary: {
@@ -45,7 +70,7 @@ export const useDashboardData = () => {
                     total_capital: totalCapital
                 },
                 recentTrades: recentTrades,
-                brokerAccounts: accounts
+                brokerAccounts: updatedAccounts
             })
         } catch (e: any) {
             console.error('Error fetching dashboard data:', e)
