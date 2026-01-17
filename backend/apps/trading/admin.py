@@ -180,8 +180,8 @@ class AllAssetsAdmin(admin.ModelAdmin):
 
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
-    list_display = ['symbol', 'name', 'asset_type', 'current_price', 'currency', 'is_active']
-    list_filter = ['asset_type', 'currency', 'is_active']
+    list_display = ['symbol', 'name', 'asset_type', 'current_price', 'currency', 'is_active', 'is_tracked', 'is_favorite']
+    list_filter = ['is_tracked', 'is_favorite', 'asset_type', 'currency', 'is_active']
     search_fields = ['symbol', 'name']
     ordering = ['symbol']
 

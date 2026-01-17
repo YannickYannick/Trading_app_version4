@@ -29870,3 +29870,475 @@ AttributeError: 'WSGIRequest' object has no attribute 'query_params'
 [INFO    ] 2026-01-17 15:50:22 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
 [INFO    ] 2026-01-17 15:50:44 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\services\yahoo_validator.py changed, reloading.
 [INFO    ] 2026-01-17 15:50:45 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 15:51:41 | django.server                  | log_message:249 | "POST /api/all-assets/131698/validate_single_yahoo/ HTTP/1.1" 200 121
+[INFO    ] 2026-01-17 15:51:46 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/131698/sync_price_history/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 15:51:47 | django.server                  | log_message:249 | "POST /api/all-assets/131698/sync_price_history/ HTTP/1.1" 200 124
+[INFO    ] 2026-01-17 15:51:53 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 15:51:54 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 15:51:56 | django.server                  | log_message:249 | "GET /api/positions/ HTTP/1.1" 200 13518
+[INFO    ] 2026-01-17 15:51:59 | django.server                  | log_message:249 | "GET /api/positions/ HTTP/1.1" 200 13518
+[INFO    ] 2026-01-17 15:53:41 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 15:53:44 | django.server                  | log_message:249 | "GET /api/positions/ HTTP/1.1" 200 13518
+[INFO    ] 2026-01-17 16:01:42 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:01:43 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:01:48 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64486
+[INFO    ] 2026-01-17 16:01:54 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64486
+[INFO    ] 2026-01-17 16:02:14 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:02:14 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:02:19 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 16:02:25 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 16:06:47 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:06:53 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 16:07:23 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:07:28 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 16:07:55 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:07:55 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:08:00 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 16:08:06 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64488
+[INFO    ] 2026-01-17 16:08:08 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 16:08:08 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 16:08:11 | django.server                  | log_message:249 | "GET /api/positions/ HTTP/1.1" 200 13519
+[INFO    ] 2026-01-17 16:08:13 | django.server                  | log_message:249 | "GET /api/positions/ HTTP/1.1" 200 13519
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 16:08:21 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 16:08:23 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13519
+[INFO    ] 2026-01-17 16:08:26 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13519
+[INFO    ] 2026-01-17 16:08:26 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64488
+[INFO    ] 2026-01-17 16:08:27 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 16:08:27 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 16:08:31 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64488
+[INFO    ] 2026-01-17 16:08:33 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 5718
+[INFO    ] 2026-01-17 16:08:34 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 5718
+[INFO    ] 2026-01-17 16:18:42 | django.server                  | log_message:249 | "OPTIONS /api/assets/overview/?include_empty=true HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:18:43 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 9627
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /admin HTTP/1.1" 301 0
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /admin/ HTTP/1.1" 302 0
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /admin/login/?next=/admin/ HTTP/1.1" 200 4158
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/css/dark_mode.css HTTP/1.1" 200 3538
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/css/base.css HTTP/1.1" 200 23100
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/css/login.css HTTP/1.1" 200 951
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/css/nav_sidebar.css HTTP/1.1" 200 2810
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/js/theme.js HTTP/1.1" 200 1653
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/css/responsive.css HTTP/1.1" 200 16194
+[INFO    ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /static/admin/js/nav_sidebar.js HTTP/1.1" 200 3063
+[WARNING ] 2026-01-17 16:19:32 | django.server                  | log_message:249 | "GET /favicon.ico HTTP/1.1" 404 3510
+[INFO    ] 2026-01-17 16:19:38 | django.server                  | log_message:249 | "POST /admin/login/?next=/admin/ HTTP/1.1" 200 4406
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "POST /admin/login/?next=/admin/ HTTP/1.1" 302 0
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "GET /admin/ HTTP/1.1" 200 21444
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "GET /static/admin/css/dashboard.css HTTP/1.1" 200 441
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "GET /static/admin/img/icon-changelink.svg HTTP/1.1" 200 978
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "GET /static/admin/img/icon-addlink.svg HTTP/1.1" 200 593
+[INFO    ] 2026-01-17 16:19:45 | django.server                  | log_message:249 | "GET /static/admin/img/icon-deletelink.svg HTTP/1.1" 200 689
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /admin/trading/asset/ HTTP/1.1" 200 28516
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/jquery.init.js HTTP/1.1" 200 347
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/css/changelists.css HTTP/1.1" 200 7501
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/core.js HTTP/1.1" 200 6208
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/admin/RelatedObjectLookups.js HTTP/1.1" 200 9777
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/actions.js HTTP/1.1" 200 8076
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/urlify.js HTTP/1.1" 200 7887
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/prepopulate.js HTTP/1.1" 200 1531
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/img/icon-yes.svg HTTP/1.1" 200 558
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/vendor/jquery/jquery.js HTTP/1.1" 200 285314
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/img/search.svg HTTP/1.1" 200 607
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/vendor/xregexp/xregexp.js HTTP/1.1" 200 325171
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/js/filters.js HTTP/1.1" 200 978
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/img/sorting-icons.svg HTTP/1.1" 200 1761
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/img/icon-viewlink.svg HTTP/1.1" 200 928
+[INFO    ] 2026-01-17 16:19:52 | django.server                  | log_message:249 | "GET /static/admin/img/tooltag-add.svg HTTP/1.1" 200 593
+[INFO    ] 2026-01-17 16:20:02 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 62317)
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /admin/trading/asset/25/change/ HTTP/1.1" 200 2517518
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/css/forms.css HTTP/1.1" 200 8844
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/js/calendar.js HTTP/1.1" 200 9159
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/js/admin/DateTimeShortcuts.js HTTP/1.1" 200 19698
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/css/widgets.css HTTP/1.1" 200 11811
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/js/prepopulate_init.js HTTP/1.1" 200 586
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /static/admin/js/change_form.js HTTP/1.1" 200 606
+[INFO    ] 2026-01-17 16:20:05 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 16:20:07 | django.server                  | log_message:249 | "GET /static/admin/img/icon-clock.svg HTTP/1.1" 200 805
+[INFO    ] 2026-01-17 16:20:07 | django.server                  | log_message:249 | "GET /static/admin/img/icon-calendar.svg HTTP/1.1" 200 1112
+[INFO    ] 2026-01-17 16:30:04 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 9627
+[INFO    ] 2026-01-17 16:30:07 | django.server                  | log_message:249 | "OPTIONS /api/brokers/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:07 | django.server                  | log_message:249 | "OPTIONS /api/brokers/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:07 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "GET /api/brokers/ HTTP/1.1" 200 650
+[INFO    ] 2026-01-17 16:30:08 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 16:30:09 | django.server                  | log_message:249 | "GET /api/brokers/ HTTP/1.1" 200 650
+[INFO    ] 2026-01-17 16:30:09 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 16:30:10 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 16:30:10 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 16:30:11 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 16:30:12 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189219330441040000 EUR (API via USDT (USDCUSDT=1.00010000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 16:30:12 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[WARNING ] 2026-01-17 16:30:13 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 16:30:13 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191808910441040000
+[INFO    ] 2026-01-17 16:30:13 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191808910441040000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 16:30:13 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 16:30:15 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 16:30:15 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 16:30:16 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189238250482080000 EUR (API via USDT (USDCUSDT=1.00020000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 16:30:16 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[WARNING ] 2026-01-17 16:30:17 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 16:30:17 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191827830482080000
+[INFO    ] 2026-01-17 16:30:17 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191827830482080000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 16:30:17 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 16:31:57 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 7075
+[INFO    ] 2026-01-17 16:31:58 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 7075
+[INFO    ] 2026-01-17 16:32:11 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 9627
+[INFO    ] 2026-01-17 17:14:27 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\assets.py changed, reloading.
+[INFO    ] 2026-01-17 17:14:30 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 17:14:51 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\assets.py changed, reloading.
+[INFO    ] 2026-01-17 17:14:52 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "OPTIONS /api/assets/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "OPTIONS /api/assets/ HTTP/1.1" 200 0
+[WARNING ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 17:34:25 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 17:34:26 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22320
+[INFO    ] 2026-01-17 17:34:26 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22320
+[INFO    ] 2026-01-17 17:34:51 | django.server                  | log_message:249 | "OPTIONS /api/assets/?asset_type=STOCK HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:34:51 | django.server                  | log_message:249 | "GET /api/assets/?asset_type=STOCK HTTP/1.1" 200 22337
+[INFO    ] 2026-01-17 17:34:58 | django.server                  | log_message:249 | "OPTIONS /api/assets/?search=A&asset_type=STOCK HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:34:58 | django.server                  | log_message:249 | "GET /api/assets/?search=A&asset_type=STOCK HTTP/1.1" 200 22706
+[INFO    ] 2026-01-17 17:35:00 | django.server                  | log_message:249 | "OPTIONS /api/assets/?search=AA&asset_type=STOCK HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:35:00 | django.server                  | log_message:249 | "GET /api/assets/?search=AA&asset_type=STOCK HTTP/1.1" 200 18915
+[INFO    ] 2026-01-17 17:35:04 | django.server                  | log_message:249 | "OPTIONS /api/assets/?search=AAP&asset_type=STOCK HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:35:04 | django.server                  | log_message:249 | "GET /api/assets/?search=AAP&asset_type=STOCK HTTP/1.1" 200 880
+[INFO    ] 2026-01-17 17:35:07 | django.server                  | log_message:249 | "OPTIONS /api/assets/42/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:35:07 | django.server                  | log_message:249 | "OPTIONS /api/assets/42/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:35:07 | django.server                  | log_message:249 | "GET /api/assets/42/ HTTP/1.1" 200 402
+[INFO    ] 2026-01-17 17:35:08 | django.server                  | log_message:249 | "GET /api/assets/42/ HTTP/1.1" 200 402
+[INFO    ] 2026-01-17 17:35:13 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22320
+[INFO    ] 2026-01-17 17:35:13 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22320
+[INFO    ] 2026-01-17 17:35:16 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 1995386
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /admin HTTP/1.1" 301 0
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /admin/ HTTP/1.1" 200 21444
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/css/dark_mode.css HTTP/1.1" 200 3538
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/css/base.css HTTP/1.1" 200 23100
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/js/theme.js HTTP/1.1" 200 1653
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/css/nav_sidebar.css HTTP/1.1" 200 2810
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/css/dashboard.css HTTP/1.1" 200 441
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/css/responsive.css HTTP/1.1" 200 16194
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/js/nav_sidebar.js HTTP/1.1" 200 3063
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/img/icon-addlink.svg HTTP/1.1" 200 593
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/img/icon-changelink.svg HTTP/1.1" 200 978
+[INFO    ] 2026-01-17 17:39:47 | django.server                  | log_message:249 | "GET /static/admin/img/icon-deletelink.svg HTTP/1.1" 200 689
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:34 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:35 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 17:50:35 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 17:50:35 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 17:50:36 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 17:50:36 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 17:50:36 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 17:50:39 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13770
+[INFO    ] 2026-01-17 17:50:41 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64490
+[INFO    ] 2026-01-17 17:50:41 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:41 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 17:50:42 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 17:50:42 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13770
+[INFO    ] 2026-01-17 17:50:42 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 17:50:46 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64490
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 17:50:47 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 17:50:50 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 60059)
+[INFO    ] 2026-01-17 17:50:50 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 53251)
+[INFO    ] 2026-01-17 17:50:53 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 53519)
+[INFO    ] 2026-01-17 18:33:19 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 18:33:19 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 18:34:55 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\assets.py changed, reloading.
+[INFO    ] 2026-01-17 18:34:58 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[WARNING ] 2026-01-17 18:38:46 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 18:38:46 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[INFO    ] 2026-01-17 18:38:47 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 18:38:47 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 18:38:47 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 18:38:48 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 18:38:58 | django.server                  | log_message:249 | "OPTIONS /api/assets/overview/?include_empty=true HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 18:39:00 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 8884919
+[INFO    ] 2026-01-17 18:40:15 | django.server                  | log_message:249 | "OPTIONS /api/assets/overview/?include_empty=false HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 18:40:16 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=false HTTP/1.1" 200 7008
+[INFO    ] 2026-01-17 18:40:19 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=false HTTP/1.1" 200 7008
+[INFO    ] 2026-01-17 18:40:20 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 8884919
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/brokers/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/brokers/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/assets/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:51 | django.server                  | log_message:249 | "OPTIONS /api/assets/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:52 | django.server                  | log_message:249 | "GET /api/brokers/ HTTP/1.1" 200 650
+[INFO    ] 2026-01-17 19:04:52 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 19:04:52 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 19:04:52 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/brokers/ HTTP/1.1" 200 650
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 19:04:53 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:04:54 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 19:04:54 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 19:04:55 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 19:04:56 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 19:04:56 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 19:04:57 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189219330441040000 EUR (API via USDT (USDCUSDT=1.00010000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 19:04:57 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[INFO    ] 2026-01-17 19:04:59 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13770
+[WARNING ] 2026-01-17 19:04:59 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 19:04:59 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191808910441040000
+[INFO    ] 2026-01-17 19:04:59 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191808910441040000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 19:04:59 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 19:05:01 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 19:05:01 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64486
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13770
+[INFO    ] 2026-01-17 19:05:02 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 19:05:02 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189219330441040000 EUR (API via USDT (USDCUSDT=1.00010000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 19:05:02 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[WARNING ] 2026-01-17 19:05:04 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 19:05:04 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191808910441040000
+[INFO    ] 2026-01-17 19:05:04 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191808910441040000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 19:05:04 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 19:05:08 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 19:05:18 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:18 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:18 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:18 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:05:19 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 19:05:19 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 19:05:19 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4321
+[INFO    ] 2026-01-17 19:05:19 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 19:05:20 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 19:05:20 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:05:20 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4321
+[INFO    ] 2026-01-17 19:05:20 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:19:24 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:19:24 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:19:31 | django.server                  | log_message:249 | "OPTIONS /api/assets/?asset_type=STOCK HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:19:31 | django.server                  | log_message:249 | "GET /api/assets/?asset_type=STOCK HTTP/1.1" 200 22783
+[INFO    ] 2026-01-17 19:19:35 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 19:20:34 | django.server                  | log_message:249 | "OPTIONS /api/assets/overview/?include_empty=true HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 19:20:35 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 8884919
+[WARNING ] 2026-01-17 20:47:08 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 20:47:08 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 20:52:57 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 20:52:57 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 401 254
+[INFO    ] 2026-01-17 20:52:57 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 20:52:57 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 20:52:58 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 20:52:58 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 20:52:58 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:52:58 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:53:49 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 20:53:50 | django.server                  | log_message:249 | "GET /api/broker-accounts/4/balance-eur/ HTTP/1.1" 200 129
+[INFO    ] 2026-01-17 20:53:51 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 20:53:51 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 20:53:52 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189238250482080000 EUR (API via USDT (USDCUSDT=1.00020000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 20:53:52 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[WARNING ] 2026-01-17 20:53:53 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 20:53:53 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191827830482080000
+[INFO    ] 2026-01-17 20:53:53 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191827830482080000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 20:53:53 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 20:53:55 | trading.api.brokers            | balance_eur:2150 | Binance account 2: Raw balances received: {'USDC': Decimal('0.20565262'), 'USDC_free': Decimal('0.20565262'), 'USDC_locked': Decimal('0E-8'), 'EUR': Decimal('400.00258958'), 'EUR_free': Decimal('400.00258958'), 'EUR_locked': Decimal('0E-8'), 'ETHW': Decimal('0.00000297'), 'ETHW_free': Decimal('0.00000297'), 'ETHW_locked': Decimal('0E-8')} (count: 9)
+[INFO    ] 2026-01-17 20:53:55 | trading.utils.binance_converter | convert_binance_balances_to_eur:77 | Starting conversion of 3 assets: ['USDC', 'EUR', 'ETHW']
+[INFO    ] 2026-01-17 20:53:55 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:53:56 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:53:57 | trading.utils.binance_converter | convert_binance_balances_to_eur:121 | [USDC] 0.20565262 → 0.189219330441040000 EUR (API via USDT (USDCUSDT=1.00010000, USDTEUR=0.92))
+[INFO    ] 2026-01-17 20:53:57 | trading.utils.binance_converter | convert_binance_balances_to_eur:89 | [EUR] 400.00258958 → 400.00258958 EUR (EUR direct)
+[WARNING ] 2026-01-17 20:53:58 | trading.utils.binance_converter | convert_binance_balances_to_eur:160 | [ETHW] 0.00000297 → 0 EUR (could not convert: no API price available and no default rate). Asset value not included in total. Consider adding a default rate for this asset.
+[INFO    ] 2026-01-17 20:53:58 | trading.utils.binance_converter | convert_binance_balances_to_eur:202 | Conversion complete: total EUR = 400.191808910441040000
+[INFO    ] 2026-01-17 20:53:58 | trading.api.brokers            | balance_eur:2175 | Binance account 2: Balance conversion result: eur_balance=400.191808910441040000 (type: <class 'decimal.Decimal'>)
+[INFO    ] 2026-01-17 20:53:58 | django.server                  | log_message:249 | "GET /api/broker-accounts/2/balance-eur/ HTTP/1.1" 200 183
+[INFO    ] 2026-01-17 20:55:02 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 20:55:02 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 20:55:02 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 20:55:03 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 20:55:03 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 20:55:03 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 20:55:06 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 63843)
+[INFO    ] 2026-01-17 20:55:09 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 60630)
+[INFO    ] 2026-01-17 20:55:30 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\views.py changed, reloading.
+[INFO    ] 2026-01-17 20:55:33 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 20:55:54 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:55:54 | django.server                  | log_message:249 | "GET /api/assets/ HTTP/1.1" 200 22766
+[INFO    ] 2026-01-17 20:55:54 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 20:55:54 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 20:55:57 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13770
+[INFO    ] 2026-01-17 20:56:00 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 20:56:01 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 20:56:01 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 20:56:05 | django.server                  | log_message:249 | "OPTIONS /api/assets/?is_tracked=true HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 20:56:06 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:56:06 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:56:17 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:56:17 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:56:30 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:56:30 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 5915
+[INFO    ] 2026-01-17 20:57:03 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\serializers.py changed, reloading.
+[INFO    ] 2026-01-17 20:57:05 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 20:57:22 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 6755
+[INFO    ] 2026-01-17 20:57:22 | django.server                  | log_message:249 | "GET /api/assets/?is_tracked=true HTTP/1.1" 200 6755
+[INFO    ] 2026-01-17 20:57:46 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\views.py changed, reloading.
+[INFO    ] 2026-01-17 20:57:47 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 20:57:57 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\views.py changed, reloading.
+[INFO    ] 2026-01-17 20:57:59 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 20:58:30 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 8884919
+[INFO    ] 2026-01-17 20:59:46 | django.server                  | log_message:249 | "OPTIONS /api/assets/overview/?include_empty=false HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 20:59:47 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=false HTTP/1.1" 200 7008
+[INFO    ] 2026-01-17 20:59:55 | django.server                  | log_message:249 | "GET /api/assets/overview/?include_empty=true HTTP/1.1" 200 8884919
+[WARNING ] 2026-01-17 21:00:42 | django.server                  | log_message:249 | "GET /assets HTTP/1.1" 404 3495
+[INFO    ] 2026-01-17 21:00:46 | django.server                  | log_message:249 | "GET /admin/ HTTP/1.1" 302 0
+[INFO    ] 2026-01-17 21:00:47 | django.server                  | log_message:249 | "GET /admin/login/?next=/admin/ HTTP/1.1" 200 4158
+[INFO    ] 2026-01-17 21:00:47 | django.server                  | log_message:249 | "GET /static/admin/css/login.css HTTP/1.1" 200 951
+[INFO    ] 2026-01-17 21:00:53 | django.server                  | log_message:249 | "POST /admin/login/?next=/admin/ HTTP/1.1" 302 0
+[INFO    ] 2026-01-17 21:00:53 | django.server                  | log_message:249 | "GET /admin/ HTTP/1.1" 200 21444
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /admin/trading/asset/ HTTP/1.1" 200 78690
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/css/changelists.css HTTP/1.1" 200 7501
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/jquery.init.js HTTP/1.1" 200 347
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/core.js HTTP/1.1" 200 6208
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/vendor/jquery/jquery.js HTTP/1.1" 200 285314
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/admin/RelatedObjectLookups.js HTTP/1.1" 200 9777
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/actions.js HTTP/1.1" 200 8076
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/urlify.js HTTP/1.1" 200 7887
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/prepopulate.js HTTP/1.1" 200 1531
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/vendor/xregexp/xregexp.js HTTP/1.1" 200 325171
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/img/search.svg HTTP/1.1" 200 607
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/img/icon-yes.svg HTTP/1.1" 200 558
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/js/filters.js HTTP/1.1" 200 978
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/img/icon-viewlink.svg HTTP/1.1" 200 928
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/img/tooltag-add.svg HTTP/1.1" 200 593
+[INFO    ] 2026-01-17 21:00:57 | django.server                  | log_message:249 | "GET /static/admin/img/sorting-icons.svg HTTP/1.1" 200 1761
+[INFO    ] 2026-01-17 21:01:04 | django.server                  | log_message:249 | "GET /admin/trading/asset/?is_active__exact=1 HTTP/1.1" 200 84398
+[INFO    ] 2026-01-17 21:01:05 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:01:16 | django.server                  | log_message:249 | "GET /admin/trading/asset/?q=aapl&is_active__exact=1 HTTP/1.1" 200 28463
+[INFO    ] 2026-01-17 21:01:16 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:01:27 | django.server                  | handle_error:82 | - Broken pipe from ('127.0.0.1', 50987)
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /admin/trading/asset/42/change/?_changelist_filters=q%3Daapl%26is_active__exact%3D1 HTTP/1.1" 200 5010434
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/css/forms.css HTTP/1.1" 200 8844
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/js/calendar.js HTTP/1.1" 200 9159
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/js/admin/DateTimeShortcuts.js HTTP/1.1" 200 19698
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/css/widgets.css HTTP/1.1" 200 11811
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/js/prepopulate_init.js HTTP/1.1" 200 586
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /static/admin/js/change_form.js HTTP/1.1" 200 606
+[INFO    ] 2026-01-17 21:01:34 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:01:37 | django.server                  | log_message:249 | "GET /static/admin/img/icon-calendar.svg HTTP/1.1" 200 1112
+[INFO    ] 2026-01-17 21:01:37 | django.server                  | log_message:249 | "GET /static/admin/img/icon-clock.svg HTTP/1.1" 200 805
+[INFO    ] 2026-01-17 21:02:04 | django.server                  | log_message:249 | "GET /admin/trading/asset/?q=aapl&is_active__exact=1 HTTP/1.1" 200 28463
+[ERROR   ] 2026-01-17 21:02:09 | django.server                  | log_message:249 | "GET /admin/trading/asset/5882/change/?_changelist_filters=q%3Daapl%26is_active__exact%3D1 HTTP/1.1" 500 12827
+[INFO    ] 2026-01-17 21:02:16 | django.server                  | log_message:249 | "GET /admin/trading/asset/42/change/?_changelist_filters=q%3Daapl%26is_active__exact%3D1 HTTP/1.1" 200 5010434
+[INFO    ] 2026-01-17 21:02:17 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:02:36 | django.server                  | log_message:249 | "GET /admin/trading/asset/42/change/?_changelist_filters=q%3Daapl%26is_active__exact%3D1 HTTP/1.1" 200 5010434
+[INFO    ] 2026-01-17 21:02:36 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:02:50 | django.server                  | log_message:249 | "GET /admin/trading/asset/21521/change/?_changelist_filters=q%3Daapl%26is_active__exact%3D1 HTTP/1.1" 200 5010540
+[INFO    ] 2026-01-17 21:02:50 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:03:29 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\admin.py changed, reloading.
+[INFO    ] 2026-01-17 21:03:31 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 21:08:06 | django.server                  | log_message:249 | "GET /admin/trading/asset/ HTTP/1.1" 200 97126
+[INFO    ] 2026-01-17 21:08:06 | django.server                  | log_message:249 | "GET /static/admin/img/icon-no.svg HTTP/1.1" 200 645
+[INFO    ] 2026-01-17 21:08:07 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:08:12 | django.server                  | log_message:249 | "GET /admin/trading/asset/?is_favorite__exact=1 HTTP/1.1" 200 23314
+[INFO    ] 2026-01-17 21:08:12 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:08:22 | django.server                  | log_message:249 | "GET /admin/trading/asset/? HTTP/1.1" 200 97126
+[INFO    ] 2026-01-17 21:08:23 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:08:24 | django.server                  | log_message:249 | "GET /admin/trading/asset/?is_tracked__exact=1 HTTP/1.1" 200 35656
+[INFO    ] 2026-01-17 21:08:25 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:08:53 | django.server                  | log_message:249 | "GET /admin/trading/asset/42/change/?_changelist_filters=is_tracked__exact%3D1 HTTP/1.1" 200 5010404
+[INFO    ] 2026-01-17 21:08:53 | django.server                  | log_message:249 | "GET /admin/jsi18n/ HTTP/1.1" 200 8634
+[INFO    ] 2026-01-17 21:42:12 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 21:42:12 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 21:42:12 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 21:42:12 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 21:42:13 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4321
+[INFO    ] 2026-01-17 21:42:14 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4321
+[INFO    ] 2026-01-17 21:48:12 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\config_django\urls.py changed, reloading.
+[INFO    ] 2026-01-17 21:48:14 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 21:54:38 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\strategies.py changed, reloading.
+[INFO    ] 2026-01-17 21:54:39 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 22:11:34 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/login/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "POST /api/auth/jwt/login/ HTTP/1.1" 200 584
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 22:11:36 | django.server                  | log_message:249 | "GET /api/positions/summary/ HTTP/1.1" 200 195
+[INFO    ] 2026-01-17 22:11:37 | django.server                  | log_message:249 | "GET /api/trades/statistics/ HTTP/1.1" 200 142
+[INFO    ] 2026-01-17 22:11:37 | django.server                  | log_message:249 | "GET /api/analytics/summary/ HTTP/1.1" 200 475
+[INFO    ] 2026-01-17 22:11:39 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13769
+[INFO    ] 2026-01-17 22:11:42 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 22:11:42 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:42 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:43 | django.server                  | log_message:249 | "GET /api/positions/?status=OPEN HTTP/1.1" 200 13769
+[INFO    ] 2026-01-17 22:11:43 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 22:11:43 | django.server                  | log_message:249 | "GET /api/ai/analyses/latest/?analysis_type=PORTFOLIO HTTP/1.1" 200 602
+[INFO    ] 2026-01-17 22:11:47 | django.server                  | log_message:249 | "GET /api/trades/ HTTP/1.1" 200 64552
+[INFO    ] 2026-01-17 22:11:55 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:55 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:55 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:55 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4426
+[INFO    ] 2026-01-17 22:11:56 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:11:57 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4426
+[INFO    ] 2026-01-17 22:12:59 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\strategies.py changed, reloading.
+[INFO    ] 2026-01-17 22:13:01 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-17 22:13:58 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\serializers.py changed, reloading.
+[INFO    ] 2026-01-17 22:13:59 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader

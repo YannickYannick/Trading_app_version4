@@ -136,8 +136,8 @@ class Strategy(TimeStampedModel):
     broker_account = models.ForeignKey(
         'BrokerAccount',
         on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        null=True, # Garder null=True pour SET_NULL, mais blank=False pour le rendre obligatoire
+        blank=False,
         related_name='strategies',
         help_text="Compte broker pour exécuter cette stratégie"
     )
@@ -170,7 +170,7 @@ class Strategy(TimeStampedModel):
             ('paper_trading', 'Paper Trading'),
             ('live_trading', 'Trading Réel'),
         ],
-        default='simulation',
+        default='live_trading',
         help_text="Mode d'exécution de la stratégie"
     )
     risk_level = models.CharField(
@@ -179,15 +179,15 @@ class Strategy(TimeStampedModel):
     
     # Quantité et budget
     min_quantity = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True,
-        help_text="Quantité minimale d'achat (1 pour actions, 0.0005 pour crypto)"
+        max_digits=20, decimal_places=10, default=0, null=False, blank=False,
+        help_text="Quantité minimale d'achat"
     )
     max_quantity = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True,
+        max_digits=20, decimal_places=10, default=1, null=False, blank=False,
         help_text="Quantité maximale d'achat"
     )
     budget = models.DecimalField(
-        max_digits=20, decimal_places=2, null=True, blank=True,
+        max_digits=20, decimal_places=2, default=1000, null=False, blank=False,
         help_text="Budget alloué à cette stratégie"
     )
     
@@ -206,8 +206,21 @@ class Strategy(TimeStampedModel):
         help_text="Quantité actuellement détenue en portefeuille"
     )
     
-    is_active = models.BooleanField(default=True)
-    is_automated = models.BooleanField(default=False)
+    # Statut
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Stratégie active"
+    )
+    is_automated = models.BooleanField(
+        default=True,
+        help_text="Trading automatique activé"
+    )
+    
+    # Gestion du risque (ajouté demande user)
+    stop_loss_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Pourcentage de stop-loss par trade (ex: 5.00 pour 5%)"
+    )
     
     class Meta:
         ordering = ['name']

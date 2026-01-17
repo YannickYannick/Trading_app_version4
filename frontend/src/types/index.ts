@@ -20,6 +20,9 @@ export interface Asset {
   currency: string
   exchange: string
   is_tradable: boolean
+  is_tracked?: boolean
+  is_favorite?: boolean
+  best_variant?: number
   last_updated: string
   created_at: string
 }
@@ -149,6 +152,7 @@ export interface Strategy {
   algorithm_type?: string
   algorithm_type_display?: string
   risk_level?: 'LOW' | 'MEDIUM' | 'HIGH'
+  stop_loss_percentage?: number
   is_active: boolean
   status?: string
   status_display?: string

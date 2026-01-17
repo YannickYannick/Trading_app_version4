@@ -84,6 +84,7 @@ class AssetSerializer(serializers.ModelSerializer):
             'symbol', 'name', 'display_name', 'asset_type', 'currency', 'exchange',
             'current_price', 'price_updated_at', 'is_active', 'description',
             'sector', 'industry', 'market_cap', 'pe_ratio', 'dividend_yield',
+            'is_tracked', 'is_favorite', 'best_variant',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -280,6 +281,7 @@ class StrategySerializer(serializers.ModelSerializer):
             'broker_account', 'broker_account_id', 'broker_name',
             # Configuration
             'algorithm_type', 'execution_mode', 'risk_level',
+            'stop_loss_percentage',
             # Quantités
             'min_quantity', 'max_quantity',
             'target_min_quantity', 'target_max_quantity',

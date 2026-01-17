@@ -12,8 +12,8 @@ import {
     Alert,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { Button } from '../common/Button'
-import { brokersService } from '../../services/api'
+import { Button } from './common/Button'
+import { brokersService } from '../services/api'
 import type { BrokerAccount } from '@trading-app/shared'
 
 interface SaxoOAuthModalProps {

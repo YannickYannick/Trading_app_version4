@@ -731,10 +731,21 @@ class AssetViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     
-    filterset_fields = ['asset_type', 'currency', 'is_active']
+    filterset_fields = ['asset_type', 'currency', 'is_active', 'is_favorite']
     search_fields = ['symbol', 'name', 'sector', 'industry']
     ordering_fields = ['symbol', 'name', 'current_price', 'market_cap', 'pe_ratio']
     ordering = ['symbol']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filtrage personnalisé pour is_tracked
+        # Si is_tracked=true, on retourne (is_tracked OR is_favorite)
+        is_tracked = self.request.query_params.get('is_tracked')
+        if is_tracked and is_tracked.lower() == 'true':
+            queryset = queryset.filter(Q(is_tracked=True) | Q(is_favorite=True))
+        
+        return queryset
     
     @action(detail=True, methods=['get'])
     def prices(self, request, pk=None):

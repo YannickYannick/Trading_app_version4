@@ -20,7 +20,7 @@ type TabType = 'list' | 'overview'
 export default function Assets() {
   // État pour les onglets
   const [activeTab, setActiveTab] = useState<TabType>('list')
-  
+
   // État pour la vue Liste
   const [search, setSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState<'SAXO' | 'BINANCE' | 'IB' | 'OTHER' | undefined>(undefined)
@@ -28,7 +28,8 @@ export default function Assets() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupByType, setGroupByType] = useState(true) // Toggle pour le regroupement par type
-  
+  const [showAllAssets, setShowAllAssets] = useState(false) // Toggle pour afficher tous les assets ou seulement ceux suivis
+
   // État pour la vue DataTree (Vue d'ensemble)
   const [overviewData, setOverviewData] = useState<AssetWithChildren[]>([])
   const [overviewLoading, setOverviewLoading] = useState(false)
@@ -39,7 +40,22 @@ export default function Assets() {
     platform: platformFilter,
     search: search || undefined,
     asset_type: assetTypeFilter || undefined,
+    is_tracked: showAllAssets ? undefined : true,
   })
+
+  // Gérer l'ajout/retrait des favoris
+  const handleToggleFavorite = async (asset: Asset) => {
+    try {
+      await assetService.updateAsset(asset.id, {
+        is_favorite: !asset.is_favorite
+      })
+      // Rafraîchir la liste
+      refetch()
+    } catch (err: any) {
+      console.error('Erreur lors de la mise à jour du favori:', err)
+      alert("Erreur lors de la mise à jour des favoris")
+    }
+  }
 
   const columns = [
     {
@@ -108,6 +124,26 @@ export default function Assets() {
         </Badge>
       ),
     },
+    {
+      key: 'actions',
+      label: 'Actions',
+      align: 'center' as const,
+      render: (_value: any, row: Asset) => (
+        <div className="action-buttons">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleToggleFavorite(row)
+            }}
+            title={row?.is_favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          >
+            <i className={`fa${row?.is_favorite ? 's' : 'r'} fa-star ${row?.is_favorite ? 'text-warning' : 'text-muted'}`}></i>
+          </Button>
+        </div>
+      ),
+    },
   ]
 
   // Types d'assets uniques pour le filtre
@@ -124,7 +160,7 @@ export default function Assets() {
   // Grouper les assets par type
   const groupedAssets = useMemo(() => {
     const groups: Record<string, Asset[]> = {}
-    
+
     assets.forEach((asset) => {
       const type = asset.asset_type || 'Sans type'
       if (!groups[type]) {
@@ -132,7 +168,7 @@ export default function Assets() {
       }
       groups[type].push(asset)
     })
-    
+
     // Trier les groupes par nom de type
     const sortedGroups: Record<string, Asset[]> = {}
     Object.keys(groups)
@@ -140,7 +176,7 @@ export default function Assets() {
       .forEach((type) => {
         sortedGroups[type] = groups[type]
       })
-    
+
     return sortedGroups
   }, [assets])
 
@@ -358,6 +394,27 @@ export default function Assets() {
                   </Button>
                 </div>
               </div>
+              <div className="filter-group">
+                <label className="filter-label">Affichage</label>
+                <div className="filter-buttons">
+                  <Button
+                    variant={!showAllAssets ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setShowAllAssets(false)}
+                    title="Afficher uniquement les assets avec trades, positions ou favoris"
+                  >
+                    Suivis ({total})
+                  </Button>
+                  <Button
+                    variant={showAllAssets ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => setShowAllAssets(true)}
+                    title="Afficher tout le catalogue (peut être lent)"
+                  >
+                    Tous
+                  </Button>
+                </div>
+              </div>
               {assetTypes.length > 0 && (
                 <div className="filter-group">
                   <label className="filter-label">Type d'asset</label>
@@ -385,7 +442,7 @@ export default function Assets() {
               </h3>
               <div className="assets-table-actions">
                 {/* Toggle regroupement par type */}
-                <button 
+                <button
                   className="toggle-group-btn"
                   onClick={() => setGroupByType(!groupByType)}
                   title={groupByType ? 'Désactiver le regroupement' : 'Activer le regroupement par type'}
@@ -393,7 +450,7 @@ export default function Assets() {
                   {groupByType ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                   <span>{groupByType ? 'Groupé' : 'Liste plate'}</span>
                 </button>
-                
+
                 {groupByType && Object.keys(groupedAssets).length > 0 && (
                   <Button
                     variant="outline"
@@ -405,7 +462,7 @@ export default function Assets() {
                 )}
               </div>
             </div>
-            
+
             {assets.length > 0 ? (
               groupByType ? (
                 // Vue groupée par type
@@ -432,7 +489,7 @@ export default function Assets() {
                             </Badge>
                           </div>
                         </div>
-                        
+
                         {isExpanded && (
                           <div className="asset-group-content">
                             <Table
@@ -484,7 +541,7 @@ export default function Assets() {
               Vue d'ensemble - Assets avec Positions et Orders
             </h3>
             <div className="overview-actions">
-              <button 
+              <button
                 className="toggle-empty-btn"
                 onClick={() => setIncludeEmptyAssets(!includeEmptyAssets)}
                 title={includeEmptyAssets ? 'Masquer les assets vides' : 'Afficher tous les assets'}
@@ -503,7 +560,7 @@ export default function Assets() {
               </Button>
             </div>
           </div>
-          
+
           {overviewError && (
             <div className="overview-error">
               <p>Erreur: {overviewError}</p>
@@ -512,7 +569,7 @@ export default function Assets() {
               </Button>
             </div>
           )}
-          
+
           <DataTreeTable
             data={overviewData}
             loading={overviewLoading}

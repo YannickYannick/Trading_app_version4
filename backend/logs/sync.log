@@ -92085,3 +92085,4 @@ apps.trading.brokers.base.AuthenticationError: Authentication failed: Refresh to
 [INFO    ] 2026-01-17 15:07:47 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 365 price records for SOLEUR (Yahoo: SOL-EUR, Total days: 365)
 [INFO    ] 2026-01-17 15:19:32 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 251 price records for AAPL:xnas (Yahoo: AAPL, Total days: 261)
 [INFO    ] 2026-01-17 15:44:06 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 365 price records for BTCEUR (Yahoo: BTC-EUR, Total days: 365)
+[INFO    ] 2026-01-17 15:51:47 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 251 price records for ETHW (Yahoo: ETHW, Total days: 251)

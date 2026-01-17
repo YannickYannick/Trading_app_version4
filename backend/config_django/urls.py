@@ -28,6 +28,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView, 
     SpectacularRedocView
 )
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     # ============================================
@@ -48,10 +49,9 @@ urlpatterns = [
     # Interface de login/logout pour l'API navigable DRF
     path('api/auth/', include('rest_framework.urls', namespace='rest_framework')),
     
-    # Note: Pour JWT, décommenter après installation de djangorestframework-simplejwt
-    # from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-    # path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    # path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # JWT Authentication (utilisé par l'application mobile)
+    path('api/auth/jwt/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/jwt/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # ============================================
     # DOCUMENTATION API (OpenAPI/Swagger)
