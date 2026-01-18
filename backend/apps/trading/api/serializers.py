@@ -281,7 +281,6 @@ class StrategySerializer(serializers.ModelSerializer):
             'broker_account', 'broker_account_id', 'broker_name',
             # Configuration
             'algorithm_type', 'execution_mode', 'risk_level',
-            'stop_loss_percentage',
             # Quantités
             'min_quantity', 'max_quantity',
             'target_min_quantity', 'target_max_quantity',

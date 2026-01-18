@@ -30342,3 +30342,83 @@ AttributeError: 'WSGIRequest' object has no attribute 'query_params'
 [INFO    ] 2026-01-17 22:13:01 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
 [INFO    ] 2026-01-17 22:13:58 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\serializers.py changed, reloading.
 [INFO    ] 2026-01-17 22:13:59 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[WARNING ] 2026-01-17 22:45:27 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 22:45:27 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 22:45:27 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[WARNING ] 2026-01-17 22:45:27 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[INFO    ] 2026-01-17 22:45:28 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 22:45:28 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 22:45:28 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 22:45:28 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-17 22:45:29 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:45:29 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:45:29 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:45:29 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-17 22:45:30 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:45:30 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-17 22:45:52 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:45:52 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:45:52 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-17 22:45:52 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-17 22:45:52 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-17 22:45:53 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-18 00:06:39 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:39 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:39 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:39 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[WARNING ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 00:06:40 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 00:06:41 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-18 00:06:41 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 00:06:41 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-18 00:06:41 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-18 00:06:41 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-18 00:06:42 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-18 00:06:43 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/strategies/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/all-assets/?page_size=10000 HTTP/1.1" 200 0
+[WARNING ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 401 254
+[WARNING ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 401 254
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:51 | django.server                  | log_message:249 | "OPTIONS /api/auth/jwt/refresh/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "POST /api/auth/jwt/refresh/ HTTP/1.1" 200 489
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-18 11:40:52 | django.server                  | log_message:249 | "OPTIONS /api/broker-accounts/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:40:53 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-18 11:40:53 | django.server                  | log_message:249 | "GET /api/all-assets/?page_size=10000 HTTP/1.1" 200 325498
+[INFO    ] 2026-01-18 11:40:53 | django.server                  | log_message:249 | "GET /api/broker-accounts/ HTTP/1.1" 200 1750
+[INFO    ] 2026-01-18 11:40:53 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-18 11:40:54 | django.server                  | log_message:249 | "GET /api/strategies/ HTTP/1.1" 200 4566
+[INFO    ] 2026-01-18 11:45:43 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\models\strategies.py changed, reloading.
+[INFO    ] 2026-01-18 11:45:46 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/positions/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/trades/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/trades/statistics/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/analytics/summary/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:10 | django.server                  | log_message:249 | "OPTIONS /api/positions/?status=OPEN HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:11 | django.utils.autoreload        | trigger_reload:265 | C:\Users\yannb\Documents\1. Programmation\2. projet - site trading\Trading_app_version4\backend\apps\trading\api\serializers.py changed, reloading.
+[INFO    ] 2026-01-18 11:46:12 | django.utils.autoreload        | run_with_reloader:681 | Watching for file changes with StatReloader
+[INFO    ] 2026-01-18 11:46:19 | django.server                  | log_message:249 | "OPTIONS /api/ai/analyses/analyze-portfolio/ HTTP/1.1" 200 0
+[INFO    ] 2026-01-18 11:46:20 | django.server                  | log_message:249 | "POST /api/ai/analyses/analyze-portfolio/ HTTP/1.1" 201 3725

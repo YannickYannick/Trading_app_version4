@@ -216,12 +216,6 @@ class Strategy(TimeStampedModel):
         help_text="Trading automatique activé"
     )
     
-    # Gestion du risque (ajouté demande user)
-    stop_loss_percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Pourcentage de stop-loss par trade (ex: 5.00 pour 5%)"
-    )
-    
     class Meta:
         ordering = ['name']
         verbose_name = 'Strategy'

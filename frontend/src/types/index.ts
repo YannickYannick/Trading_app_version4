@@ -152,7 +152,6 @@ export interface Strategy {
   algorithm_type?: string
   algorithm_type_display?: string
   risk_level?: 'LOW' | 'MEDIUM' | 'HIGH'
-  stop_loss_percentage?: number
   is_active: boolean
   status?: string
   status_display?: string

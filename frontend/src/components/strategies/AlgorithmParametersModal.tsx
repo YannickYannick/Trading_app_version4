@@ -20,41 +20,29 @@ const ALGORITHM_PARAMETERS_DEFINITIONS: Record<string, Array<{
   threshold: [
     { key: 'threshold_low', label: 'Seuil bas', type: 'float', default: 100.0, description: 'Prix en dessous = signal d\'achat' },
     { key: 'threshold_high', label: 'Seuil haut', type: 'float', default: 200.0, description: 'Prix au-dessus = signal de vente' },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
   ma_crossover: [
     { key: 'ma1_period', label: 'Période MA rapide', type: 'int', default: 20, min: 1, max: 200 },
     { key: 'ma2_period', label: 'Période MA lente', type: 'int', default: 50, min: 1, max: 200 },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
   rsi: [
     { key: 'rsi_period', label: 'Période RSI', type: 'int', default: 14, min: 2, max: 100 },
     { key: 'rsi_low', label: 'Seuil bas RSI', type: 'int', default: 30, min: 0, max: 100 },
     { key: 'rsi_high', label: 'Seuil haut RSI', type: 'int', default: 70, min: 0, max: 100 },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
   bollinger: [
     { key: 'bb_period', label: 'Période Bollinger', type: 'int', default: 20, min: 2, max: 200 },
     { key: 'bb_std', label: 'Écart-type', type: 'float', default: 2.0, min: 0.1, max: 5 },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
   macd: [
     { key: 'macd_fast', label: 'Période EMA rapide', type: 'int', default: 12, min: 1, max: 50 },
     { key: 'macd_slow', label: 'Période EMA lente', type: 'int', default: 26, min: 1, max: 100 },
     { key: 'macd_signal', label: 'Période signal', type: 'int', default: 9, min: 1, max: 50 },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
   grid: [
     { key: 'grid_min', label: 'Prix minimum', type: 'float', default: 100.0, min: 0 },
     { key: 'grid_max', label: 'Prix maximum', type: 'float', default: 200.0, min: 0 },
     { key: 'grid_levels', label: 'Nombre de niveaux', type: 'int', default: 10, min: 2, max: 100 },
-    { key: 'order_size', label: 'Taille d\'ordre max', type: 'float', default: 1.0, min: 0.01 },
-    { key: 'stop_loss', label: 'Stop-loss (%)', type: 'float', default: 0.05, min: 0, max: 1 },
   ],
 }
 
