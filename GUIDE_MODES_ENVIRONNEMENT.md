@@ -4,6 +4,8 @@
 
 Ce guide explique comment basculer entre les modes **Production** et **Développement** pour le backend Django et le frontend React.
 
+Pour un déploiement **Vercel (frontend) + Railway (backend)**, voir **`docs/DEPLOIEMENT_VERCEL_RAILWAY.md`** (Procfile, variables, CORS `*.vercel.app`, `SECURE_PROXY_SSL_HEADER`, dépannage).
+
 ---
 
 ## Table des Matières

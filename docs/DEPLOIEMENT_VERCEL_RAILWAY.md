@@ -39,6 +39,8 @@ Railway utilisera le **`Procfile`** à cet emplacement.
 
 Les origines **`https://*.vercel.app`** sont autorisées par **regex** dans `config_django/settings/production.py` (`CORS_ALLOWED_ORIGIN_REGEXES`).
 
+**HTTPS derrière le proxy Railway :** `production.py` définit `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')` avant `SECURE_SSL_REDIRECT`. Sans cela, Django croit que la requête est en HTTP et renvoie une **301 en boucle** vers la même URL. HostArmada / Passenger envoie en général aussi `X-Forwarded-Proto` : ce réglage reste adapté aux deux hébergeurs.
+
 Autres secrets métier : clés brokers, `GEMINI_*`, etc. — comme sur HostArmada / `.env` local, **sans** commiter le `.env`.
 
 ### 1.5 Réseau public (Railway)
@@ -114,7 +116,19 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 
 ---
 
-## 4. Checklist
+## 4. Dépannage
+
+| Symptôme | Piste |
+|----------|--------|
+| **301 en boucle** (navigateur ou `curl -L` : trop de redirections ; `Location` = même URL) | Vérifier `SECURE_PROXY_SSL_HEADER` dans `production.py` (déjà en place sur la branche `deploiement`) et redéployer. |
+| **502 / « Application failed to respond »** | Port public Railway = port d’écoute Gunicorn (`$PORT` dans le `Procfile`) ; lire les **logs** (crash DB, import, etc.). |
+| **CORS** | Regex `*.vercel.app` ; ajouter `CORS_ALLOWED_ORIGINS` pour un domaine perso. |
+| **Front sans données** | `VITE_API_BASE_URL` avec `/api`, **redéployer Vercel** après changement des `VITE_*`. |
+| **`gunicorn: command not found`** | `python -m gunicorn …` ou vérifier `pip install -r requirements.txt` dans les build logs. |
+
+---
+
+## 5. Checklist
 
 - [ ] Railway : Root = `backend`, variables `SECRET_KEY`, `ALLOWED_HOSTS`, DB, secrets métier
 - [ ] Railway : domaine public + port aligné sur `$PORT` / networking
@@ -125,7 +139,7 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 
 ---
 
-## 5. Référence projet Bachata (même principe)
+## 6. Référence projet Bachata (même principe)
 
 - [hebergement.md (Capital_Of_Fusion V5)](https://github.com/YannickYannick/Capital_Of_Fusion_version5/blob/main/docs/explication/hebergement.md)  
 - [deploiement.md (Capital_Of_Fusion V5)](https://github.com/YannickYannick/Capital_Of_Fusion_version5/blob/main/docs/explication/deploiement.md)  
@@ -133,5 +147,7 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 Différences Trading : **WSGI** `config_django.wsgi`, **settings** `config_django.settings.production`, front **Vite** + `VITE_API_BASE_URL` au lieu de `NEXT_PUBLIC_API_URL`.
 
 ---
+
+Documentation voisine : **`GUIDE_MODES_ENVIRONNEMENT.md`** (modes dev / prod), **`deployment_config/README.md`** (HostArmada), **`RAPPORT_DEPLOIEMENT_HOSTARMADA.md`**.
 
 *Dernière mise à jour : 2026-03-28*
