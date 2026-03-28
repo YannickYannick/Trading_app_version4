@@ -8,4 +8,4 @@ from .trading import *
 from .strategies import Strategy, StrategyPerformance, AlgorithmParameter, AlgorithmSchema, AlgorithmParameterDefinition
 from .brokers import *
 from .automation import *
-
+from .portfolio import PortfolioSnapshot

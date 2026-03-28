@@ -62,6 +62,8 @@ export interface Position {
   all_asset_platform?: string
   all_asset_yahoo_symbol?: string
   size: number
+  quantity: number // Champ réel du backend
+  symbol: string // Champ calculé du backend
   entry_price: number
   current_price: number | null
   yahoo_current_price?: number | null // Prix actuel depuis Yahoo Finance
@@ -88,6 +90,8 @@ export interface Trade {
   all_asset_yahoo_symbol?: string
   size: number // Alias pour quantity dans le serializer
   quantity?: number // Nom réel du champ backend
+  symbol?: string // Champ calculé du backend
+  yahoo_current_price?: number | null // Prix actuel depuis Yahoo Finance
   price: number
   side: 'BUY' | 'SELL'
   timestamp: string // Alias pour executed_at dans le serializer
@@ -223,7 +227,7 @@ export interface BrokerAccount {
   account_id: string
   environment: 'live' | 'simulation'
   environment_display?: string
-  
+
   // Credentials Saxo
   saxo_client_id?: string | null
   saxo_client_secret?: string | null
@@ -232,12 +236,12 @@ export interface BrokerAccount {
   saxo_access_token?: string | null
   saxo_refresh_token?: string | null
   saxo_token_expires_at?: string | null
-  
+
   // Credentials Binance
   binance_api_key?: string | null
   binance_api_secret?: string | null
   binance_testnet?: boolean
-  
+
   // Credentials génériques
   api_key?: string
   api_secret?: string
@@ -247,11 +251,11 @@ export interface BrokerAccount {
   refresh_token?: string
   token_expires_at?: string | null
   extra_credentials?: Record<string, any>
-  
+
   // Auto-refresh
   auto_refresh_enabled?: boolean
   auto_refresh_frequency?: number
-  
+
   // Balance et statut
   balance?: number | null
   currency?: string
@@ -260,11 +264,11 @@ export interface BrokerAccount {
   is_active: boolean
   is_demo?: boolean
   is_sandbox: boolean
-  
+
   // Timestamps
   created_at?: string
   updated_at?: string
-  
+
   user: number
 }
 

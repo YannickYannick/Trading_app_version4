@@ -18,10 +18,11 @@ export default function Trades() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
+  const [loadAllPrices, setLoadAllPrices] = useState(false) // Option utilisateur
   const [selectedAssets, setSelectedAssets] = useState<number[]>([])
   const [chartViewMode, setChartViewMode] = useState<'global' | 'per_asset'>('global')
   const [showChart, setShowChart] = useState(true)
-  
+
   const { trades, loading, error, statistics, total, refetch } = useTrades({
     side: sideFilter,
     date_from: dateFrom || undefined,
@@ -66,13 +67,13 @@ export default function Trades() {
         const allAssetIds = trades
           .map(t => t.all_asset?.id || (typeof t.all_asset === 'number' ? t.all_asset : null))
           .filter((id): id is number => id !== null && id !== undefined)
-        
+
         // Charger les prix en parallèle (limité à 10 à la fois)
         const batches = []
         for (let i = 0; i < allAssetIds.length; i += 10) {
           batches.push(allAssetIds.slice(i, i + 10))
         }
-        
+
         for (const batch of batches) {
           const results = await Promise.allSettled(
             batch.map(async (id) => {
@@ -80,17 +81,17 @@ export default function Trades() {
               return { id, price }
             })
           )
-          
+
           results.forEach((result) => {
             if (result.status === 'fulfilled') {
               priceMap[result.value.id] = result.value.price
             }
           })
         }
-        
+
         setYahooPrices(priceMap)
       }
-      
+
       loadYahooPrices()
     }
   }, [trades])
@@ -189,13 +190,23 @@ export default function Trades() {
           <YahooActions
             allAssetId={allAssetId}
             allAssetSymbol={row?.all_asset_symbol || row?.all_asset?.symbol}
-            onSuccess={() => {
-              refetch()
-              // Recharger le prix Yahoo après succès
+            onSuccess={async () => {
+              // Mise à jour asynchrone : récupérer les nouvelles données de l'AllAsset
               if (allAssetId) {
-                assetService.getYahooCurrentPrice(allAssetId).then(price => {
+                try {
+                  // Récupérer l'AllAsset mis à jour depuis le backend
+                  const updatedAsset = await assetService.getAllAssetById(allAssetId)
+
+                  // Mettre à jour le prix Yahoo
+                  const price = await assetService.getYahooCurrentPrice(allAssetId)
                   setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
-                })
+
+                  // Forcer un re-render en appelant refetch (nécessaire pour mettre à jour le symbole Yahoo)
+                  // Note: On pourrait optimiser davantage en mettant à jour le state local des trades
+                  refetch()
+                } catch (error) {
+                  console.error('Erreur lors de la mise à jour:', error)
+                }
               }
             }}
             compact
@@ -261,6 +272,13 @@ export default function Trades() {
           >
             Vente
           </Button>
+          <Button
+            variant={loadAllPrices ? 'success' : 'outline'}
+            onClick={() => setLoadAllPrices(!loadAllPrices)}
+            title={loadAllPrices ? 'Charger tous les prix Yahoo (lent)' : 'Charger 20 prix Yahoo (rapide)'}
+          >
+            {loadAllPrices ? '📊 Tous les prix' : '⚡ 20 prix'}
+          </Button>
         </div>
       </div>
 
@@ -302,14 +320,14 @@ export default function Trades() {
         >
           {showChart && (
             <>
-                  <ChartControls
-                    selectedAssets={selectedAssets}
-                    viewMode={chartViewMode}
-                    onSelectedAssetsChange={setSelectedAssets}
-                    onViewModeChange={setChartViewMode}
-                    allAssetsInTrades={allAssetsInTrades}
-                    allAssetsMap={allAssetsMap}
-                  />
+              <ChartControls
+                selectedAssets={selectedAssets}
+                viewMode={chartViewMode}
+                onSelectedAssetsChange={setSelectedAssets}
+                onViewModeChange={setChartViewMode}
+                allAssetsInTrades={allAssetsInTrades}
+                allAssetsMap={allAssetsMap}
+              />
               <TradesChart
                 trades={trades}
                 selectedAssets={selectedAssets}

@@ -68,7 +68,7 @@ urlpatterns = [
     # ============================================
     # Décommenter quand les apps seront prêtes
     # path('api/macro/', include('apps.macro_economics.urls')),
-    # path('api/ai/', include('apps.ai_assistant.urls')),
+    path('api/ai/', include('apps.ai_assistant.api.urls')),
 ]
 
 # ============================================

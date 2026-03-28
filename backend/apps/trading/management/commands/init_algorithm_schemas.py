@@ -38,7 +38,6 @@ class Command(BaseCommand):
                     {'key': 'threshold_low', 'param_type': 'float', 'default_value': '100.0', 'required': True, 'description': 'Seuil bas : prix en dessous = signal d\'achat'},
                     {'key': 'threshold_high', 'param_type': 'float', 'default_value': '200.0', 'required': True, 'description': 'Seuil haut : prix au-dessus = signal de vente'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre (limite de sécurité)'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
             'ma_crossover': {
@@ -48,7 +47,6 @@ class Command(BaseCommand):
                     {'key': 'ma1_period', 'param_type': 'int', 'default_value': '20', 'required': True, 'description': 'Période de la moyenne mobile rapide'},
                     {'key': 'ma2_period', 'param_type': 'int', 'default_value': '50', 'required': True, 'description': 'Période de la moyenne mobile lente'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
             'rsi': {
@@ -59,7 +57,6 @@ class Command(BaseCommand):
                     {'key': 'rsi_low', 'param_type': 'int', 'default_value': '30', 'required': True, 'description': 'Seuil bas RSI : en dessous = survente (achat)'},
                     {'key': 'rsi_high', 'param_type': 'int', 'default_value': '70', 'required': True, 'description': 'Seuil haut RSI : au-dessus = surachat (vente)'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
             'bollinger': {
@@ -69,7 +66,6 @@ class Command(BaseCommand):
                     {'key': 'bb_period', 'param_type': 'int', 'default_value': '20', 'required': True, 'description': 'Période pour la moyenne mobile des bandes'},
                     {'key': 'bb_std', 'param_type': 'float', 'default_value': '2.0', 'required': True, 'description': 'Nombre d\'écarts-types pour les bandes'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
             'macd': {
@@ -80,7 +76,6 @@ class Command(BaseCommand):
                     {'key': 'macd_slow', 'param_type': 'int', 'default_value': '26', 'required': True, 'description': 'Période EMA lente pour MACD'},
                     {'key': 'macd_signal', 'param_type': 'int', 'default_value': '9', 'required': True, 'description': 'Période EMA pour la ligne de signal'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
             'grid': {
@@ -91,7 +86,6 @@ class Command(BaseCommand):
                     {'key': 'grid_max', 'param_type': 'float', 'default_value': '200.0', 'required': True, 'description': 'Prix maximum de la grille'},
                     {'key': 'grid_levels', 'param_type': 'int', 'default_value': '10', 'required': True, 'description': 'Nombre de niveaux dans la grille'},
                     {'key': 'order_size', 'param_type': 'float', 'default_value': '1.0', 'required': True, 'description': 'Taille maximale d\'un ordre'},
-                    {'key': 'stop_loss', 'param_type': 'float', 'default_value': '0.05', 'required': True, 'description': 'Stop-loss (5%)'},
                 ]
             },
         }

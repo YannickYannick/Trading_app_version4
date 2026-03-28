@@ -1,14 +1,8 @@
-import axios from 'axios'
+// Utilisation du client partagé qui gère l'auth
+import apiClient from './api/client'
 
-const API_BASE_URL = '/api'
-
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true,
-})
+// Maintien de la variable client pour compatibilité du reste du fichier
+const client = apiClient
 
 // Types
 export interface Asset {
@@ -99,6 +93,12 @@ export const api = {
 
   async getRecentTrades(): Promise<Trade[]> {
     const response = await client.get('/trades/recent/')
+    return response.data
+  },
+
+  // Analytics
+  async getAnalyticsSummary(): Promise<any> {
+    const response = await client.get('/analytics/summary/')
     return response.data
   },
 }

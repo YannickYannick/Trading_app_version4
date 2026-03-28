@@ -113,6 +113,13 @@ router.register(r'brokers', views.BrokerViewSet, basename='broker')
 # --------------------------------------------
 router.register(r'broker-accounts', views.BrokerAccountViewSet, basename='broker-account')
 
+# --------------------------------------------
+# ANALYTIQUE & DASHBOARD
+# Endpoints :
+#   GET /analytics/summary/ → KPI Dashboard
+# --------------------------------------------
+router.register(r'analytics', views.AnalyticsViewSet, basename='analytics')
+
 
 # ============================================
 # URLS FINALES

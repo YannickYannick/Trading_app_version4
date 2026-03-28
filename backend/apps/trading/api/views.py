@@ -22,7 +22,7 @@ import logging
 from apps.trading.models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
     Strategy, StrategyPerformance, Broker, BrokerAccount, BrokerSyncLog,
-    ScheduledTask, TaskExecutionLog
+    ScheduledTask, TaskExecutionLog, PortfolioSnapshot
 )
 from apps.trading.services.broker_service import BrokerService
 from .serializers import (
@@ -3155,3 +3155,114 @@ def get_assets_with_positions_orders(request):
             'success': False,
             'error': f'Erreur lors de la récupération des données: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ============================================
+# VIEWSET ANALYTICS
+# ============================================
+
+class AnalyticsViewSet(viewsets.ViewSet):
+    """
+    ViewSet pour les analyses et statistiques du dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """
+        GET /api/analytics/summary/
+        Retourne les KPIs principaux pour le dashboard.
+        """
+        user = request.user
+        
+        # 1. Calculer la Valeur Totale (Cash + Investi)
+        # ---------------------------------------------
+        broker_accounts = BrokerAccount.objects.filter(user=user, is_active=True)
+        open_positions = Position.objects.filter(user=user, is_open=True)
+        
+        # Cash: Somme des balances converties en EUR
+        total_cash = sum(account.balance or 0 for account in broker_accounts)
+        
+        # Investi: Somme de (Quantité * Prix Actuel)
+        total_invested = 0
+        for pos in open_positions:
+            price = pos.current_price or pos.entry_price or 0
+            if price and pos.quantity:
+                total_invested += float(price) * float(pos.quantity)
+                
+        total_value = float(total_cash) + total_invested
+        
+        # 2. Calculer le Taux de Réussite (Trades Fermés uniquement)
+        # ----------------------------------------------------------
+        closed_positions = Position.objects.filter(user=user, is_open=False)
+        total_closed = closed_positions.count()
+        
+        # PnL est une property, on ne peut pas filtrer dessus directement via l'ORM
+        # sans annotation complexe. On le fait en Python.
+        winning_positions = 0
+        for p in closed_positions:
+            if p.pnl and p.pnl > 0:
+                winning_positions += 1
+        
+        win_rate = (winning_positions / total_closed * 100) if total_closed > 0 else 0
+        
+        # 3. Breakdown par Broker
+        # -----------------------
+        breakdown = []
+        for account in broker_accounts:
+            # Cash du broker
+            account_cash = float(account.balance or 0)
+            
+            # Valeur des positions sur ce broker
+            account_positions = open_positions.filter(broker=account.broker)
+            
+            account_invested = 0
+            # Filtrer les positions qui correspondent au broker de ce compte
+            pos_for_broker = [p for p in open_positions if p.broker_id == account.broker_id]
+            
+            for pos in pos_for_broker:
+                 price = pos.current_price or pos.entry_price or 0
+                 if price and pos.quantity:
+                    account_invested += float(price) * float(pos.quantity)
+            
+            breakdown.append({
+                'broker_name': account.name or account.broker.name,
+                'total': account_cash + account_invested,
+                'cash': account_cash,
+                'invested': account_invested
+            })
+
+        # 4. Historique (Graphique Evolution)
+        # -----------------------------------
+        # Récupérer les 30 derniers snapshots
+        snapshots = PortfolioSnapshot.objects.filter(user=user).order_by('date')[:30]
+        history = [
+            {
+                'date': s.date.isoformat(),
+                'total_value': float(s.total_value),
+                'invested': float(s.total_invested),
+                'cash': float(s.total_cash)
+            }
+            for s in snapshots
+        ]
+        
+        # Ajouter le point actuel "Live" à l'historique pour que le graphe soit à jour
+        from django.utils import timezone
+        history.append({
+            'date': timezone.now().isoformat(),
+            'total_value': total_value,
+            'invested': total_invested,
+            'cash': float(total_cash)
+        })
+
+        return Response({
+            'kpi': {
+                'total_value': round(total_value, 2),
+                'total_invested': round(total_invested, 2),
+                'total_cash': round(float(total_cash), 2),
+                'win_rate': round(win_rate, 2),
+                'total_closed_positions': total_closed,
+                'active_positions': open_positions.count()
+            },
+            'breakdown': breakdown,
+            'history': history
+        })

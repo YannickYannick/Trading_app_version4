@@ -1,37 +1,53 @@
 /**
  * Page Dashboard - Vue d'ensemble du trading
  */
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Badge, Loading, Table } from '@components/common'
 import { usePositions } from '@hooks/usePositions'
 import { useTrades } from '@hooks/useTrades'
 import { formatCurrency, formatPercent, formatDate } from '@utils/format'
 import type { Position } from '@types'
+import AIInsightWidget from '@components/AIInsightWidget'
+import { AnalyticsCharts } from '@components/dashboard/AnalyticsCharts'
+import api from '@services/api'
 import './Dashboard.css'
 
+interface DashboardKpi {
+  total_value: number;
+  total_invested: number;
+  total_cash: number;
+  win_rate: number;
+  total_closed_positions: number;
+  active_positions: number;
+}
+
 export default function Dashboard() {
-  const { positions, loading: positionsLoading, summary } = usePositions({ status: 'OPEN' })
-  const { trades, loading: tradesLoading, statistics } = useTrades()
+  const { positions, loading: positionsLoading } = usePositions({ status: 'OPEN' })
+  const { trades, loading: tradesLoading } = useTrades()
 
-  const stats = useMemo(() => {
-    const totalPnl = positions.reduce((sum, pos) => sum + (pos?.pnl || 0), 0)
-    const totalValue = positions.reduce(
-      (sum, pos) => sum + ((pos?.size || 0) * (pos?.current_price || 0)),
-      0
-    )
-    const winRate = statistics?.win_rate || 0
+  const [kpi, setKpi] = useState<DashboardKpi | null>(null)
+  const [history, setHistory] = useState<any[]>([])
+  const [breakdown, setBreakdown] = useState<any[]>([])
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true)
 
-    return {
-      totalPnl,
-      totalValue,
-      winRate,
-      openPositions: positions.length,
-      totalTrades: trades.length,
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const data = await api.getAnalyticsSummary()
+        setKpi(data.kpi)
+        setHistory(data.history)
+        setBreakdown(data.breakdown)
+      } catch (error) {
+        console.error("Failed to fetch analytics", error)
+      } finally {
+        setLoadingAnalytics(false)
+      }
     }
-  }, [positions, trades, statistics])
+    fetchAnalytics()
+  }, [])
 
-  if (positionsLoading || tradesLoading) {
+  if (positionsLoading || tradesLoading || loadingAnalytics) {
     return (
       <div className="dashboard-page">
         <Loading text="Chargement du dashboard..." />
@@ -47,7 +63,10 @@ export default function Dashboard() {
       label: 'Symbole',
       render: (_value: any, row: Position) => (
         <Link to={`/positions/${row?.id || ''}`} className="link-symbol">
-          {row?.asset?.symbol || 'N/A'}
+          <div>{row?.symbol || row?.all_asset_symbol || 'N/A'}</div>
+          {row?.all_asset_yahoo_symbol && (
+            <div style={{ fontSize: '0.75rem', color: '#666' }}>{row.all_asset_yahoo_symbol}</div>
+          )}
         </Link>
       ),
     },
@@ -56,7 +75,7 @@ export default function Dashboard() {
       label: 'Taille',
       align: 'right' as const,
       render: (_value: any, row: Position) => {
-        const size = Number(row?.size || 0)
+        const size = Number(row?.quantity || 0)
         return isNaN(size) ? '0.0000' : size.toFixed(4)
       },
     },
@@ -70,7 +89,7 @@ export default function Dashboard() {
       key: 'current_price',
       label: 'Prix actuel',
       align: 'right' as const,
-      render: (_value: any, row: Position) => formatCurrency(row?.current_price || 0),
+      render: (_value: any, row: Position) => formatCurrency(row?.yahoo_current_price || row?.current_price || 0),
     },
     {
       key: 'pnl',
@@ -91,38 +110,39 @@ export default function Dashboard() {
         <p className="dashboard-subtitle">Vue d'ensemble de votre portefeuille</p>
       </div>
 
-      {/* Statistiques principales */}
+      {/* AI Widget */}
+      <div style={{ marginBottom: '24px' }}>
+        <AIInsightWidget scope="PORTFOLIO" />
+      </div>
+
+      {/* Statistiques principales - Source API Analytics */}
       <div className="dashboard-stats-grid">
         <Card className="stat-card stat-card-primary">
           <div className="stat-card-content">
-            <h3 className="stat-card-label">P&L Total</h3>
-            <p className={`stat-card-value ${stats.totalPnl >= 0 ? 'positive' : 'negative'}`}>
-              {formatCurrency(stats.totalPnl)}
-            </p>
-            <Badge variant={stats.totalPnl >= 0 ? 'success' : 'danger'} className="stat-card-badge">
-              {formatPercent((stats.totalPnl / (stats.totalValue || 1)) * 100)}
-            </Badge>
-          </div>
-        </Card>
-
-        <Card className="stat-card">
-          <div className="stat-card-content">
             <h3 className="stat-card-label">Valeur Totale</h3>
-            <p className="stat-card-value">{formatCurrency(stats.totalValue)}</p>
+            <p className="stat-card-value">{formatCurrency(kpi?.total_value || 0)}</p>
+            <div style={{ display: 'flex', gap: '10px', fontSize: '0.8rem', opacity: 0.8, marginTop: '5px' }}>
+              <span>Cash: {formatCurrency(kpi?.total_cash || 0)}</span>
+              <span>|</span>
+              <span>Investi: {formatCurrency(kpi?.total_invested || 0)}</span>
+            </div>
           </div>
         </Card>
 
         <Card className="stat-card">
           <div className="stat-card-content">
             <h3 className="stat-card-label">Taux de Réussite</h3>
-            <p className="stat-card-value">{formatPercent(stats.winRate)}</p>
+            <p className={`stat-card-value ${(kpi?.win_rate || 0) >= 50 ? 'positive' : 'negative'}`}>
+              {formatPercent(kpi?.win_rate || 0)}
+            </p>
+            <span style={{ fontSize: '0.75rem', color: '#888' }}>Sur trades fermés</span>
           </div>
         </Card>
 
         <Card className="stat-card">
           <div className="stat-card-content">
             <h3 className="stat-card-label">Positions Ouvertes</h3>
-            <p className="stat-card-value">{stats.openPositions}</p>
+            <p className="stat-card-value">{kpi?.active_positions || 0}</p>
             <Link to="/positions" className="stat-card-link">
               Voir toutes →
             </Link>
@@ -131,90 +151,100 @@ export default function Dashboard() {
 
         <Card className="stat-card">
           <div className="stat-card-content">
-            <h3 className="stat-card-label">Total Trades</h3>
-            <p className="stat-card-value">{stats.totalTrades}</p>
+            <h3 className="stat-card-label">Positions Fermées</h3>
+            <p className="stat-card-value">{kpi?.total_closed_positions || 0}</p>
             <Link to="/trades" className="stat-card-link">
-              Voir tous →
+              Voir trades →
             </Link>
           </div>
         </Card>
+      </div>
 
-        {summary && (
-          <Card className="stat-card">
-            <div className="stat-card-content">
-              <h3 className="stat-card-label">Positions Fermées</h3>
-              <p className="stat-card-value">{summary.closed_positions || 0}</p>
+      {/* Nouveaux Graphiques d'Analytique */}
+      <AnalyticsCharts history={history} breakdown={breakdown} />
+
+      <div className="dashboard-sections-grid">
+        {/* Positions récentes */}
+        <Card
+          title="Positions Ouvertes"
+          subtitle={`${positions.length} position(s) ouverte(s)`}
+          actions={
+            <Link to="/positions">
+              <button className="btn btn-outline btn-sm">Voir toutes</button>
+            </Link>
+          }
+          className="dashboard-positions-card"
+        >
+          {recentPositions.length > 0 ? (
+            <Table
+              columns={positionColumns}
+              data={recentPositions}
+              keyExtractor={(pos) => pos?.id || ''}
+              compact
+            />
+          ) : (
+            <div className="empty-state">
+              <p>Aucune position ouverte</p>
+              <Link to="/positions">
+                <button className="btn btn-primary">Créer une position</button>
+              </Link>
+            </div>
+          )}
+        </Card>
+
+        {/* Trades récents */}
+        {trades.length > 0 && (
+          <Card
+            title="Trades Récents"
+            subtitle={`${trades.length} trade(s) au total`}
+            actions={
+              <Link to="/trades">
+                <button className="btn btn-outline btn-sm">Voir tous</button>
+              </Link>
+            }
+            className="dashboard-trades-card"
+          >
+            <div className="trades-list">
+              {trades.slice(0, 5).map((trade) => {
+                const size = Number(trade?.size || trade?.quantity || 0)
+                return (
+                  <div key={trade?.id || Math.random()} className="trade-item">
+                    <div className="trade-item-main">
+                      <div className="trade-symbol-container">
+                        <span className="trade-symbol">{trade?.symbol || trade?.all_asset_symbol || 'N/A'}</span>
+                        {trade?.all_asset_yahoo_symbol && (
+                          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '6px' }}>
+                            {trade.all_asset_yahoo_symbol}
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant={trade?.side === 'BUY' ? 'success' : 'danger'}>
+                        {trade?.side || 'N/A'}
+                      </Badge>
+                    </div>
+                    <div className="trade-item-details">
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <span style={{ fontSize: '0.9rem' }}>Exec: {formatCurrency(trade?.price || 0)}</span>
+                        {trade?.yahoo_current_price && (
+                          <span style={{ fontSize: '0.8rem', color: '#aaa' }}>
+                            Actuel: {formatCurrency(trade.yahoo_current_price)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="trade-size">
+                        {isNaN(size) ? '0.0000' : size.toFixed(4)}
+                      </span>
+                      <span className="trade-date">
+                        {formatDate(trade?.timestamp || trade?.executed_at || '', 'dd/MM HH:mm')}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </Card>
         )}
       </div>
-
-      {/* Positions récentes */}
-      <Card
-        title="Positions Ouvertes"
-        subtitle={`${positions.length} position(s) ouverte(s)`}
-        actions={
-          <Link to="/positions">
-            <button className="btn btn-outline btn-sm">Voir toutes</button>
-          </Link>
-        }
-        className="dashboard-positions-card"
-      >
-        {recentPositions.length > 0 ? (
-          <Table
-            columns={positionColumns}
-            data={recentPositions}
-            keyExtractor={(pos) => pos?.id || ''}
-            compact
-          />
-        ) : (
-          <div className="empty-state">
-            <p>Aucune position ouverte</p>
-            <Link to="/positions">
-              <button className="btn btn-primary">Créer une position</button>
-            </Link>
-          </div>
-        )}
-      </Card>
-
-      {/* Trades récents */}
-      {trades.length > 0 && (
-        <Card
-          title="Trades Récents"
-          subtitle={`${trades.length} trade(s) au total`}
-          actions={
-            <Link to="/trades">
-              <button className="btn btn-outline btn-sm">Voir tous</button>
-            </Link>
-          }
-          className="dashboard-trades-card"
-        >
-          <div className="trades-list">
-            {trades.slice(0, 5).map((trade) => {
-              const size = Number(trade?.size || trade?.quantity || 0)
-              return (
-                <div key={trade?.id || Math.random()} className="trade-item">
-                  <div className="trade-item-main">
-                    <span className="trade-symbol">{trade?.asset?.symbol || 'N/A'}</span>
-                    <Badge variant={trade?.side === 'BUY' ? 'success' : 'danger'}>
-                      {trade?.side || 'N/A'}
-                    </Badge>
-                  </div>
-                  <div className="trade-item-details">
-                    <span>{formatCurrency(trade?.price || 0)}</span>
-                    <span className="trade-size">
-                      {isNaN(size) ? '0.0000' : size.toFixed(4)}
-                    </span>
-                    <span className="trade-date">
-                      {formatDate(trade?.timestamp || trade?.executed_at || '', 'dd/MM HH:mm')}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
     </div>
   )
 }

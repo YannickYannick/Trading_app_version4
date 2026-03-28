@@ -92038,3 +92038,50 @@ apps.trading.brokers.base.AuthenticationError: Authentication failed: Refresh to
 [INFO    ] 2026-01-03 14:12:05 | trading.services.sync.assets   | _process_assets_bulk:372 |    → Asset BGBL:xasx (ID: 129810) will be updated with saxo_uic=54387171
 [INFO    ] 2026-01-03 14:12:05 | trading.services.sync.assets   | _process_assets_bulk:372 |    → Asset AGOGE:xjse (ID: 129811) will be updated with saxo_uic=54381281
 [INFO    ] 2026-01-03 14:12:06 | trading.services.sync.assets   | _process_assets_bulk:375 |    ✅ Bulk updated batch 18 (341 assets)
+[INFO    ] 2026-01-14 22:59:50 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 256 price records for TEP:xpar (Yahoo: TEP.PA, Total days: 264)
+[INFO    ] 2026-01-15 21:18:51 | trading.sync.PositionSyncService | _log_start:77 | 🔄 Starting position sync for Binance
+[INFO    ] 2026-01-15 21:18:57 | trading.sync.PositionSyncService | sync:91 | Retrieved 3 positions from BINANCE
+[WARNING ] 2026-01-15 21:18:57 | trading.sync.PositionSyncService | _get_or_create_all_asset:539 | AllAsset not found for USDC (BINANCE). Creating minimal AllAsset. Consider running asset sync first.
+[INFO    ] 2026-01-15 21:18:57 | trading.sync.PositionSyncService | _get_or_create_all_asset:560 | Created minimal AllAsset for USDC (BINANCE)
+[INFO    ] 2026-01-15 21:18:57 | trading.sync.PositionSyncService | _sync_single_position:343 | Creating new position for USDC (side=LONG, qty=0.20565262)
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_single_position:357 | Position 51 created successfully: USDC LONG qty=0.20565262
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_positions:174 | Created position for USDC
+[WARNING ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _get_or_create_all_asset:539 | AllAsset not found for EUR (BINANCE). Creating minimal AllAsset. Consider running asset sync first.
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _get_or_create_all_asset:560 | Created minimal AllAsset for EUR (BINANCE)
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_single_position:343 | Creating new position for EUR (side=LONG, qty=400.00258958)
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_single_position:357 | Position 52 created successfully: EUR LONG qty=400.00258958
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_positions:174 | Created position for EUR
+[WARNING ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _get_or_create_all_asset:539 | AllAsset not found for ETHW (BINANCE). Creating minimal AllAsset. Consider running asset sync first.
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _get_or_create_all_asset:560 | Created minimal AllAsset for ETHW (BINANCE)
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_single_position:343 | Creating new position for ETHW (side=LONG, qty=0.00000297)
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_single_position:357 | Position 53 created successfully: ETHW LONG qty=0.00000297
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _sync_positions:174 | Created position for ETHW
+[INFO    ] 2026-01-15 21:18:58 | trading.sync.PositionSyncService | _log_complete:115 | 🏁 positions sync completed: 3 created, 0 updated (7.32s)
+[INFO    ] 2026-01-15 21:19:21 | trading.sync.PositionSyncService | _log_start:77 | 🔄 Starting position sync for Binance
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | sync:91 | Retrieved 3 positions from BINANCE
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 51 for USDC (side=LONG)
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 51 updated successfully: USDC LONG qty=0.20565262
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for USDC
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 52 for EUR (side=LONG)
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 52 updated successfully: EUR LONG qty=400.00258958
+[INFO    ] 2026-01-15 21:19:30 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for EUR
+[INFO    ] 2026-01-15 21:19:31 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 53 for ETHW (side=LONG)
+[INFO    ] 2026-01-15 21:19:31 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 53 updated successfully: ETHW LONG qty=0.00000297
+[INFO    ] 2026-01-15 21:19:31 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for ETHW
+[INFO    ] 2026-01-15 21:19:32 | trading.sync.PositionSyncService | _log_complete:115 | 🏁 positions sync completed: 0 created, 3 updated (10.97s)
+[INFO    ] 2026-01-15 21:20:04 | trading.sync.PositionSyncService | _log_start:77 | 🔄 Starting position sync for Binance
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | sync:91 | Retrieved 3 positions from BINANCE
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 51 for USDC (side=LONG)
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 51 updated successfully: USDC LONG qty=0.20565262
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for USDC
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 52 for EUR (side=LONG)
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 52 updated successfully: EUR LONG qty=400.00258958
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for EUR
+[INFO    ] 2026-01-15 21:20:10 | trading.sync.PositionSyncService | _sync_single_position:330 | Updating existing position 53 for ETHW (side=LONG)
+[INFO    ] 2026-01-15 21:20:11 | trading.sync.PositionSyncService | _sync_single_position:340 | Position 53 updated successfully: ETHW LONG qty=0.00000297
+[INFO    ] 2026-01-15 21:20:11 | trading.sync.PositionSyncService | _sync_positions:177 | Updated position for ETHW
+[INFO    ] 2026-01-15 21:20:11 | trading.sync.PositionSyncService | _log_complete:115 | 🏁 positions sync completed: 0 created, 3 updated (6.66s)
+[INFO    ] 2026-01-17 14:39:44 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 365 price records for USDC (Yahoo: USDC-USD, Total days: 365)
+[INFO    ] 2026-01-17 15:07:47 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 365 price records for SOLEUR (Yahoo: SOL-EUR, Total days: 365)
+[INFO    ] 2026-01-17 15:19:32 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 251 price records for AAPL:xnas (Yahoo: AAPL, Total days: 261)
+[INFO    ] 2026-01-17 15:44:06 | trading.services.sync.all_asset_prices | sync_from_yahoo_finance:216 | Synced 365 price records for BTCEUR (Yahoo: BTC-EUR, Total days: 365)

@@ -3,6 +3,7 @@ Django>=6.0
 python-decouple>=3.8
 gunicorn>=21.2.0
 waitress>=3.0.0
+whitenoise>=6.6.0
 
 # API REST
 djangorestframework>=3.16.0
@@ -21,6 +22,9 @@ psycopg2-binary>=2.9.9
 # APIs externes
 requests>=2.31.0
 
+# AI/ML
+google-generativeai>=0.3.0
+
 # Utilitaires
 python-dateutil>=2.8.2
 PyYAML>=6.0.0
@@ -31,3 +35,4 @@ yfinance>=0.2.36
 # Calculs scientifiques pour algorithmes de trading
 numpy>=1.24.0
 pandas>=2.0.0
+

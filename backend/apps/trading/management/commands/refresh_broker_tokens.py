@@ -10,12 +10,46 @@ from apps.trading.services.broker_service import BrokerService
 from apps.trading.utils.token_utils import parse_iso_datetime
 from apps.trading.constants import DEFAULT_TOKEN_REFRESH_MINUTES_BEFORE
 import logging
+import os
+from pathlib import Path
 
 logger = logging.getLogger('trading.management.refresh_tokens')
+
+# Chemin du fichier de log (compatible local et production)
+if os.path.exists('/home/lebaffc1/logs'):
+    LOG_FILE = '/home/lebaffc1/logs/cron_saxo_tokens.log'
+else:
+    # Environnement local
+    LOG_FILE = Path(__file__).resolve().parent.parent.parent.parent.parent / 'logs' / 'cron_saxo_tokens.log'
 
 
 class Command(BaseCommand):
     help = 'Rafraîchit les tokens des brokers qui expirent bientôt'
+    
+    def log_and_print(self, message, style=None):
+        """Écrit dans stdout ET dans le fichier de log"""
+        # Afficher dans la console
+        if style:
+            self.stdout.write(style(message))
+        else:
+            self.stdout.write(message)
+        
+        # Écrire dans le fichier de log
+        try:
+            # Créer le dossier logs s'il n'existe pas
+            log_dir = os.path.dirname(LOG_FILE)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            
+            # Ajouter au fichier avec timestamp
+            with open(LOG_FILE, 'a', encoding='utf-8') as f:
+                timestamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+                # Retirer les codes couleur ANSI pour le fichier
+                clean_message = message
+                f.write(f"[{timestamp}] {clean_message}\n")
+        except Exception as e:
+            # Ne pas crasher si on ne peut pas écrire dans le log
+            self.stdout.write(f"⚠️ Impossible d'écrire dans le log: {e}")
     
     def add_arguments(self, parser):
         parser.add_argument(
@@ -49,10 +83,9 @@ class Command(BaseCommand):
         # Créer un seuil d'expiration
         threshold = timezone.now() + timedelta(minutes=minutes_before)
         
-        self.stdout.write(
-            self.style.SUCCESS(
-                f'🔄 Recherche des tokens à rafraîchir (expiration < {threshold})...'
-            )
+        self.log_and_print(
+            f'🔄 Recherche des tokens à rafraîchir (expiration < {threshold})...',
+            self.style.SUCCESS
         )
         
         # Construire la requête
@@ -96,12 +129,13 @@ class Command(BaseCommand):
             )
         
         if not accounts_to_refresh:
-            self.stdout.write(
-                self.style.WARNING('Aucun token à rafraîchir.')
+            self.log_and_print(
+                'Aucun token à rafraîchir.',
+                self.style.WARNING
             )
             return
         
-        self.stdout.write(
+        self.log_and_print(
             f'📋 {len(accounts_to_refresh)} compte(s) trouvé(s)'
         )
         
@@ -194,16 +228,15 @@ class Command(BaseCommand):
                 )
         
         # Résumé
-        self.stdout.write('')
-        self.stdout.write(self.style.SUCCESS('📊 Résumé:'))
-        self.stdout.write(f'  ✅ Rafraîchis: {refreshed}')
-        self.stdout.write(f'  ❌ Échecs: {failed}')
-        self.stdout.write(f'  ⏭️  Ignorés: {skipped}')
+        self.log_and_print('')
+        self.log_and_print('📊 Résumé:', self.style.SUCCESS)
+        self.log_and_print(f'  ✅ Rafraîchis: {refreshed}')
+        self.log_and_print(f'  ❌ Échecs: {failed}')
+        self.log_and_print(f'  ⏭️  Ignorés: {skipped}')
         
         if refreshed > 0:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f'\n✅ {refreshed} token(s) rafraîchi(s) avec succès!'
-                )
+            self.log_and_print(
+                f'\n✅ {refreshed} token(s) rafraîchi(s) avec succès!',
+                self.style.SUCCESS
             )
 

@@ -6,6 +6,16 @@ from .base import *
 
 DEBUG = False
 
+# Static files served via WhiteNoise (for Passenger/shared hosting)
+# Insert WhiteNoise right after SecurityMiddleware in the MIDDLEWARE from base.py
+MIDDLEWARE.insert(
+    MIDDLEWARE.index('django.middleware.security.SecurityMiddleware') + 1,
+    'whitenoise.middleware.WhiteNoiseMiddleware'
+)
+
+# WhiteNoise configuration - using simple storage for reliability
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
 # Database PostgreSQL pour la production

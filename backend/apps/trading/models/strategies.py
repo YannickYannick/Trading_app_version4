@@ -132,6 +132,26 @@ class Strategy(TimeStampedModel):
         help_text="Asset cible que cette stratégie trade"
     )
     
+    # Compte broker pour exécuter cette stratégie
+    broker_account = models.ForeignKey(
+        'BrokerAccount',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='strategies',
+        help_text="Compte broker pour exécuter cette stratégie"
+    )
+    
+    # Asset Saxo spécifique (optionnel, pour compatibilité)
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='strategies',
+        help_text="Asset Saxo spécifique (optionnel)"
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     
@@ -143,16 +163,18 @@ class Strategy(TimeStampedModel):
         blank=True,
         help_text="Type d'algorithme de trading"
     )
+    execution_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ('simulation', 'Simulation'),
+            ('paper_trading', 'Paper Trading'),
+            ('live_trading', 'Trading Réel'),
+        ],
+        default='simulation',
+        help_text="Mode d'exécution de la stratégie"
+    )
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, default=RiskLevel.MEDIUM
-    )
-    max_position_size = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Taille maximale d'une position en %"
-    )
-    max_daily_loss = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Perte maximale journalière en %"
     )
     
     # Quantité et budget
@@ -171,6 +193,18 @@ class Strategy(TimeStampedModel):
     
     # Paramètres (JSONField conservé pour compatibilité backward)
     parameters = models.JSONField(default=dict, blank=True, help_text="Paramètres (ancien système - utilisé en fallback)")
+    
+    # Fréquence et portfolio
+    check_frequency = models.IntegerField(
+        default=45,
+        help_text="Fréquence de vérification en minutes"
+    )
+    portfolio_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        default=0,
+        help_text="Quantité actuellement détenue en portefeuille"
+    )
     
     is_active = models.BooleanField(default=True)
     is_automated = models.BooleanField(default=False)

@@ -1,6 +1,5 @@
 .table-wrapper {
-  overflow-x: visible;
-  /* Changed from auto to allow dropdowns to overflow */
+  overflow-x: auto;
   border-radius: var(--border-radius-lg);
   max-width: 100%;
 }
@@ -28,8 +27,7 @@
 }
 
 .table td {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  white-space: nowrap;
 }
 
 .table th {

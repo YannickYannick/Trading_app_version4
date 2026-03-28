@@ -31,7 +31,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-in-production')
 
-DEBUG = config('DEBUG', default=True, cast=bool)
+def cast_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ('true', '1', 'yes', 'on')
+
+DEBUG = config('DEBUG', default=True, cast=cast_bool)
 
 # Application definition
 INSTALLED_APPS = [
@@ -90,7 +95,7 @@ WSGI_APPLICATION = 'config_django.wsgi.application'
 # Database
 # Configuration Supabase PostgreSQL / SQLite
 # Pour basculer entre SQLite (dev) et Supabase (prod), utilisez USE_SUPABASE=true/false
-USE_SUPABASE = config('USE_SUPABASE', default=True, cast=bool)
+USE_SUPABASE = config('USE_SUPABASE', default=True, cast=cast_bool)
 
 if USE_SUPABASE:
     # Configuration Supabase PostgreSQL

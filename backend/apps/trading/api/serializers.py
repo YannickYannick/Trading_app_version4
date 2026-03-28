@@ -220,21 +220,103 @@ class AlgorithmParameterSerializer(serializers.ModelSerializer):
 
 class StrategySerializer(serializers.ModelSerializer):
     """Serializer pour les stratégies."""
+    # Champs depuis all_asset
     all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
     all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+    
+    # Champs depuis broker_account
+    broker_account_id = serializers.PrimaryKeyRelatedField(
+        source='broker_account',
+        queryset=BrokerAccount.objects.all(),
+        allow_null=True,
+        required=False
+    )
+    broker_name = serializers.CharField(source='broker_account.name', read_only=True)
+    
+    # Champs depuis asset (Saxo)
+    asset_id = serializers.PrimaryKeyRelatedField(
+        source='asset',
+        queryset=Asset.objects.all(),
+        allow_null=True,
+        required=False
+    )
+    asset_symbol = serializers.CharField(source='asset.symbol', read_only=True)
+    
+    # Aliases pour compatibilité frontend
+    target_min_quantity = serializers.DecimalField(
+        source='min_quantity',
+        max_digits=20,
+        decimal_places=10,
+        required=False,
+        allow_null=True
+    )
+    target_max_quantity = serializers.DecimalField(
+        source='max_quantity',
+        max_digits=20,
+        decimal_places=10,
+        required=False,
+        allow_null=True
+    )
+    
+    # Performance (calculés via SerializerMethodField)
+    total_trades = serializers.SerializerMethodField()
+    successful_trades = serializers.SerializerMethodField()
+    total_pnl = serializers.SerializerMethodField()
+    
+    # Algorithm parameters
     algorithm_parameters = AlgorithmParameterSerializer(many=True, read_only=True)
     algorithm_parameters_data = AlgorithmParameterSerializer(many=True, write_only=True, required=False)
     
     class Meta:
         model = Strategy
         fields = [
-            'id', 'name', 'description', 'all_asset', 'all_asset_symbol', 'all_asset_name',
-            'algorithm_type', 'risk_level', 'max_position_size', 'max_daily_loss',
-            'min_quantity', 'max_quantity', 'budget',
+            'id', 'name', 'description',
+            # AllAssets
+            'all_asset', 'all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol',
+            # Assets Saxo (optionnel)
+            'asset', 'asset_id', 'asset_symbol',
+            # Broker
+            'broker_account', 'broker_account_id', 'broker_name',
+            # Configuration
+            'algorithm_type', 'execution_mode', 'risk_level',
+            # Quantités
+            'min_quantity', 'max_quantity',
+            'target_min_quantity', 'target_max_quantity',
+            'budget', 'portfolio_quantity',
+            # Fréquence
+            'check_frequency',
+            # Paramètres
             'parameters', 'algorithm_parameters', 'algorithm_parameters_data',
-            'is_active', 'is_automated', 'created_at', 'updated_at'
+            # Performance
+            'total_trades', 'successful_trades', 'total_pnl',
+            # Statuts
+            'is_active', 'is_automated',
+            # Timestamps
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'all_asset_symbol', 'all_asset_name', 'algorithm_parameters']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at',
+            'all_asset_symbol', 'all_asset_name', 'all_asset_yahoo_symbol',
+            'broker_name', 'asset_symbol',
+            'total_trades', 'successful_trades', 'total_pnl',
+            'algorithm_parameters'
+        ]
+    
+    def get_total_trades(self, obj):
+        """Calcule le nombre total de trades pour cette stratégie."""
+        return Trade.objects.filter(strategy=obj).count()
+    
+    def get_successful_trades(self, obj):
+        """Calcule le nombre de positions gagnantes (PnL > 0)."""
+        # PnL est une propriété calculée, impossible de filtrer via l'ORM directement
+        positions = Position.objects.filter(strategy=obj, is_open=False)
+        return sum(1 for p in positions if p.pnl and p.pnl > 0)
+    
+    def get_total_pnl(self, obj):
+        """Calcule le P&L total de toutes les positions fermées."""
+        positions = Position.objects.filter(strategy=obj, is_open=False)
+        return sum((p.pnl or 0) for p in positions)
     
     def update(self, instance, validated_data):
         """Mise à jour avec gestion des algorithm_parameters."""
@@ -298,17 +380,7 @@ class StrategySerializer(serializers.ModelSerializer):
             allow_null=True
         )
     
-    def validate_max_position_size(self, value):
-        """Valider que la taille max est entre 0 et 100%."""
-        if value is not None and (value < 0 or value > 100):
-            raise serializers.ValidationError("La taille max doit être entre 0 et 100%")
-        return value
-    
-    def validate_max_daily_loss(self, value):
-        """Valider que la perte max est entre 0 et 100%."""
-        if value is not None and (value < 0 or value > 100):
-            raise serializers.ValidationError("La perte max doit être entre 0 et 100%")
-        return value
+
 
 
 class StrategyNestedSerializer(serializers.ModelSerializer):
@@ -348,8 +420,9 @@ class PositionSerializer(serializers.ModelSerializer):
     strategy_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     # Champs calculés (propriétés du modèle)
-    pnl = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
-    pnl_percent = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    # Champs calculés (propriétés du modèle ou calculé temps réel)
+    pnl = serializers.SerializerMethodField()
+    pnl_percent = serializers.SerializerMethodField()
     
     # Champ symbol pour compatibilité (utilise all_asset en priorité)
     symbol = serializers.SerializerMethodField()
@@ -420,7 +493,40 @@ class PositionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Le prix d'entrée doit être positif")
         return value
 
+    def get_pnl(self, obj):
+        """Calcule le PnL avec le prix actuel (Yahoo ou DB)."""
+        current_price = self.get_yahoo_current_price(obj)
+        if current_price is None and obj.current_price:
+            current_price = float(obj.current_price)
+            
+        if current_price is None or not obj.entry_price:
+            return None
+            
+        entry_price = float(obj.entry_price)
+        quantity = float(obj.quantity)
+        
+        if obj.side == 'LONG':
+            return (current_price - entry_price) * quantity
+        else:
+            return (entry_price - current_price) * quantity
 
+    def get_pnl_percent(self, obj):
+        """Calcule le % PnL avec le prix actuel (Yahoo ou DB)."""
+        current_price = self.get_yahoo_current_price(obj)
+        if current_price is None and obj.current_price:
+            current_price = float(obj.current_price)
+            
+        if current_price is None or not obj.entry_price:
+            return None
+            
+        entry_price = float(obj.entry_price)
+        if entry_price == 0:
+            return 0.0
+            
+        if obj.side == 'LONG':
+            return ((current_price - entry_price) / entry_price) * 100
+        else:
+            return ((entry_price - current_price) / entry_price) * 100
 class TradeSerializer(serializers.ModelSerializer):
     """
     Serializer pour Trade.
@@ -447,6 +553,9 @@ class TradeSerializer(serializers.ModelSerializer):
     # Champs calculés (propriétés du modèle)
     total_value = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
     
+    # Prix actuel calculé depuis Yahoo Finance
+    yahoo_current_price = serializers.SerializerMethodField()
+    
     # Champ symbol pour compatibilité (utilise all_asset en priorité)
     symbol = serializers.SerializerMethodField()
     
@@ -471,9 +580,9 @@ class TradeSerializer(serializers.ModelSerializer):
             'trade_type', 'side', 'quantity', 'price', 'fees',  # side ajouté pour compatibilité
             'executed_at', 'timestamp', 'broker_trade_id',  # timestamp ajouté pour compatibilité
             # Calculés
-            'symbol', 'total_value'
+            'symbol', 'total_value', 'yahoo_current_price'
         ]
-        read_only_fields = ['id', 'total_value', 'side', 'timestamp']
+        read_only_fields = ['id', 'total_value', 'side', 'timestamp', 'yahoo_current_price']
     
     def get_symbol(self, obj):
         """Retourne le symbol depuis all_asset (ou asset en fallback)."""
@@ -482,6 +591,28 @@ class TradeSerializer(serializers.ModelSerializer):
         elif obj.asset:
             return obj.asset.symbol
         return None
+
+    def get_yahoo_current_price(self, obj):
+        """
+        Récupère le prix actuel depuis Yahoo Finance pour l'AllAsset.
+        Retourne None si pas disponible.
+        """
+        if not obj.all_asset or not obj.all_asset.symbole_yahoo:
+            return None
+        
+        if obj.all_asset.symbole_yahoo in ['Not_searched', 'not_found', 'manual']:
+            return None
+        
+        try:
+            from ..services.data_providers.yahoo_finance import YahooFinanceService
+            yahoo_service = YahooFinanceService()
+            price = yahoo_service.get_current_price(obj.all_asset.symbole_yahoo)
+            
+            if price is not None:
+                return float(price)
+            return None
+        except Exception:
+            return None
     
     def validate_quantity(self, value):
         """Valider que la quantité est positive."""
