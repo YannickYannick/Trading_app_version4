@@ -16,7 +16,11 @@ MIDDLEWARE.insert(
 # WhiteNoise configuration - using simple storage for reliability
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', '').split(',')
+    if h.strip()
+]
 
 # Database PostgreSQL pour la production
 DATABASES = {
@@ -56,6 +60,11 @@ CORS_ALLOWED_ORIGINS = [
 if not CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = []
     # En production, NE PAS utiliser CORS_ALLOW_ALL_ORIGINS = True
+
+# Front Vercel (preview + prod) sans lister chaque URL (cf. Capital_Of_Fusion deploiement.md)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://[\w-]+\.vercel\.app$',
+]
 
 # URLs exposées dans les réponses CORS
 CORS_EXPOSE_HEADERS = [

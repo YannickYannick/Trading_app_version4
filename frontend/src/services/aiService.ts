@@ -10,8 +10,9 @@ import {
     AnalyzePortfolioRequest,
     AnalyzeStrategyResponse,
 } from '../types/aiTypes';
+import { config } from '../utils/config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = config.apiBaseUrl;
 
 // Créer une instance axios avec configuration
 const api = axios.create({

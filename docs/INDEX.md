@@ -90,6 +90,12 @@ python manage.py runserver
 # Swagger sur http://localhost:8000/api/docs/
 ```
 
+## ☁️ Déploiement cloud (Vercel + Railway)
+
+Guide pas à pas (aligné sur la doc du projet Capital_Of_Fusion V5, adapté Vite + `config_django`) : **[DEPLOIEMENT_VERCEL_RAILWAY.md](DEPLOIEMENT_VERCEL_RAILWAY.md)**.
+
+Hébergement classique HostArmada (le-baff.com) : voir `deployment_config/README.md` et `RAPPORT_DEPLOIEMENT_HOSTARMADA.md`.
+
 ## 📊 Base de données
 
 Connecté à **Supabase PostgreSQL** :

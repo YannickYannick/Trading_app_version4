@@ -2,6 +2,8 @@
 
 Ce dossier contient les fichiers de configuration utilisés pour le déploiement sur HostArmada (le-baff.com).
 
+Pour un déploiement **Vercel (frontend React/Vite) + Railway (backend Django)**, voir la doc à la racine des docs : [`docs/DEPLOIEMENT_VERCEL_RAILWAY.md`](../docs/DEPLOIEMENT_VERCEL_RAILWAY.md).
+
 ## 📁 Structure
 
 ```
