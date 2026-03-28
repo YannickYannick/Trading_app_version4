@@ -93,7 +93,7 @@ Dans **Settings → General → Node.js Version**, privilégier **20.x LTS** (é
 ### 2.4 Build
 
 - **Install** : `npm install`
-- **Build** : `npm run build` → **`vite build`** (le script `build:check` lance aussi `tsc` en local pour la rigueur des types).
+- **Build** : `npm run build` → exécute Vite via **`node ./node_modules/vite/bin/vite.js build`** (évite l’erreur Vercel *Permission denied* sur `node_modules/.bin/vite`).
 - **Output** : `dist`
 
 Le fichier `frontend/vercel.json` définit des **rewrites** SPA (toutes les routes → `index.html`) pour React Router.
@@ -129,6 +129,7 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 | **CORS** | Regex `*.vercel.app` ; ajouter `CORS_ALLOWED_ORIGINS` pour un domaine perso. |
 | **Front sans données** | `VITE_API_BASE_URL` avec `/api`, **redéployer Vercel** après changement des `VITE_*`. |
 | **`npm install` ERESOLVE (@testing-library/react vs React 19)** | Utiliser `@testing-library/react` **^16** + `@testing-library/dom` **^10** (déjà dans le repo) ; Node **20.x** sur Vercel. |
+| **Build 126 : `Permission denied` sur `.bin/vite`** | Le script `build` appelle `node ./node_modules/vite/bin/vite.js build` (déjà dans le repo). |
 | **`gunicorn: command not found`** | `python -m gunicorn …` ou vérifier `pip install -r requirements.txt` dans les build logs. |
 
 ---
