@@ -12,6 +12,8 @@ export interface AssetFilters {
   page?: number
   page_size?: number
   ordering?: string
+  is_tracked?: boolean
+  is_favorite?: boolean
 }
 
 export interface AllAssetFilters {
@@ -172,11 +174,11 @@ export const assetService = {
     const response = await apiClient.get<AssetsOverviewResponse>('/assets/overview/', {
       params: { include_empty: includeEmpty ? 'true' : 'false' },
     })
-    
+
     if (!response.data.success) {
       throw new Error(response.data.error || 'Erreur lors de la récupération des données')
     }
-    
+
     return response.data.data
   },
 
@@ -244,14 +246,14 @@ export const assetService = {
           currency: string
           message?: string
         }>(`/all-assets/${allAssetId}/current_price/`)
-        
+
         if (response.data.success && response.data.price !== null && response.data.price !== undefined) {
           const price = response.data.price
           priceCache.set(allAssetId, { price, timestamp: Date.now() })
           inFlightRequests.delete(allAssetId)
           return price
         }
-        
+
         // Fallback: essayer depuis l'historique si current_price échoue
         try {
           const historyResponse = await apiClient.get<{
@@ -262,7 +264,7 @@ export const assetService = {
           }>(`/all-assets/${allAssetId}/prices/`, {
             params: { days: 1, format: 'list' },
           })
-          
+
           // Prendre le premier résultat (le plus récent)
           if (historyResponse.data.results && historyResponse.data.results.length > 0) {
             const price = historyResponse.data.results[0].close || null
@@ -273,7 +275,7 @@ export const assetService = {
         } catch (historyError) {
           // Ignorer l'erreur de l'historique
         }
-        
+
         // Mettre en cache null pour éviter les requêtes répétées
         priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
         inFlightRequests.delete(allAssetId)
@@ -303,7 +305,7 @@ export const assetService = {
 
     // Stocker la promesse pour déduplication
     inFlightRequests.set(allAssetId, requestPromise)
-    
+
     return requestPromise
   },
 
@@ -351,14 +353,14 @@ export const assetService = {
       }>(`/all-assets/${allAssetId}/prices/`, {
         params: { days, output_format: format }, // Utiliser output_format pour éviter conflit avec DRF
       })
-      
+
       // Log pour debug
       console.log(`[getPriceHistory] Response for asset ${allAssetId}:`, {
         count: response.data.count,
         resultsLength: response.data.results?.length,
         all_asset_symbol: response.data.all_asset_symbol,
       })
-      
+
       return response.data
     } catch (error: any) {
       // Gérer les erreurs d'authentification (401) - ne pas logger, l'intercepteur gère le refresh

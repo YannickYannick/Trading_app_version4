@@ -159,9 +159,7 @@ Problème rencontré lors de la récupération des prix Saxo pour la validation 
 - ✅ Solutions implémentées : gestion des structures multiples, priorités des champs, logging détaillé
 - ⚠️ Limitation : permissions du compte peuvent bloquer l'accès aux prix
 
-## 🔄 Migrations
-
-### [Migration Saxo : SIM → LIVE](migration-saxo-sim-to-live.md)
+## 🔄 Migrations### [Migration Saxo : SIM → LIVE](migration-saxo-sim-to-live.md)
 **Date :** 29 Décembre 2025
 
 Migration complète de l'environnement Saxo Bank de SIM vers LIVE :
@@ -170,4 +168,3 @@ Migration complète de l'environnement Saxo Bank de SIM vers LIVE :
 - ✅ Script de migration Django pour mettre à jour les comptes existants
 - ✅ Script de test de validation pour vérifier la migration
 - 🎯 Objectif : Éliminer les erreurs `NoAccess` en utilisant l'environnement LIVE
-

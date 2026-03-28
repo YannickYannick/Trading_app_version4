@@ -14,6 +14,7 @@ import Orders from '@pages/Orders'
 import Strategies from '@pages/Strategies'
 import Brokers from '@pages/Brokers'
 import Settings from '@pages/Settings'
+import AIAdvisor from '@pages/AIAdvisor'
 
 function App() {
   return (
@@ -59,6 +60,9 @@ function App() {
 
         {/* Settings */}
         <Route path="settings" element={<Settings />} />
+
+        {/* AI Advisor */}
+        <Route path="ai-advisor" element={<AIAdvisor />} />
 
         {/* Route 404 */}
         <Route path="*" element={<NotFound />} />

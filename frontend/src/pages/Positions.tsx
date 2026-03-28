@@ -31,13 +31,13 @@ export default function Positions() {
         const allAssetIds = positions
           .map(p => p.all_asset?.id || (typeof p.all_asset === 'number' ? p.all_asset : null))
           .filter((id): id is number => id !== null && id !== undefined)
-        
+
         // Charger les prix en parallèle (limité à 10 à la fois pour éviter de surcharger)
         const batches = []
         for (let i = 0; i < allAssetIds.length; i += 10) {
           batches.push(allAssetIds.slice(i, i + 10))
         }
-        
+
         for (const batch of batches) {
           const results = await Promise.allSettled(
             batch.map(async (id) => {
@@ -45,17 +45,17 @@ export default function Positions() {
               return { id, price }
             })
           )
-          
+
           results.forEach((result) => {
             if (result.status === 'fulfilled') {
               priceMap[result.value.id] = result.value.price
             }
           })
         }
-        
+
         setYahooPrices(priceMap)
       }
-      
+
       loadYahooPrices()
     }
   }, [positions])
@@ -98,26 +98,6 @@ export default function Positions() {
       ),
     },
     {
-      key: 'yahoo_price',
-      label: 'Prix Yahoo',
-      align: 'center' as const,
-      render: (_value: any, row: Position) => {
-        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
-        const price = allAssetId ? yahooPrices[allAssetId] : null
-        return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
-      },
-    },
-    {
-      key: 'symbol',
-      label: 'Symbole',
-      align: 'center' as const,
-      render: (_value: any, row: Position) => (
-        <Link to={`/positions/${row?.id || ''}`} className="link-symbol">
-          {row?.asset?.symbol || 'N/A'}
-        </Link>
-      ),
-    },
-    {
       key: 'side',
       label: 'Side',
       align: 'center' as const,
@@ -128,10 +108,13 @@ export default function Positions() {
       ),
     },
     {
-      key: 'size',
+      key: 'quantity',
       label: 'Taille',
       align: 'center' as const,
-      render: (_value: any, row: Position) => (row?.size || 0).toFixed(4),
+      render: (_value: any, row: Position) => {
+        const val = row?.quantity || row?.size || 0
+        return Number(val).toFixed(4)
+      },
     },
     {
       key: 'entry_price',
@@ -144,8 +127,11 @@ export default function Positions() {
       label: 'Prix actuel',
       align: 'center' as const,
       render: (_value: any, row: Position) => {
-        // Utiliser yahoo_current_price si disponible (prix en temps réel), sinon current_price stocké
-        const price = (row as any)?.yahoo_current_price ?? row?.current_price
+        // En priorité : prix Yahoo chargé en live (yahooPrices), sinon prix de l'objet row
+        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const livePrice = allAssetId ? yahooPrices[allAssetId] : null
+
+        const price = livePrice ?? (row as any)?.yahoo_current_price ?? row?.current_price
         return formatCurrency(price || 0)
       },
     },
@@ -226,13 +212,15 @@ export default function Positions() {
           <YahooActions
             allAssetId={allAssetId}
             allAssetSymbol={row?.all_asset_symbol || row?.all_asset?.symbol}
-            onSuccess={() => {
-              refetch()
-              // Recharger le prix Yahoo après succès
+            onSuccess={async () => {
+              // Mise à jour asynchrone sans recharger la page
               if (allAssetId) {
-                assetService.getYahooCurrentPrice(allAssetId).then(price => {
+                try {
+                  const price = await assetService.getYahooCurrentPrice(allAssetId)
                   setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
-                })
+                } catch (error) {
+                  console.error('Erreur lors de la mise à jour:', error)
+                }
               }
             }}
             compact

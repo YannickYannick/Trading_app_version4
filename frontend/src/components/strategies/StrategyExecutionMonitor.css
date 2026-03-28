@@ -1,0 +1,157 @@
+.strategy-execution-monitor {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #1a1d29;
+    border-radius: 8px;
+    border: 1px solid #2d3142;
+}
+
+.monitor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.monitor-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.25rem;
+}
+
+.monitor-table-container {
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.monitor-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #0f1117;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.monitor-table thead {
+    background: #2d3142;
+}
+
+.monitor-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #a0a4b8;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.monitor-table tbody tr {
+    border-bottom: 1px solid #2d3142;
+    transition: background 0.2s;
+}
+
+.monitor-table tbody tr:hover {
+    background: #1a1d29;
+}
+
+.monitor-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.monitor-table td {
+    padding: 1rem;
+    color: #e0e0e0;
+}
+
+.strategy-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.strategy-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-running {
+    background: #3b82f6;
+    color: white;
+}
+
+.badge-completed {
+    background: #10b981;
+    color: white;
+}
+
+.badge-failed {
+    background: #ef4444;
+    color: white;
+}
+
+.signal-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.signal-buy {
+    background: #10b981;
+    color: white;
+}
+
+.signal-sell {
+    background: #ef4444;
+    color: white;
+}
+
+.signal-hold {
+    background: #f59e0b;
+    color: white;
+}
+
+.signal-none {
+    background: #6b7280;
+    color: white;
+}
+
+.action-cell,
+.output-cell {
+    display: flex;
+    align-items: center;
+}
+
+.monitor-footer {
+    text-align: center;
+    padding-top: 1rem;
+    border-top: 1px solid #2d3142;
+}
+
+.text-muted {
+    color: #9ca3af;
+}
+
+.text-danger {
+    color: #ef4444;
+}
+
+.text-success {
+    color: #10b981;
+}
+
+.small {
+    font-size: 0.875rem;
+}

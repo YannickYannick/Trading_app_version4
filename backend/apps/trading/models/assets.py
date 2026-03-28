@@ -62,6 +62,20 @@ class AllAssets(models.Model):
     binance_quote_asset = models.CharField(max_length=20, blank=True)
     binance_status = models.CharField(max_length=20, blank=True)
     
+    # Regroupement des assets (relation vers Asset normalisé)
+    parent_asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='variants',
+        help_text="Asset normalisé parent (ex: AAPL pour AAPL:xnas, AAPL:xnys)"
+    )
+    is_best_variant = models.BooleanField(
+        default=False,
+        help_text="Indique si c'est la meilleure variante pour le parent_asset (USD prioritaire)"
+    )
+    
     # Historique des prix en format JSONB (compact)
     price_history_json = models.JSONField(
         default=dict,
@@ -148,7 +162,11 @@ class AllAssets(models.Model):
 
 
 class Asset(TimeStampedModel):
-    """Actif sous-jacent avec données enrichies."""
+    """Asset normalisé regroupant plusieurs variantes broker.
+    
+    Ex: AAPL regroupe AAPL:xnas (NASDAQ), AAPL:xpar (Euronext), etc.
+    Le symbole est simplifié (sans MIC), la devise est prioritairement USD.
+    """
     
     class AssetType(models.TextChoices):
         STOCK = 'STOCK', 'Action'
@@ -159,17 +177,42 @@ class Asset(TimeStampedModel):
         BOND = 'BOND', 'Obligation'
         OTHER = 'OTHER', 'Autre'
     
-    # Référence vers AllAssets (catalogue universel)
+    # Meilleure variante (USD prioritaire, bourse principale)
+    best_variant = models.ForeignKey(
+        AllAssets,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        help_text="Meilleur AllAssets pour trading (USD, NYSE/NASDAQ prioritaires)"
+    )
+    
+    # Suivi et favoris
+    is_tracked = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Asset suivi (a des trades/positions ou ajouté manuellement)"
+    )
+    is_favorite = models.BooleanField(
+        default=False,
+        help_text="Asset ajouté manuellement à la watchlist"
+    )
+    
+    # Référence vers AllAssets (DEPRECATED - utilisé pour compatibilité)
     all_asset = models.ForeignKey(
         AllAssets,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='enriched_assets',
-        help_text="Référence vers le catalogue universel des actifs"
+        help_text="[DEPRECATED] Utiliser best_variant à la place"
     )
     
-    symbol = models.CharField(max_length=50, unique=True)
+    symbol = models.CharField(
+        max_length=50, 
+        unique=True,
+        help_text="Symbole normalisé sans MIC (ex: AAPL, BTC, ETH)"
+    )
     name = models.CharField(max_length=255)
     asset_type = models.CharField(
         max_length=20,

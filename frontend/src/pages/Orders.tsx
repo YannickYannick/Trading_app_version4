@@ -3,9 +3,9 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Search, Filter, RefreshCw, Plus, Eye, Copy, XCircle, Trash2, 
-  Save, X, Clock, TrendingUp, CheckCircle 
+import {
+  Search, Filter, RefreshCw, Plus, Eye, Copy, XCircle, Trash2,
+  Save, X, Clock, TrendingUp, CheckCircle
 } from 'lucide-react'
 import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
 import PlaceOrderModal from '@components/orders/PlaceOrderModal'
@@ -25,13 +25,13 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isPlaceOrderModalOpen, setIsPlaceOrderModalOpen] = useState(false)
-  
+
   // États pour les positions
   const [positions, setPositions] = useState<Position[]>([])
   const [positionsLoading, setPositionsLoading] = useState(false)
   const [sellQuantities, setSellQuantities] = useState<Map<number, number>>(new Map())
   const [sellingPosition, setSellingPosition] = useState<number | null>(null)
-  
+
   // Filtres et tri
   const [filters, setFilters] = useState({
     broker: '',
@@ -40,20 +40,20 @@ export default function Orders() {
     search: ''
   })
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
-  
+
   // Brokers pour filtre
   const [brokers, setBrokers] = useState<BrokerAccount[]>([])
-  
+
   // État d'édition inline
   const [editingCell, setEditingCell] = useState<{ orderId: number; field: string } | null>(null)
-  
+
   // Colonnes éditables
   const editableFields = ['quantity', 'price', 'stop_price']
-  
+
   // Colonnes visibles
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
-  
+
   // Métadonnées des colonnes pour ColumnSelector
   const allColumnsData: ColumnOption[] = [
     { key: 'modified', label: 'Modifié', defaultVisible: true },
@@ -73,7 +73,7 @@ export default function Orders() {
     { key: 'yahoo_actions', label: 'Actions Yahoo', defaultVisible: true },
     { key: 'actions', label: 'Actions', defaultVisible: true },
   ]
-  
+
   // Charger les positions depuis l'API (même source que /positions)
   const loadPositions = async () => {
     try {
@@ -81,7 +81,7 @@ export default function Orders() {
       // Charger uniquement les positions ouvertes
       const openPositions = await positionService.getOpen()
       setPositions(openPositions)
-      
+
       // Initialiser les quantités de vente avec la quantité totale
       const initialQuantities = new Map<number, number>()
       openPositions.forEach(p => {
@@ -94,43 +94,43 @@ export default function Orders() {
       setPositionsLoading(false)
     }
   }
-  
+
   // Vendre une position au marché
   const handleSellPosition = async (position: Position) => {
     const positionSize = Number(position.size) || 0
     const quantity = sellQuantities.get(position.id) || positionSize
     const symbol = position.asset?.symbol
-    
+
     if (!symbol) {
       alert('Symbole non trouvé pour cette position')
       return
     }
-    
+
     if (quantity <= 0) {
       alert('La quantité doit être supérieure à 0')
       return
     }
-    
+
     if (quantity > positionSize) {
       alert(`La quantité ne peut pas dépasser ${positionSize}`)
       return
     }
-    
+
     if (!confirm(`Vendre ${quantity} ${symbol} au marché ?`)) {
       return
     }
-    
+
     try {
       setSellingPosition(position.id)
-      
+
       // Trouver le broker account associé à cette position
       // On utilise le premier broker disponible si pas d'info spécifique
       const brokerAccount = brokers[0]
-      
+
       if (!brokerAccount) {
         throw new Error('Aucun compte broker disponible')
       }
-      
+
       // Créer un ordre de vente au marché via le broker
       const result = await orderService.placeOrder({
         broker_account_id: brokerAccount.id,
@@ -139,13 +139,13 @@ export default function Orders() {
         side: 'SELL',
         quantity: String(quantity),
       })
-      
+
       if (result.success) {
         alert(`✅ ${result.message || `Ordre de vente créé pour ${quantity} ${symbol}`}`)
       } else {
         throw new Error(result.message || 'Erreur lors de la vente')
       }
-      
+
       // Recharger les ordres et positions
       await loadOrders()
       await loadPositions()
@@ -156,7 +156,7 @@ export default function Orders() {
       setSellingPosition(null)
     }
   }
-  
+
   // Charger les ordres
   const loadOrders = async () => {
     try {
@@ -168,13 +168,13 @@ export default function Orders() {
       }
       const response = await orderService.getAll(apiFilters)
       const ordersList = response.results || []
-      
+
       // Calculer total_value pour chaque ordre
       const ordersWithTotal = ordersList.map(order => ({
         ...order,
         total_value: (order.quantity || 0) * (order.price || 0)
       }))
-      
+
       setOrders(ordersWithTotal)
       setOriginalOrders(ordersWithTotal)
       setModifiedOrders(new Map())
@@ -186,7 +186,7 @@ export default function Orders() {
       setLoading(false)
     }
   }
-  
+
   // Charger les brokers
   const loadBrokers = async () => {
     try {
@@ -196,13 +196,13 @@ export default function Orders() {
       console.error('Erreur lors du chargement des brokers:', err)
     }
   }
-  
+
   useEffect(() => {
     loadOrders()
     loadBrokers()
     loadPositions() // Charger les positions au démarrage
   }, [])
-  
+
   // Initialiser les colonnes visibles depuis localStorage
   useEffect(() => {
     if (visibleColumns.length === 0) {
@@ -233,13 +233,13 @@ export default function Orders() {
         const allAssetIds = orders
           .map(o => o.all_asset?.id || (typeof o.all_asset === 'number' ? o.all_asset : null))
           .filter((id): id is number => id !== null && id !== undefined)
-        
+
         // Charger les prix en parallèle (limité à 10 à la fois)
         const batches = []
         for (let i = 0; i < allAssetIds.length; i += 10) {
           batches.push(allAssetIds.slice(i, i + 10))
         }
-        
+
         for (const batch of batches) {
           const results = await Promise.allSettled(
             batch.map(async (id) => {
@@ -247,26 +247,26 @@ export default function Orders() {
               return { id, price }
             })
           )
-          
+
           results.forEach((result) => {
             if (result.status === 'fulfilled') {
               priceMap[result.value.id] = result.value.price
             }
           })
         }
-        
+
         setYahooPrices(priceMap)
       }
-      
+
       loadYahooPrices()
     }
   }, [orders])
-  
+
   // Vérifier si un ordre a été modifié
   const isOrderModified = useCallback((orderId: number): boolean => {
     return modifiedOrders.has(orderId)
   }, [modifiedOrders])
-  
+
   // Marquer un ordre comme modifié
   const markAsModified = useCallback((orderId: number, field: string, value: any) => {
     setModifiedOrders(prev => {
@@ -276,14 +276,14 @@ export default function Orders() {
       return newMap
     })
   }, [])
-  
+
   // Fonction pour démarrer l'édition
   const startEdit = (orderId: number, field: string) => {
     if (editableFields.includes(field)) {
       setEditingCell({ orderId, field })
     }
   }
-  
+
   // Sauvegarder une modification locale
   const saveEditLocally = (orderId: number, field: string, value: string) => {
     const numValue = parseFloat(value)
@@ -291,15 +291,15 @@ export default function Orders() {
       setOrders(prev => prev.map(order => {
         if (order.id === orderId) {
           const updated = { ...order, [field]: numValue }
-          
+
           // Recalculer total_value si quantity ou price change
           if (field === 'quantity' || field === 'price') {
             updated.total_value = (updated.quantity || 0) * (updated.price || 0)
           }
-          
+
           // Marquer comme modifié
           markAsModified(orderId, field, numValue)
-          
+
           return updated
         }
         return order
@@ -307,25 +307,25 @@ export default function Orders() {
     }
     setEditingCell(null)
   }
-  
+
   // Annuler l'édition
   const cancelEdit = () => {
     setEditingCell(null)
   }
-  
+
   // Sauvegarder toutes les modifications
   const saveAllChanges = async () => {
     setIsSaving(true)
     setError(null)
-    
+
     try {
       const promises: Promise<any>[] = []
-      
+
       // Sauvegarder les ordres modifiés
       for (const [orderId, changes] of modifiedOrders.entries()) {
         promises.push(orderService.update(orderId, changes))
       }
-      
+
       // Créer les nouveaux ordres
       for (const newOrder of newOrders) {
         promises.push(orderService.create({
@@ -338,16 +338,16 @@ export default function Orders() {
           broker_id: newOrder.broker_id
         }))
       }
-      
+
       await Promise.all(promises)
-      
+
       // Réinitialiser les états
       setModifiedOrders(new Map())
       setNewOrders([])
-      
+
       // Recharger les ordres
       await loadOrders()
-      
+
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erreur lors de la sauvegarde')
       console.error('Erreur lors de la sauvegarde:', err)
@@ -355,7 +355,7 @@ export default function Orders() {
       setIsSaving(false)
     }
   }
-  
+
   // Annuler toutes les modifications
   const cancelAllChanges = () => {
     if (window.confirm('Annuler toutes les modifications non sauvegardées ?')) {
@@ -365,7 +365,7 @@ export default function Orders() {
       setEditingCell(null)
     }
   }
-  
+
   // Tri
   const handleSort = (key: string) => {
     setSortConfig(prev => {
@@ -375,28 +375,28 @@ export default function Orders() {
       return { key, direction: 'asc' }
     })
   }
-  
+
   // Filtrage
   const filteredOrders = orders.filter(order => {
-    const matchBroker = !filters.broker || 
+    const matchBroker = !filters.broker ||
       (order.broker_name?.toLowerCase().includes(filters.broker.toLowerCase()) ||
-       order.broker?.name?.toLowerCase().includes(filters.broker.toLowerCase()))
+        order.broker?.name?.toLowerCase().includes(filters.broker.toLowerCase()))
     const matchStatus = !filters.status || order.status === filters.status
     const matchSide = !filters.side || order.side === filters.side
-    const matchSearch = !filters.search || 
+    const matchSearch = !filters.search ||
       order.asset?.symbol?.toLowerCase().includes(filters.search.toLowerCase()) ||
       order.asset?.name?.toLowerCase().includes(filters.search.toLowerCase())
-    
+
     return matchBroker && matchStatus && matchSide && matchSearch
   })
-  
+
   // Tri des ordres
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     if (!sortConfig) return 0
-    
+
     let aValue: any = a[sortConfig.key as keyof Order]
     let bValue: any = b[sortConfig.key as keyof Order]
-    
+
     // Gérer les valeurs imbriquées
     if (sortConfig.key === 'broker_name') {
       aValue = a.broker_name || a.broker?.name || ''
@@ -405,12 +405,12 @@ export default function Orders() {
       aValue = a.asset?.symbol || ''
       bValue = b.asset?.symbol || ''
     }
-    
+
     if (aValue === bValue) return 0
     const comparison = aValue < bValue ? -1 : 1
     return sortConfig.direction === 'asc' ? comparison : -comparison
   })
-  
+
   // Actions sur les ordres
   const handleDuplicate = async (order: Order) => {
     // Générer un ID temporaire unique (négatif pour distinguer des vrais IDs)
@@ -426,17 +426,17 @@ export default function Orders() {
     setNewOrders(prev => [...prev, newOrder])
     setOrders(prev => [newOrder, ...prev])
   }
-  
+
   // Vérifier si un ordre est un nouvel ordre non sauvegardé
   const isNewOrder = (orderId: number) => {
     return newOrders.some(o => o.id === orderId)
   }
-  
+
   const handleCancel = async (orderId: number) => {
     if (!confirm('Êtes-vous sûr de vouloir annuler cet ordre ?')) {
       return
     }
-    
+
     // Si c'est un nouvel ordre non sauvegardé, le supprimer localement
     if (isNewOrder(orderId)) {
       setOrders(prev => prev.filter(o => o.id !== orderId))
@@ -448,7 +448,7 @@ export default function Orders() {
       })
       return
     }
-    
+
     try {
       await orderService.cancel(orderId)
       await loadOrders()
@@ -457,12 +457,12 @@ export default function Orders() {
       console.error('Erreur:', err)
     }
   }
-  
+
   const handleDelete = async (orderId: number) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet ordre ?')) {
       return
     }
-    
+
     // Si c'est un nouvel ordre non sauvegardé, le supprimer localement seulement
     if (isNewOrder(orderId)) {
       setOrders(prev => prev.filter(o => o.id !== orderId))
@@ -474,7 +474,7 @@ export default function Orders() {
       })
       return
     }
-    
+
     try {
       await orderService.delete(orderId)
       setOrders(prev => prev.filter(o => o.id !== orderId))
@@ -489,7 +489,7 @@ export default function Orders() {
       console.error('Erreur:', err)
     }
   }
-  
+
   // Synchroniser les ordres
   const handleSyncOrders = async () => {
     try {
@@ -500,11 +500,11 @@ export default function Orders() {
         alert('Aucun compte broker disponible')
         return
       }
-      
+
       await orderService.syncOrders({
         broker_account_id: brokerAccount.id
       })
-      
+
       await loadOrders()
     } catch (err: any) {
       alert(err.error || 'Erreur lors de la synchronisation')
@@ -513,7 +513,7 @@ export default function Orders() {
       setLoading(false)
     }
   }
-  
+
   // Badges de statut
   const getStatusBadge = (status: Order['status']) => {
     const config: Record<string, { variant: string; icon: any; label: string }> = {
@@ -525,10 +525,10 @@ export default function Orders() {
       REJECTED: { variant: 'error', icon: XCircle, label: 'Rejeté' },
       EXPIRED: { variant: 'default', icon: XCircle, label: 'Expiré' }
     }
-    
+
     const statusConfig = config[status] || { variant: 'default', icon: Clock, label: status }
     const Icon = statusConfig.icon
-    
+
     return (
       <Badge variant={statusConfig.variant as any}>
         <Icon style={{ width: '12px', height: '12px', marginRight: '4px', display: 'inline', verticalAlign: 'middle' }} />
@@ -536,10 +536,10 @@ export default function Orders() {
       </Badge>
     )
   }
-  
+
   // Vérifier s'il y a des modifications non sauvegardées
   const hasUnsavedChanges = modifiedOrders.size > 0 || newOrders.length > 0
-  
+
   // Colonnes du tableau
   const columns = [
     {
@@ -732,11 +732,11 @@ export default function Orders() {
           {getStatusBadge(value as Order['status'])}
           {row.filled_quantity && row.filled_quantity > 0 && (
             <div className="text-xs text-gray-500 mt-1" style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '0.25rem' }}>
-              Exécuté: {typeof row.filled_quantity === 'string' 
-                ? parseFloat(row.filled_quantity).toFixed(4) 
-                : row.filled_quantity.toFixed(4)} / {typeof row.quantity === 'string' 
-                ? parseFloat(row.quantity).toFixed(4) 
-                : row.quantity.toFixed(4)}
+              Exécuté: {typeof row.filled_quantity === 'string'
+                ? parseFloat(row.filled_quantity).toFixed(4)
+                : row.filled_quantity.toFixed(4)} / {typeof row.quantity === 'string'
+                  ? parseFloat(row.quantity).toFixed(4)
+                  : row.quantity.toFixed(4)}
             </div>
           )}
         </div>
@@ -762,13 +762,15 @@ export default function Orders() {
           <YahooActions
             allAssetId={allAssetId}
             allAssetSymbol={row?.all_asset_symbol || row?.all_asset?.symbol}
-            onSuccess={() => {
-              loadOrders()
-              // Recharger le prix Yahoo après succès
+            onSuccess={async () => {
+              // Mise à jour asynchrone sans recharger la page
               if (allAssetId) {
-                assetService.getYahooCurrentPrice(allAssetId).then(price => {
+                try {
+                  const price = await assetService.getYahooCurrentPrice(allAssetId)
                   setYahooPrices(prev => ({ ...prev, [allAssetId]: price }))
-                })
+                } catch (error) {
+                  console.error('Erreur lors de la mise à jour:', error)
+                }
               }
             }}
             compact
@@ -805,7 +807,7 @@ export default function Orders() {
               title="Annuler"
             >
               <XCircle style={{ width: '16px', height: '16px' }} />
-          </button>
+            </button>
           )}
           <button
             onClick={() => handleDelete(row.id)}
@@ -818,7 +820,7 @@ export default function Orders() {
       ),
     },
   ]
-  
+
   if (loading && orders.length === 0) {
     return (
       <div className="page-container">
@@ -826,10 +828,10 @@ export default function Orders() {
       </div>
     )
   }
-  
+
   const pendingOrders = orders.filter((o) => ['PENDING', 'OPEN', 'PARTIALLY_FILLED'].includes(o.status))
   const filledOrders = orders.filter((o) => o.status === 'FILLED')
-  
+
   return (
     <div className="page-container orders-page">
       <div className="orders-header">
@@ -861,15 +863,15 @@ export default function Orders() {
               </button>
             </>
           )}
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={() => setIsPlaceOrderModalOpen(true)}
           >
             <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Nouvel Ordre
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={handleSyncOrders}
             disabled={loading}
           >
@@ -878,14 +880,14 @@ export default function Orders() {
           </Button>
         </div>
       </div>
-      
+
       {/* Barre d'avertissement si modifications non sauvegardées */}
       {hasUnsavedChanges && (
         <div className="warning-banner">
           ⚠️ Vous avez <strong>{modifiedOrders.size + newOrders.length} modification(s)</strong> non sauvegardée(s). N'oubliez pas d'enregistrer !
         </div>
       )}
-      
+
       {/* Erreur */}
       {error && (
         <div className="error-banner">
@@ -894,7 +896,7 @@ export default function Orders() {
           <Button onClick={loadOrders} variant="outline" size="small">Réessayer</Button>
         </div>
       )}
-      
+
       {/* Filtres */}
       <div className="orders-filters">
         <div className="filter-search">
@@ -907,7 +909,7 @@ export default function Orders() {
             className="filter-input"
           />
         </div>
-        
+
         <select
           value={filters.broker}
           onChange={(e) => setFilters(prev => ({ ...prev, broker: e.target.value }))}
@@ -920,7 +922,7 @@ export default function Orders() {
             </option>
           ))}
         </select>
-        
+
         <select
           value={filters.status}
           onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
@@ -934,7 +936,7 @@ export default function Orders() {
           <option value="CANCELLED">Annulé</option>
           <option value="REJECTED">Rejeté</option>
         </select>
-        
+
         <select
           value={filters.side}
           onChange={(e) => setFilters(prev => ({ ...prev, side: e.target.value }))}
@@ -945,7 +947,7 @@ export default function Orders() {
           <option value="SELL">Vente</option>
         </select>
       </div>
-      
+
       {/* Stats */}
       <div className="orders-stats">
         <Card>
@@ -963,7 +965,7 @@ export default function Orders() {
           </div>
         </Card>
       </div>
-      
+
       {/* Table */}
       <Card>
         {orders.length === 0 ? (
@@ -975,8 +977,8 @@ export default function Orders() {
           </div>
         ) : (
           <>
-            <Table 
-              columns={columns} 
+            <Table
+              columns={columns}
               data={sortedOrders}
               sortConfig={sortConfig}
               onSort={handleSort}
@@ -990,7 +992,7 @@ export default function Orders() {
           </>
         )}
       </Card>
-      
+
       {/* Tableau des Positions */}
       <Card className="positions-card">
         <div className="positions-header">
@@ -1000,22 +1002,22 @@ export default function Orders() {
               <Badge variant="info" style={{ marginLeft: '8px' }}>{positions.length}</Badge>
             )}
           </h2>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="small"
             onClick={loadPositions}
             disabled={positionsLoading}
           >
-            <RefreshCw style={{ 
-              width: '14px', 
-              height: '14px', 
+            <RefreshCw style={{
+              width: '14px',
+              height: '14px',
               marginRight: '6px',
-              animation: positionsLoading ? 'spin 1s linear infinite' : 'none' 
+              animation: positionsLoading ? 'spin 1s linear infinite' : 'none'
             }} />
             Actualiser
           </Button>
         </div>
-        
+
         {positionsLoading ? (
           <div className="positions-loading">
             <Loading size="small" />
@@ -1030,7 +1032,8 @@ export default function Orders() {
             <table className="positions-table">
               <thead>
                 <tr>
-                  <th>Symbole</th>
+                  <th>Symbole (Broker)</th>
+                  <th>Symbole (Yahoo)</th>
                   <th>Nom</th>
                   <th>Côté</th>
                   <th>Quantité</th>
@@ -1044,38 +1047,53 @@ export default function Orders() {
               </thead>
               <tbody>
                 {positions.map((position) => {
-                  const positionSize = Number(position.size) || 0
-                  const positionPnl = Number(position.pnl) || 0
-                  const positionPnlPercent = Number(position.pnl_percent) || 0
+                  // Utiliser quantity (backend) et fallback à size si nécessaire
+                  const positionSize = Number(position.quantity) || Number(position.size) || 0
+
+                  // Calculer le P&L si non disponible directement
+                  let positionPnl = Number(position.pnl) || 0
+                  let positionPnlPercent = Number(position.pnl_percent) || 0
+
                   const sellQty = sellQuantities.get(position.id) ?? positionSize
                   const isSelling = sellingPosition === position.id
-                  
+
+                  // Déterminer le symbole à afficher
+                  const displaySymbol = position.symbol || position.all_asset_symbol || position.asset?.symbol || 'N/A'
+                  const yahooSymbol = position.all_asset_yahoo_symbol || position.all_asset?.symbole_yahoo || '-'
+                  const displayName = position.all_asset_name || position.asset?.name || '-'
+
+                  // Prix actuel (préférence pour Yahoo si dispo, sinon broker)
+                  const currentPrice = position.yahoo_current_price || position.current_price
+
                   return (
                     <tr key={position.id}>
                       <td className="symbol-cell">
                         <Link to={`/positions/${position.id}`} className="link-symbol">
-                          <strong>{position.asset?.symbol || 'N/A'}</strong>
+                          <strong>{displaySymbol}</strong>
                         </Link>
                       </td>
+                      <td className="yahoo-symbol-cell">
+                        <span className="text-sm text-gray-500">{yahooSymbol}</span>
+                      </td>
                       <td className="name-cell">
-                        {position.asset?.name || '-'}
+                        {displayName}
                       </td>
                       <td>
                         <Badge variant={position.side === 'BUY' ? 'success' : 'danger'}>
-                          {position.side === 'BUY' ? 'LONG' : 'SHORT'}
+                          {position.side === 'BUY' ? 'LONG' : position.side === 'SELL' ? 'SHORT' : position.side}
                         </Badge>
                       </td>
-                      <td className="number-cell">{positionSize.toFixed(4)}</td>
-                      <td className="number-cell">
+                      <td className="number-cell font-mono">{positionSize.toFixed(4)}</td>
+                      <td className="number-cell font-mono">
                         {formatCurrency(position.entry_price || 0)}
                       </td>
-                      <td className="number-cell">
-                        {position.current_price ? formatCurrency(position.current_price) : '-'}
+                      <td className="number-cell font-mono">
+                        {currentPrice ? formatCurrency(currentPrice) : '-'}
                       </td>
-                      <td className={`number-cell ${positionPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
+                      <td className={`number-cell font-mono ${positionPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                         {positionPnl >= 0 ? '+' : ''}{formatCurrency(positionPnl)}
                       </td>
-                      <td className={`number-cell ${positionPnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
+                      <td className={`number-cell font-mono ${positionPnlPercent >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                         {positionPnlPercent >= 0 ? '+' : ''}{positionPnlPercent.toFixed(2)}%
                       </td>
                       <td className="sell-quantity-cell">
@@ -1138,7 +1156,7 @@ export default function Orders() {
           </div>
         )}
       </Card>
-      
+
       {/* Footer */}
       <div className="orders-footer">
         <div className="footer-info">
@@ -1153,7 +1171,7 @@ export default function Orders() {
           💡 Double-cliquez sur Quantité, Prix ou Stop Prix pour éditer • Les modifications sont automatiquement enregistrées localement
         </div>
       </div>
-      
+
       {/* Modal de placement d'ordre */}
       <PlaceOrderModal
         isOpen={isPlaceOrderModalOpen}

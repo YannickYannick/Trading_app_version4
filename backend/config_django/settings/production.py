@@ -6,7 +6,30 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+# Static files served via WhiteNoise (for Passenger/shared hosting)
+# Insert WhiteNoise right after SecurityMiddleware in the MIDDLEWARE from base.py
+MIDDLEWARE.insert(
+    MIDDLEWARE.index('django.middleware.security.SecurityMiddleware') + 1,
+    'whitenoise.middleware.WhiteNoiseMiddleware'
+)
+
+# WhiteNoise configuration - using simple storage for reliability
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Always include the Railway deployment domain and localhost for health checks.
+# Additional hosts can be supplied via the ALLOWED_HOSTS environment variable
+# (comma-separated) in the Railway service config.
+_env_allowed_hosts = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', '').split(',')
+    if h.strip()
+]
+ALLOWED_HOSTS = list({
+    'trading-production-b4fd.up.railway.app',
+    'localhost',
+    '127.0.0.1',
+    *_env_allowed_hosts,
+})
 
 # Database PostgreSQL pour la production
 DATABASES = {
@@ -24,7 +47,9 @@ DATABASES = {
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
-SECURE_SSL_REDIRECT = True
+# Railway terminates SSL at the edge and forwards plain HTTP to the application.
+# Setting this to True would create an infinite redirect loop → 502 errors.
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000
