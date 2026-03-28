@@ -4,7 +4,7 @@ import multiprocessing
 proc_name = 'trading_app_v4'
 
 # Adresses d'écoute
-bind = '127.0.0.1:8000'
+bind = '0.0.0.0:8000'
 
 # Workers
 # (2 x CPUs) + 1 est la formule recommandée
