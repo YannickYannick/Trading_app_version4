@@ -10,6 +10,7 @@ import type { Strategy, BrokerAccount, AllAsset } from '@types'
 import AlgorithmParametersModal from '@components/strategies/AlgorithmParametersModal'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import StrategyParametersPanel from '@components/strategies/StrategyParametersPanel'
+import StrategyExecutionMonitor from '@components/strategies/StrategyExecutionMonitor'
 
 import './Strategies.css'
 
@@ -268,6 +269,20 @@ export default function Strategies() {
 
       // Sauvegarde asynchrone en arrière-plan (sans bloquer l'UI)
       strategyService.update(row.id, updateData)
+        .then((updatedStrategy) => {
+          // Si on change l'algorithme, ouvrir la modale de paramètres APRÈS la mise à jour
+          if (key === 'algorithm_type' && newValue) {
+            // Mettre à jour l'état avec la stratégie complète retournée par l'API
+            setStrategies(prevStrategies =>
+              prevStrategies.map(s => s.id === updatedStrategy.id ? updatedStrategy : s)
+            )
+            // Ouvrir la modale avec la stratégie mise à jour
+            setTimeout(() => {
+              setSelectedStrategyForParams(updatedStrategy)
+              setAlgorithmParamsModalOpen(true)
+            }, 100)
+          }
+        })
         .catch((err: any) => {
           console.error('Erreur lors de la sauvegarde:', err)
           // En cas d'erreur, recharger pour restaurer l'état correct
@@ -1042,6 +1057,9 @@ export default function Strategies() {
           {showVisualization ? 'Masquer le graphique' : 'Afficher le graphique de stratégie'}
         </Button>
       </div>
+
+      {/* Panneau de monitoring des exécutions */}
+      <StrategyExecutionMonitor />
     </div>
   )
 }

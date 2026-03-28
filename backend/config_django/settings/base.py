@@ -138,9 +138,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
+# Évite staticfiles.W004 en prod si le dossier projet n'existe pas (ex. image Docker /app sans static/)
+_project_static = BASE_DIR / 'static'
+STATICFILES_DIRS = [_project_static] if _project_static.is_dir() else []
 
 # Media files
 MEDIA_URL = 'media/'

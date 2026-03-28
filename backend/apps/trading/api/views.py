@@ -22,13 +22,13 @@ import logging
 from apps.trading.models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
     Strategy, StrategyPerformance, Broker, BrokerAccount, BrokerSyncLog,
-    ScheduledTask, TaskExecutionLog, PortfolioSnapshot
+    ScheduledTask, TaskExecutionLog, PortfolioSnapshot, StrategyExecution
 )
 from apps.trading.services.broker_service import BrokerService
 from .serializers import (
     AllAssetsSerializer, AssetSerializer, AssetNestedSerializer, AssetPriceSerializer,
     AllAssetPriceHistorySerializer, PositionSerializer, TradeSerializer, OrderSerializer,
-    StrategySerializer, BrokerSerializer, BrokerAccountSerializer
+    StrategySerializer, BrokerSerializer, BrokerAccountSerializer, StrategyExecutionSerializer
 )
 
 
@@ -1942,6 +1942,591 @@ class StrategyViewSet(viewsets.ModelViewSet):
         strategy.is_active = False
         strategy.save()
         return Response({'status': 'Strategy deactivated', 'strategy': StrategySerializer(strategy).data})
+    
+    def _build_portfolio_data(self, strategy):
+        """
+        Construit les données de portfolio pour une stratégie.
+        
+        Returns:
+            tuple: (portfolio_dict, pending_orders_list)
+        """
+        from apps.trading.models import Position, Order
+        from decimal import Decimal
+        
+        # Portfolio : cash et quantité totale pour cet asset
+        # Pour simplifier, on considère le cash comme illimité (ou configurable)
+        # La quantité totale = positions ouvertes pour cet asset
+        positions = Position.objects.filter(
+            all_asset=strategy.all_asset,  # Utiliser all_asset au lieu de asset
+            user=strategy.user,
+            is_open=True
+        )
+        
+        quantity_total = sum(Decimal(str(p.quantity)) for p in positions)
+        
+        # Cash : Récupérer depuis BrokerAccount ou fallback sur le budget
+        cash_total = 0.0
+        if strategy.broker_account and strategy.broker_account.balance is not None:
+            cash_total = float(strategy.broker_account.balance)
+        elif strategy.budget is not None:
+            cash_total = float(strategy.budget)
+        else:
+            cash_total = 10000.0 # Fallback ultime
+        
+        portfolio = {
+            'cash_total': float(cash_total),
+            'quantity_total': float(quantity_total),
+            'broker_name': strategy.broker_account.broker.name if strategy.broker_account and strategy.broker_account.broker else 'Simulation'
+        }
+        
+        # Pending orders : ordres non exécutés pour cet asset
+        pending_orders_qs = Order.objects.filter(
+            all_asset=strategy.all_asset,  # Utiliser all_asset au lieu de asset
+            user=strategy.user,
+            status='pending'
+        )
+        
+        pending_orders = []
+        for order in pending_orders_qs:
+            pending_orders.append({
+                'type': order.order_type.upper(),  # 'BUY' ou 'SELL'
+                'qty': float(order.quantity),
+                'price': float(order.price)
+            })
+        
+        return portfolio, pending_orders
+    
+
+    def _execute_signal(self, strategy, signal_type, quantity, price, execution):
+        """
+        Exécute concrètement le signal en créant les entrées en base (Order, Trade, Position).
+        Appelle l'API du broker réel (Binance/Saxo) et capture la réponse.
+        """
+        from apps.trading.models import Position, Order, Trade
+        from apps.trading.services.broker_service import BrokerService
+        from decimal import Decimal
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        if not strategy.broker_account or not strategy.broker_account.broker:
+            raise Exception("Aucun compte broker configuré pour cette stratégie")
+            
+        broker = strategy.broker_account.broker
+        qty_decimal = Decimal(str(quantity))
+        price_decimal = Decimal(str(price))
+        
+        # ============================================
+        # APPEL API BROKER RÉEL
+        # ============================================
+        broker_api_response = None
+        broker_api_url = None
+        broker_api_error = None
+        
+        try:
+            # Déterminer l'URL de l'API en fonction du broker
+            broker_name = broker.name.lower()
+            if 'binance' in broker_name:
+                broker_api_url = "POST https://api.binance.com/api/v3/order"
+            elif 'saxo' in broker_name:
+                broker_api_url = "POST https://gateway.saxobank.com/openapi/trade/v2/orders"
+            else:
+                broker_api_url = f"API {broker.name} (endpoint inconnu)"
+            
+            # Appeler le BrokerService pour passer l'ordre réel
+            broker_service = BrokerService(user=strategy.user)
+            
+            # Récupérer le symbole de l'asset
+            asset_symbol = strategy.all_asset.symbol if strategy.all_asset else 'UNKNOWN'
+            
+            # ============================================
+            # AJUSTER LA QUANTITÉ SELON LES FILTRES DU BROKER
+            # ============================================
+            adjusted_quantity = qty_decimal
+            
+            try:
+                # Obtenir l'instance du broker pour accéder aux filtres
+                broker_instance = broker_service.get_broker_instance(strategy.broker_account)
+                
+                # Pour Binance : récupérer les filtres LOT_SIZE
+                if 'binance' in broker_name:
+                    exchange_info = broker_instance._get_exchange_info() if hasattr(broker_instance, '_get_exchange_info') else None
+                    
+                    if exchange_info:
+                        symbols = exchange_info.get('symbols', [])
+                        symbol_info = next((s for s in symbols if s.get('symbol') == asset_symbol.upper()), None)
+                        
+                        if symbol_info:
+                            filters = symbol_info.get('filters', [])
+                            lot_size_filter = next((f for f in filters if f.get('filterType') == 'LOT_SIZE'), None)
+                            
+                            if lot_size_filter:
+                                from decimal import Decimal, ROUND_DOWN
+                                
+                                min_qty = Decimal(str(lot_size_filter.get('minQty', '0')))
+                                max_qty = Decimal(str(lot_size_filter.get('maxQty', '999999999')))
+                                step_size = Decimal(str(lot_size_filter.get('stepSize', '1')))
+                                
+                                logger.info(
+                                    f"📏 Filtres Binance {asset_symbol}: "
+                                    f"minQty={min_qty}, maxQty={max_qty}, stepSize={step_size}"
+                                )
+                                
+                                # Arrondir au stepSize
+                                if step_size > 0:
+                                    # Diviser par stepSize, arrondir vers le bas, puis multiplier
+                                    adjusted_quantity = (qty_decimal / step_size).quantize(Decimal('1'), rounding=ROUND_DOWN) * step_size
+                                
+                                # Vérifier min/max
+                                if adjusted_quantity < min_qty:
+                                    logger.warning(f"⚠️ Quantité {adjusted_quantity} < minQty {min_qty}, ajustement à minQty")
+                                    adjusted_quantity = min_qty
+                                elif adjusted_quantity > max_qty:
+                                    logger.warning(f"⚠️ Quantité {adjusted_quantity} > maxQty {max_qty}, ajustement à maxQty")
+                                    adjusted_quantity = max_qty
+                                
+                                logger.info(
+                                    f"✅ Quantité ajustée : {qty_decimal} -> {adjusted_quantity} "
+                                    f"(stepSize={step_size})"
+                                )
+                            else:
+                                logger.warning(f"⚠️ Pas de filtre LOT_SIZE trouvé pour {asset_symbol}")
+                        else:
+                            logger.warning(f"⚠️ Symbole {asset_symbol} non trouvé dans exchangeInfo")
+                    else:
+                        logger.warning("⚠️ Impossible de récupérer exchangeInfo de Binance")
+                
+                # Pour Saxo : logique similaire si nécessaire (à implémenter)
+                elif 'saxo' in broker_name:
+                    # Saxo a des règles différentes, à implémenter si nécessaire
+                    logger.info(f"📏 Saxo : pas d'ajustement automatique implémenté pour le moment")
+                    
+            except Exception as adjust_error:
+                logger.warning(f"⚠️ Erreur lors de l'ajustement de quantité : {adjust_error}, utilisation de la quantité originale")
+                adjusted_quantity = qty_decimal
+            
+            # ============================================
+            # APPELER L'API BROKER AVEC LA QUANTITÉ AJUSTÉE
+            # ============================================
+            
+            logger.info(
+                f"🚀 Appel API broker {broker.name} pour {signal_type} "
+                f"{adjusted_quantity} {asset_symbol} @ {price_decimal}"
+            )
+            
+            # Passer l'ordre via le broker
+            order_result = broker_service.place_order(
+                broker_account=strategy.broker_account,
+                symbol=asset_symbol,
+                side=signal_type,  # 'BUY' ou 'SELL'
+                quantity=adjusted_quantity,  # Utiliser la quantité ajustée
+                order_type='MARKET',
+                price=None,  # MARKET orders n'ont pas de prix limite
+            )
+            
+            if order_result.success:
+                logger.info(f"✅ Ordre broker placé avec succès : {order_result.order_id}")
+                broker_api_response = {
+                    'success': True,
+                    'order_id': order_result.order_id,
+                    'message': order_result.message,
+                    'raw_data': order_result.raw_data if hasattr(order_result, 'raw_data') else None,
+                }
+            else:
+                logger.error(f"❌ Échec de l'ordre broker : {order_result.error}")
+                broker_api_error = order_result.error
+                broker_api_response = {
+                    'success': False,
+                    'error': order_result.error,
+                }
+        
+        except Exception as e:
+            logger.exception(f"❌ Erreur lors de l'appel API broker : {e}")
+            broker_api_error = str(e)
+            broker_api_response = {
+                'success': False,
+                'error': str(e),
+                'exception_type': type(e).__name__,
+            }
+        
+        # ============================================
+        # CRÉER LES ENTRÉES EN BASE DE DONNÉES
+        # ============================================
+        
+        # 1. Créer l'Ordre en base locale
+        broker_order_id = f"AUTO-{execution.id}"
+        if broker_api_response and broker_api_response.get('success'):
+            # Si l'API broker a retourné un ID, l'utiliser
+            if broker_api_response.get('order_id'):
+                broker_order_id = broker_api_response['order_id']
+        
+        Order.objects.create(
+             user=strategy.user,
+             all_asset=strategy.all_asset,
+             broker=broker,
+             strategy=strategy,
+             order_type='MARKET',
+             side='BUY' if signal_type == 'BUY' else 'SELL',
+             status='FILLED' if broker_api_response and broker_api_response.get('success') else 'FAILED',
+             quantity=adjusted_quantity,  # Utiliser la quantité ajustée
+             filled_quantity=adjusted_quantity if broker_api_response and broker_api_response.get('success') else Decimal('0'),
+             price=price_decimal,
+             broker_order_id=broker_order_id
+        )
+        
+        # 2. Créer le Trade (seulement si succès)
+        trade = None
+        if broker_api_response and broker_api_response.get('success'):
+            trade = Trade.objects.create(
+                 user=strategy.user,
+                 all_asset=strategy.all_asset,
+                 broker=broker,
+                 position=None, # Sera lié après
+                 strategy=strategy,
+                 trade_type='BUY' if signal_type == 'BUY' else 'SELL',
+                 quantity=adjusted_quantity,  # Utiliser la quantité ajustée
+                 price=price_decimal,
+                 fees=Decimal('0'),
+                 executed_at=timezone.now(),
+                 broker_trade_id=f"TRD-{execution.id}"
+            )
+        
+        # 3. Mettre à jour la Position (seulement si succès)
+        if broker_api_response and broker_api_response.get('success'):
+            position = Position.objects.filter(
+                user=strategy.user, 
+                all_asset=strategy.all_asset,
+                is_open=True
+            ).first()
+            
+            if signal_type == 'BUY':
+                 if position:
+                     # Moyenne pondérée du prix d'entrée
+                     current_val = position.entry_price * position.quantity
+                     trade_val = price_decimal * adjusted_quantity  # Utiliser la quantité ajustée
+                     new_qty = position.quantity + adjusted_quantity  # Utiliser la quantité ajustée
+                     position.entry_price = (current_val + trade_val) / new_qty
+                     position.quantity = new_qty
+                     position.save()
+                 else:
+                     # Nouvelle position
+                     position = Position.objects.create(
+                         user=strategy.user,
+                         all_asset=strategy.all_asset,
+                         broker=broker,
+                         strategy=strategy,
+                         side='LONG',
+                         quantity=adjusted_quantity,  # Utiliser la quantité ajustée
+                         entry_price=price_decimal,
+                         current_price=price_decimal,
+                         is_open=True
+                     )
+            elif signal_type == 'SELL':
+                 if position:
+                     position.quantity -= adjusted_quantity  # Utiliser la quantité ajustée
+                     if position.quantity <= Decimal('0.00000001'):
+                         position.is_open = False
+                         position.closed_at = timezone.now()
+                         position.quantity = 0
+                     position.save()
+                     
+            # Lier le trade à la position
+            if trade and position:
+                trade.position = position
+                trade.save()
+        
+        # ============================================
+        # RETOURNER LA RÉPONSE POUR AFFICHAGE
+        # ============================================
+        return {
+            'api_url': broker_api_url,
+            'api_response': broker_api_response,
+            'api_error': broker_api_error,
+            'quantity_original': float(qty_decimal),
+            'quantity_adjusted': float(adjusted_quantity),
+            'quantity_was_adjusted': (qty_decimal != adjusted_quantity),
+        }
+
+    @action(detail=True, methods=['post'])
+    def execute(self, request, pk=None):
+        """POST /api/strategies/1/execute/ → Exécute la stratégie manuellement."""
+        from apps.trading.models import StrategyExecution
+        from apps.trading.algorithms import get_algorithm_instance
+        import json
+        from datetime import datetime
+        
+        strategy = self.get_object()
+        
+        # Créer un log d'exécution
+        execution = StrategyExecution.objects.create(
+            strategy=strategy,
+            status='running'
+        )
+        
+        try:
+            # Récupérer l'algorithme
+            algo = strategy.get_algorithm_instance()
+            if not algo:
+                raise Exception(f"Impossible de créer l'algorithme {strategy.algorithm_type}")
+            
+            # Construire les données de portfolio et ordres en attente
+            portfolio, pending_orders = self._build_portfolio_data(strategy)
+            
+            # Récupérer les données de prix de l'asset (Depuis JSONB)
+            # Support both new JSONB format and fallback if needed (though we prefer JSONB)
+            price_history_json = getattr(strategy.all_asset, 'price_history_json', {}) or {}
+            
+            if not price_history_json:
+                raise Exception(f"Aucune donnée de prix disponible pour l'asset {strategy.all_asset} (JSONB empty)")
+                
+            # Convert JSONB dict to list sorted by date
+            # JSON format: {'YYYY-MM-DD': {'open': ..., 'close': ...}}
+            sorted_dates = sorted(price_history_json.keys())
+            
+            # Keep last 100 points
+            sorted_dates = sorted_dates[-100:]
+            
+            price_data = []
+            for d in sorted_dates:
+                data = price_history_json[d]
+                # conversion format
+                try:
+                    dt_obj = datetime.strptime(d, '%Y-%m-%d').date()
+                except ValueError:
+                    dt_obj = datetime.fromisoformat(d.replace('Z', '')).date()
+
+                price_data.append({
+                    'date': dt_obj,
+                    'open': data.get('open'),
+                    'high': data.get('high'),
+                    'low': data.get('low'),
+                    'close': data.get('close'),
+                    'volume': data.get('volume')
+                })
+            
+            if not price_data:
+                raise Exception(f"Aucune donnée de prix disponible pour l'asset {strategy.all_asset}")
+            
+            # Calculer les signaux avec portfolio et ordres en attente
+            signals = algo.calculate_signals(price_data, portfolio, pending_orders)
+            
+            # Déterminer le signal principal
+            signal_type = signals.get('signal', 'NONE')
+            signal_price = float(price_data[-1]['close']) if price_data else None
+            # Utiliser la quantité calculée par l'algorithme au lieu de max_quantity
+            signal_quantity = signals.get('quantity', 0)
+            output_data = {
+                'signals': signals,
+                'price_data_count': len(price_data),
+                'portfolio': portfolio,
+                'pending_orders_count': len(pending_orders)
+            }
+            
+            # Mettre à jour l'exécution
+            execution.status = 'completed'
+            execution.signal = signal_type
+            execution.signal_price = signal_price
+            execution.signal_quantity = signal_quantity
+            execution.output = json.dumps(output_data)
+            execution.completed_at = timezone.now()
+            execution.save()
+            
+            # AUTOMATED TRADING: Execute the signal if automated and valid
+            if strategy.is_automated and signal_type in ['BUY', 'SELL'] and signal_quantity > 0:
+                try:
+                    # Appeler _execute_signal et capturer la réponse de l'API broker
+                    broker_response = self._execute_signal(strategy, signal_type, signal_quantity, signal_price, execution)
+                    
+                    # Ajouter la réponse du broker à l'output
+                    output_data['execution_executed'] = True
+                    output_data['broker_api_url'] = broker_response.get('api_url')
+                    output_data['broker_api_response'] = broker_response.get('api_response')
+                    output_data['broker_api_error'] = broker_response.get('api_error')
+                    
+                    execution.output = json.dumps(output_data)
+                    execution.save()
+                except Exception as e:
+                    execution.error = f"Execution error: {str(e)}"
+                    execution.status = 'failed'
+                    execution.save()
+            
+            return Response({
+                'status': 'success',
+                'execution_id': execution.id,
+                'signal': signal_type,
+                'signal_price': signal_price,
+                'signal_quantity': signal_quantity,
+                'output': output_data
+            })
+
+
+            
+        except Exception as e:
+            execution.status = 'failed'
+            execution.error = str(e)
+            execution.completed_at = timezone.now()
+            execution.save()
+            
+            return Response({
+                'status': 'error',
+                'execution_id': execution.id,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def execute_all(self, request):
+        """POST /api/strategies/execute-all/ → Exécute toutes les stratégies actives."""
+        from apps.trading.models import StrategyExecution
+        import json
+        from datetime import datetime
+        
+        strategies = Strategy.objects.filter(user=request.user, is_active=True)
+        results = []
+        
+        for strategy in strategies:
+            execution = StrategyExecution.objects.create(
+                strategy=strategy,
+                status='running'
+            )
+            
+            try:
+                algo = strategy.get_algorithm_instance()
+                if not algo:
+                    raise Exception(f"Impossible de créer l'algorithme {strategy.algorithm_type}")
+                
+                # Construire les données de portfolio et ordres en attente
+                portfolio, pending_orders = self._build_portfolio_data(strategy)
+                
+                 # Récupérer les données de prix de l'asset (Depuis JSONB)
+                price_history_json = getattr(strategy.all_asset, 'price_history_json', {}) or {}
+                
+                if not price_history_json:
+                    raise Exception(f"Aucune donnée de prix disponible pour l'asset {strategy.all_asset} (JSONB empty)")
+                    
+                sorted_dates = sorted(price_history_json.keys())
+                sorted_dates = sorted_dates[-100:]
+                
+                price_data = []
+                for d in sorted_dates:
+                    data = price_history_json[d]
+                    try:
+                        dt_obj = datetime.strptime(d, '%Y-%m-%d').date()
+                    except ValueError:
+                        dt_obj = datetime.fromisoformat(d.replace('Z', '')).date()
+
+                    price_data.append({
+                        'date': dt_obj,
+                        'open': data.get('open'),
+                        'high': data.get('high'),
+                        'low': data.get('low'),
+                        'close': data.get('close'),
+                        'volume': data.get('volume')
+                    })
+
+                if not price_data:
+                    raise Exception(f"Aucune donnée de prix disponible pour l'asset {strategy.all_asset}")
+                
+                # Calculer les signaux avec portfolio et ordres en attente
+                signals = algo.calculate_signals(price_data, portfolio, pending_orders)
+                
+                signal_type = signals.get('signal', 'NONE')
+                signal_price = float(price_data[-1]['close']) if price_data else None
+                # Utiliser la quantité calculée par l'algorithme au lieu de max_quantity
+                signal_quantity = signals.get('quantity', 0)
+                output_data = {
+                    'signals': signals,
+                    'price_data_count': len(price_data),
+                    'portfolio': portfolio,
+                    'pending_orders_count': len(pending_orders)
+                }
+                
+                execution.status = 'completed'
+                execution.signal = signal_type
+                execution.signal_price = signal_price
+                execution.signal_quantity = signal_quantity
+                execution.output = json.dumps(output_data)
+                execution.completed_at = timezone.now()
+                execution.save()
+                
+                # AUTOMATED TRADING: Execute the signal if automated and valid
+                if strategy.is_automated and signal_type in ['BUY', 'SELL'] and signal_quantity > 0:
+                    try:
+                        # Appeler _execute_signal et capturer la réponse de l'API broker
+                        broker_response = self._execute_signal(strategy, signal_type, signal_quantity, signal_price, execution)
+                        
+                        # Ajouter la réponse du broker à l'output
+                        output_data['execution_executed'] = True
+                        output_data['broker_api_url'] = broker_response.get('api_url')
+                        output_data['broker_api_response'] = broker_response.get('api_response')
+                        output_data['broker_api_error'] = broker_response.get('api_error')
+                        
+                        execution.output = json.dumps(output_data)
+                        execution.save()
+                    except Exception as e:
+                        execution.error = f"Execution error: {str(e)}"
+                        execution.status = 'failed'
+                        execution.save()
+                
+                results.append({
+                    'strategy_id': strategy.id,
+                    'strategy_name': strategy.name,
+                    'status': 'success',
+                    'execution_id': execution.id,
+                    'signal': signal_type
+                })
+                
+            except Exception as e:
+                execution.status = 'failed'
+                execution.error = str(e)
+                execution.completed_at = timezone.now()
+                execution.save()
+                
+                results.append({
+                    'strategy_id': strategy.id,
+                    'strategy_name': strategy.name,
+                    'status': 'error',
+                    'execution_id': execution.id,
+                    'error': str(e)
+                })
+        
+        return Response({
+            'total_strategies': len(strategies),
+            'results': results
+        })
+
+
+
+class StrategyExecutionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet pour les logs d'exécution de stratégies (lecture seule).
+    
+    Endpoints:
+    - GET /api/strategy-executions/ → Liste tous les logs
+    - GET /api/strategy-executions/1/ → Détails d'un log
+    - GET /api/strategy-executions/recent/ → Logs récents (20 derniers)
+    """
+    from .serializers import StrategyExecutionSerializer
+    serializer_class = StrategyExecutionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+    
+    filterset_fields = ['strategy', 'status', 'signal']
+    ordering_fields = ['started_at', 'completed_at']
+    ordering = ['-started_at']
+    
+    def get_queryset(self):
+        """Filtre les exécutions par utilisateur via la stratégie."""
+        from apps.trading.models import StrategyExecution
+        return StrategyExecution.objects.filter(
+            strategy__user=self.request.user
+        ).select_related('strategy')
+    
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """GET /api/strategy-executions/recent/ → 20 derniers logs."""
+        executions = self.get_queryset()[:20]
+        serializer = self.get_serializer(executions, many=True)
+        return Response(serializer.data)
 
 
 # ============================================

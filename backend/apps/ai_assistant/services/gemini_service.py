@@ -6,7 +6,7 @@ import time
 import json
 from typing import Dict, Optional
 from decouple import config
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
 
 logger = logging.getLogger('ai_assistant')
@@ -26,7 +26,7 @@ class GeminiAIService:
             self.enabled = False
         else:
             self.enabled = True
-            genai.configure(api_key=self.api_key)
+            self.client = genai.Client(api_key=self.api_key)
             
             # Configuration du modèle
             self.model_name = config('GEMINI_MODEL', default='gemini-2.5-flash')
@@ -38,26 +38,6 @@ class GeminiAIService:
                 'top_k': 40,
                 'max_output_tokens': 8192,
             }
-            
-            # Configuration de sécurité
-            self.safety_settings = [
-                {
-                    "category": "HARM_CATEGORY_HARASSMENT",
-                    "threshold": "BLOCK_NONE"
-                },
-                {
-                    "category": "HARM_CATEGORY_HATE_SPEECH",
-                    "threshold": "BLOCK_NONE"
-                },
-                {
-                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    "threshold": "BLOCK_NONE"
-                },
-                {
-                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                    "threshold": "BLOCK_NONE"
-                },
-            ]
             
             logger.info(f"GeminiAIService initialisé avec le modèle {self.model_name}")
     
@@ -103,16 +83,12 @@ class GeminiAIService:
             try:
                 logger.info(f"Génération d'analyse (tentative {attempt + 1}/{max_retries})")
                 
-                # Créer le modèle
-                model = genai.GenerativeModel(
-                    model_name=self.model_name,
-                    generation_config=self.generation_config,
-                    safety_settings=self.safety_settings
-                )
-                
                 # Générer la réponse
                 start_time = time.time()
-                response = model.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                )
                 elapsed_time = time.time() - start_time
                 
                 # Extraire le texte de la réponse

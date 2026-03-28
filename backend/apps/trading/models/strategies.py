@@ -386,3 +386,75 @@ class StrategyPerformance(TimeStampedModel):
             return 0
         return (self.winning_trades / self.total_trades) * 100
 
+
+class StrategyExecution(TimeStampedModel):
+    """Log d'exécution d'une stratégie."""
+    
+    STATUS_CHOICES = [
+        ('running', 'En cours'),
+        ('completed', 'Terminé'),
+        ('failed', 'Échoué'),
+    ]
+    
+    SIGNAL_CHOICES = [
+        ('BUY', 'Achat'),
+        ('SELL', 'Vente'),
+        ('HOLD', 'Conserver'),
+        ('NONE', 'Aucun signal'),
+    ]
+    
+    strategy = models.ForeignKey(
+        Strategy,
+        on_delete=models.CASCADE,
+        related_name='executions'
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='running'
+    )
+    
+    # Signal généré
+    signal = models.CharField(
+        max_length=10,
+        choices=SIGNAL_CHOICES,
+        default='NONE'
+    )
+    signal_price = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Prix au moment du signal"
+    )
+    signal_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        null=True,
+        blank=True,
+        help_text="Quantité recommandée"
+    )
+    
+    # Résultat
+    output = models.TextField(
+        blank=True,
+        help_text="Détails de l'exécution (JSON)"
+    )
+    error = models.TextField(
+        blank=True,
+        help_text="Message d'erreur si échec"
+    )
+    
+    class Meta:
+        ordering = ['-started_at']
+        verbose_name = 'Strategy Execution'
+        verbose_name_plural = 'Strategy Executions'
+        indexes = [
+            models.Index(fields=['-started_at']),
+            models.Index(fields=['strategy', '-started_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.strategy.name} - {self.started_at.strftime('%Y-%m-%d %H:%M:%S')} - {self.status}"

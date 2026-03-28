@@ -23,7 +23,7 @@ psycopg2-binary>=2.9.9
 requests>=2.31.0
 
 # AI/ML
-google-generativeai>=0.3.0
+google-genai>=0.1.0
 
 # Utilitaires
 python-dateutil>=2.8.2

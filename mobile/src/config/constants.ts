@@ -1,15 +1,15 @@
 import { Platform } from 'react-native';
 
 // URL de base de l'API
-// On utilise l'URL de production car elle est accessible depuis le téléphone via internet/4G/Wifi
-// contrairement au serveur local qui pose des problèmes de réseau (10.0.2.2 vs IP locale vs localhost)
-// En dev, on peut surcharger si nécessaire, mais pour l'instant on force la prod comme sur le build qui marche.
+// IMPORTANT: Pour le développement mobile, on utilise l'IP locale du PC
+// car le téléphone ne peut pas accéder à "localhost" ou "127.0.0.1"
+// L'IP doit être celle de votre PC sur le réseau local (trouvée avec ipconfig)
 
 const PROD_API_URL = 'https://le-baff.com/api';
-const LOCAL_API_URL = 'http://192.168.1.171:8000/api'; // Fallback local au cas où
+const LOCAL_API_URL = 'http://192.168.236.173:8000/api'; // IP locale mise à jour
 
 export const API_BASE_URL = __DEV__
-  ? PROD_API_URL // Même en dev, on utilise la prod pour l'instant pour garantir la connexion
+  ? LOCAL_API_URL // En dev, on utilise le serveur local pour éviter les problèmes SSL/CORS
   : PROD_API_URL;
 
 export const AUTH_TOKEN_KEY = 'auth_token';

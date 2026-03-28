@@ -603,7 +603,7 @@ class StrategyAdmin(admin.ModelAdmin):
             'fields': ('algorithm_type',)
         }),
         ('Configuration', {
-            'fields': ('risk_level', 'max_position_size', 'max_daily_loss', 'parameters')
+            'fields': ('risk_level', 'parameters')
         }),
         ('Statut', {
             'fields': ('is_active', 'is_automated')

@@ -8,7 +8,8 @@ Un Serializer convertit automatiquement :
 from rest_framework import serializers
 from apps.trading.models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory, Position, Trade, Order,
-    Strategy, StrategyPerformance, AlgorithmParameter, Broker, BrokerAccount
+    Strategy, StrategyPerformance, AlgorithmParameter, Broker, BrokerAccount,
+    StrategyExecution
 )
 
 
@@ -709,3 +710,27 @@ class OrderSerializer(serializers.ModelSerializer):
             })
         
         return data
+
+
+class StrategyExecutionSerializer(serializers.ModelSerializer):
+    """Serializer pour les logs d'exécution de stratégies."""
+    strategy_name = serializers.CharField(source='strategy.name', read_only=True)
+    strategy_id = serializers.IntegerField(source='strategy.id', read_only=True)
+    duration = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = StrategyExecution
+        fields = [
+            'id', 'strategy', 'strategy_id', 'strategy_name',
+            'started_at', 'completed_at', 'duration', 'status',
+            'signal', 'signal_price', 'signal_quantity',
+            'output', 'error'
+        ]
+        read_only_fields = ['id', 'started_at']
+    
+    def get_duration(self, obj):
+        """Calcule la durée d'exécution en secondes."""
+        if obj.completed_at and obj.started_at:
+            delta = obj.completed_at - obj.started_at
+            return round(delta.total_seconds(), 2)
+        return None

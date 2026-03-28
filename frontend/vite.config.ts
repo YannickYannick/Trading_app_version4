@@ -23,6 +23,15 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: true, // Enable WebSocket proxying (needed for SSE)
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Disable buffering for SSE
+            if (req.url?.includes('/stream')) {
+              proxyReq.setHeader('X-Accel-Buffering', 'no')
+            }
+          })
+        },
       },
     },
   },
