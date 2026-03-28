@@ -719,7 +719,7 @@ class SaxoBroker(BrokerBase):
             Liste de BrokerAsset
         """
         if asset_types is None:
-            asset_types = ['Stock', 'Etf', 'CfdOnStock']
+            asset_types = ['Stock', 'Etf', 'CfdOnStock', 'FxSpot']
         
         all_assets = []
         for asset_type in asset_types:

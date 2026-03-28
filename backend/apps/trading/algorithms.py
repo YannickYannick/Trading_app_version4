@@ -37,36 +37,298 @@ class TradingAlgorithm(ABC):
 
 
 class ThresholdAlgorithm(TradingAlgorithm):
-    """Algorithme de seuils : Acheter en dessous de X1, vendre au-dessus de X2"""
+    """
+    Algorithme de seuils avec gestion avancée du portfolio.
     
-    def calculate_signals(self, price_data: List[Dict]) -> Dict:
-        if len(price_data) < 1:
-            return {'signal': 'HOLD', 'strength': 0.0, 'reason': 'Pas assez de données'}
+    Achète en dessous de threshold_low, vend au-dessus de threshold_high.
+    Gère les contraintes de quantité (min/max), les ordres en attente,
+    et la taille de trade fixe.
+    """
+    
+    def calculate_signals(self, price_data: List[Dict], portfolio: Dict = None, pending_orders: List[Dict] = None) -> Dict:
+        """
+        Calcule les signaux d'achat/vente avec gestion du portfolio.
         
-        current_price = float(price_data[-1]['close'])
+        Args:
+            price_data: Liste de dictionnaires avec 'date', 'open', 'high', 'low', 'close', 'volume'
+            portfolio: Dict avec 'cash_total' et 'quantity_total' (optionnel)
+            pending_orders: Liste d'ordres en attente avec 'type', 'qty', 'price' (optionnel)
+            
+        Returns:
+            Dict avec 'signal' ('BUY', 'SELL', 'HOLD', 'SKIP'), 'strength', 'reason', 'quantity'
+        """
+        if len(price_data) < 1:
+            return {'signal': 'HOLD', 'strength': 0.0, 'reason': 'Pas assez de données', 'quantity': 0}
+        
+        # Prix actuel (arrondi à 8 décimales pour éviter les erreurs de précision)
+        current_price = round(float(price_data[-1]['close']), 8)
+        
+        # Paramètres de configuration
         threshold_low = self.parameters.get('threshold_low', 0)
         threshold_high = self.parameters.get('threshold_high', float('inf'))
+        min_qty = self.parameters.get('min_qty', 0)  # Floor (plancher)
+        max_qty = self.parameters.get('max_qty', float('inf'))  # Cap (plafond)
+        trade_size = self.parameters.get('trade_size', 1.0)  # Quantité fixe par ordre
         
+        # Si pas de portfolio fourni, utiliser la logique simple (rétrocompatibilité)
+        if portfolio is None:
+            return self._simple_signal_logic(current_price, threshold_low, threshold_high)
+        
+        # Extraction des données du portfolio (arrondies à 8 décimales)
+        cash_total = round(float(portfolio.get('cash_total', 0)), 8)
+        quantity_total = round(float(portfolio.get('quantity_total', 0)), 8)
+        
+        # Initialisation des ordres en attente
+        if pending_orders is None:
+            pending_orders = []
+        
+        # ========================================
+        # CALCUL DES DISPONIBILITÉS RÉELLES
+        # ========================================
+        locked_cash, locked_qty = self._calculate_locked_resources(pending_orders)
+        
+        available_cash = round(cash_total - locked_cash, 8)
+        available_qty = round(quantity_total - locked_qty, 8)
+
+        # ========================================
+        # CONSTRUCTION DES INFORMATIONS DE DEBUG
+        # ========================================
+        # Helper pour sérialiser JSON (Infinity -> "Infinity")
+        def safe_json(val):
+            if val == float('inf'): return "Infinity"
+            if val == float('-inf'): return "-Infinity"
+            return val
+
+        debug_info = {
+            'inputs': {
+                'current_price': current_price,
+                'threshold_low': safe_json(threshold_low),
+                'threshold_high': safe_json(threshold_high),
+                'min_qty': safe_json(min_qty),
+                'max_qty': safe_json(max_qty),
+                'trade_size': safe_json(trade_size),
+                'portfolio': {
+                    'cash_total': cash_total,
+                    'quantity_total': quantity_total,
+                    'locked_cash': locked_cash,
+                    'locked_qty': locked_qty,
+                    'available_cash': available_cash,
+                    'available_qty': available_qty
+                }
+            },
+            'logic': []
+        }
+
+        # ========================================
+        # LOGIQUE DE DÉCISION
+        # ========================================
+        
+        # SIGNAL ACHAT : Prix <= threshold_low
+        if current_price <= threshold_low:
+            debug_info['logic'].append(f"Prix ({current_price}) <= Seuil bas ({threshold_low}) -> Analyse signal ACHAT")
+            result = self._evaluate_buy_signal(
+                current_price, threshold_low, quantity_total, max_qty,
+                trade_size, available_cash, debug_info
+            )
+        
+        # SIGNAL VENTE : Prix >= threshold_high
+        elif current_price >= threshold_high:
+            debug_info['logic'].append(f"Prix ({current_price}) >= Seuil haut ({threshold_high}) -> Analyse signal VENTE")
+            result = self._evaluate_sell_signal(
+                current_price, threshold_high, quantity_total, min_qty,
+                trade_size, available_qty, debug_info
+            )
+        
+        # ZONE NEUTRE : Pas de signal
+        else:
+            debug_info['logic'].append(f"Prix ({current_price}) entre seuils [{threshold_low} - {threshold_high}] -> Zone NEUTRE")
+            result = {
+                'signal': 'HOLD',
+                'strength': 0.0,
+                'reason': f'Prix ({current_price}) dans la zone neutre [{threshold_low} - {threshold_high}]',
+                'quantity': 0
+            }
+        
+        # Fusionner les infos de debug
+        result['debug_info'] = debug_info
+        return result
+    
+    def _calculate_locked_resources(self, pending_orders: List[Dict]) -> tuple:
+        """
+        Calcule les ressources bloquées par les ordres en attente.
+        
+        Args:
+            pending_orders: Liste d'ordres avec 'type', 'qty', 'price'
+            
+        Returns:
+            Tuple (locked_cash, locked_qty) arrondis à 8 décimales
+        """
+        locked_cash = 0.0
+        locked_qty = 0.0
+        
+        for order in pending_orders:
+            order_type = order.get('type', '').upper()
+            qty = float(order.get('qty', 0))
+            price = float(order.get('price', 0))
+            
+            if order_type == 'BUY':
+                # Les ordres d'achat bloquent du cash
+                locked_cash += qty * price
+            elif order_type == 'SELL':
+                # Les ordres de vente bloquent de la quantité
+                locked_qty += qty
+        
+        return round(locked_cash, 8), round(locked_qty, 8)
+    
+    def _evaluate_buy_signal(self, current_price: float, threshold_low: float,
+                            quantity_total: float, max_qty: float,
+                            trade_size: float, available_cash: float, debug_info: Dict) -> Dict:
+        """
+        Évalue si un signal d'achat peut être généré.
+        """
+        # Calcul de l'espace restant avant le plafond
+        space_to_max = round(max_qty - quantity_total, 8)
+        debug_info['logic'].append(f"Espace avant max: {space_to_max} (Max {max_qty} - Actuel {quantity_total})")
+        
+        # CONDITION D'ARRÊT 1 : Plafond atteint
+        if space_to_max <= 0:
+            debug_info['logic'].append("❌ Plafond atteint")
+            return {
+                'signal': 'SKIP',
+                'strength': 0.0,
+                'reason': f'Max Cap atteint : quantité actuelle ({quantity_total}) >= max autorisé ({max_qty})',
+                'quantity': 0
+            }
+        
+        # Quantité théorique (limitée par l'espace disponible)
+        desired_qty = min(trade_size, space_to_max)
+        debug_info['logic'].append(f"Quantité cible: {desired_qty} (min(TradeSize {trade_size}, Espace {space_to_max}))")
+        
+        # Vérification et ajustement selon les fonds disponibles
+        max_affordable_qty = available_cash / current_price if current_price > 0 else 0
+        
+        if max_affordable_qty < desired_qty:
+            qty_to_buy = round(max_affordable_qty, 8)
+            debug_info['logic'].append(f"⚠️ Fonds limités ({available_cash}€): ajustement Qté {desired_qty} -> {qty_to_buy}")
+        else:
+            qty_to_buy = round(desired_qty, 8)
+            
+        # Coût de l'ordre
+        order_cost = round(qty_to_buy * current_price, 8)
+        debug_info['logic'].append(f"Coût estimé: {order_cost}€ ({qty_to_buy} * {current_price}€)")
+        
+        # CONDITION D'ARRÊT 2 : Quantité nulle ou insignifiante
+        if qty_to_buy <= 0:
+            debug_info['logic'].append(f"❌ Quantité nulle (Fonds insuffisants ou prix trop élevé)")
+            return {
+                'signal': 'SKIP',
+                'strength': 0.0,
+                'reason': f'Quantité calculée nulle (Dispo: {available_cash}€)',
+                'quantity': 0
+            }
+        
+        # SIGNAL VALIDE : Générer l'ordre d'achat
+        strength = min(1.0, (threshold_low - current_price) / threshold_low * 2) if threshold_low > 0 else 0.5
+        debug_info['logic'].append("✅ Conditions remplies -> Signal BUY généré")
+        
+        return {
+            'signal': 'BUY',
+            'strength': round(strength, 4),
+            'reason': f'Prix ({current_price}) en dessous du seuil bas ({threshold_low})',
+            'quantity': qty_to_buy,
+            'order_cost': order_cost,
+            'space_to_max': space_to_max
+        }
+    
+    def _evaluate_sell_signal(self, current_price: float, threshold_high: float,
+                             quantity_total: float, min_qty: float,
+                             trade_size: float, available_qty: float, debug_info: Dict) -> Dict:
+        """
+        Évalue si un signal de vente peut être généré.
+        """
+        debug_info['logic'].append(f"Vérification plancher: {min_qty} (Actuel {quantity_total})")
+        
+        # CONDITION D'ARRÊT 1 : Plancher atteint
+        if quantity_total <= min_qty:
+            debug_info['logic'].append("❌ Plancher atteint")
+            return {
+                'signal': 'SKIP',
+                'strength': 0.0,
+                'reason': f'Min Floor atteint : quantité actuelle ({quantity_total}) <= min requis ({min_qty})',
+                'quantity': 0
+            }
+        
+        # CONDITION D'ARRÊT 2 : Quantité disponible insuffisante pour le trade_size
+        if available_qty < trade_size:
+            debug_info['logic'].append(f"❌ Quantité disponible insuffisante ({available_qty} < {trade_size})")
+            return {
+                'signal': 'SKIP',
+                'strength': 0.0,
+                'reason': f'Quantité disponible insuffisante : {available_qty} < trade_size ({trade_size})',
+                'quantity': 0
+            }
+        
+        # Calcul du stock vendable au-dessus du plancher
+        sellable_cap = round(quantity_total - min_qty, 8)
+        debug_info['logic'].append(f"Stock vendable: {sellable_cap} (Actuel {quantity_total} - Min {min_qty})")
+        
+        # CONDITION D'ARRÊT 3 : Espace vendable insuffisant
+        if sellable_cap < trade_size:
+            debug_info['logic'].append(f"❌ Stock vendable insuffisant ({sellable_cap} < {trade_size})")
+            return {
+                'signal': 'SKIP',
+                'strength': 0.0,
+                'reason': f'Espace vendable insuffisant : {sellable_cap} (après min_qty) < trade_size ({trade_size})',
+                'quantity': 0
+            }
+        
+        # Quantité à vendre (trade_size, car toutes les conditions sont remplies)
+        qty_to_sell = trade_size
+        debug_info['logic'].append(f"Quantité validée: {qty_to_sell}")
+        
+        # SIGNAL VALIDE : Générer l'ordre de vente
+        strength = min(1.0, (current_price - threshold_high) / threshold_high * 2) if threshold_high > 0 else 0.5
+        debug_info['logic'].append("✅ Conditions remplies -> Signal SELL généré")
+        
+        return {
+            'signal': 'SELL',
+            'strength': round(strength, 4),
+            'reason': f'Prix ({current_price}) au-dessus du seuil haut ({threshold_high})',
+            'quantity': qty_to_sell,
+            'order_value': round(qty_to_sell * current_price, 8),
+            'sellable_cap': sellable_cap
+        }
+    
+    def _simple_signal_logic(self, current_price: float, threshold_low: float, threshold_high: float) -> Dict:
+        """
+        Logique simple sans gestion de portfolio (rétrocompatibilité).
+        
+        Utilisée quand aucun portfolio n'est fourni.
+        """
         if current_price <= threshold_low:
             strength = min(1.0, (threshold_low - current_price) / threshold_low * 2) if threshold_low > 0 else 0.5
             return {
                 'signal': 'BUY',
                 'strength': strength,
-                'reason': f'Prix ({current_price}) en dessous du seuil bas ({threshold_low})'
+                'reason': f'Prix ({current_price}) en dessous du seuil bas ({threshold_low})',
+                'quantity': 0  # Quantité non définie en mode simple
             }
         elif current_price >= threshold_high:
             strength = min(1.0, (current_price - threshold_high) / threshold_high * 2) if threshold_high > 0 else 0.5
             return {
                 'signal': 'SELL',
                 'strength': strength,
-                'reason': f'Prix ({current_price}) au-dessus du seuil haut ({threshold_high})'
+                'reason': f'Prix ({current_price}) au-dessus du seuil haut ({threshold_high})',
+                'quantity': 0
             }
         else:
             return {
                 'signal': 'HOLD',
                 'strength': 0.0,
-                'reason': f'Prix ({current_price}) dans la zone neutre'
+                'reason': f'Prix ({current_price}) dans la zone neutre',
+                'quantity': 0
             }
+
 
 
 class MovingAverageCrossoverAlgorithm(TradingAlgorithm):

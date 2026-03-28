@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, Modal, Touch
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
+import { SaxoOAuthModal } from '../components/SaxoOAuthModal'
 import { brokersService } from '../services/api'
 import { Ionicons } from '@expo/vector-icons'
 import type { BrokerAccount } from '@trading-app/shared'
@@ -11,6 +12,8 @@ export const BrokerManageScreen = ({ navigation }: any) => {
     const [accounts, setAccounts] = useState<BrokerAccount[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<number | null>(null) // ID of account being processed
+    const [showOAuthModal, setShowOAuthModal] = useState(false)
+    const [selectedAccount, setSelectedAccount] = useState<BrokerAccount | null>(null)
 
     const loadAccounts = useCallback(async () => {
         try {
@@ -56,14 +59,25 @@ export const BrokerManageScreen = ({ navigation }: any) => {
         }
     }
 
+    const handleConnectSaxo = (account: BrokerAccount) => {
+        setSelectedAccount(account)
+        setShowOAuthModal(true)
+    }
+
+    const handleOAuthSuccess = () => {
+        loadAccounts() // Reload accounts to show updated tokens
+        Alert.alert('Succès', 'Authentification Saxo réussie!')
+    }
+
     const handleConnectNew = () => {
-        // TODO: Implement connection flow (e.g. navigation to a form or Saxo OAuth)
+        // TODO: Implement connection flow for new accounts
         Alert.alert('Information', 'La connexion de nouveaux comptes sera bientôt disponible.')
     }
 
     const renderAccountCard = (account: BrokerAccount) => {
         const isSaxo = account.broker_type === 'SAXO'
         const isBinance = account.broker_type === 'BINANCE'
+        const hasTokens = account.saxo_access_token || account.saxo_refresh_token
 
         return (
             <Card key={account.id} style={styles.card}>
@@ -124,13 +138,23 @@ export const BrokerManageScreen = ({ navigation }: any) => {
                         <Text style={styles.actionsLabel}>Gestion Saxo</Text>
                         <View style={styles.actionsRow}>
                             <Button
-                                title="Refresh Token"
-                                onPress={() => handleRefreshSaxo(account.id)}
-                                variant="secondary"
+                                title={hasTokens ? "Réautoriser" : "Connecter"}
+                                onPress={() => handleConnectSaxo(account)}
+                                variant={hasTokens ? "outline" : "primary"}
                                 size="sm"
                                 loading={actionLoading === account.id}
                                 style={styles.actionButton}
                             />
+                            {hasTokens && (
+                                <Button
+                                    title="Refresh Token"
+                                    onPress={() => handleRefreshSaxo(account.id)}
+                                    variant="secondary"
+                                    size="sm"
+                                    loading={actionLoading === account.id}
+                                    style={styles.actionButton}
+                                />
+                            )}
                         </View>
                     </View>
                 )}
@@ -163,6 +187,16 @@ export const BrokerManageScreen = ({ navigation }: any) => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Saxo OAuth Modal */}
+            {selectedAccount && (
+                <SaxoOAuthModal
+                    visible={showOAuthModal}
+                    account={selectedAccount}
+                    onSuccess={handleOAuthSuccess}
+                    onClose={() => setShowOAuthModal(false)}
+                />
+            )}
         </SafeAreaView>
     )
 }

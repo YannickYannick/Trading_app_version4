@@ -1,18 +1,21 @@
-import { Platform } from 'react-native'
+import { Platform } from 'react-native';
 
 // URL de base de l'API
-// Android Emulator utilise 10.0.2.2 pour localhost
-// iOS Simulator utilise localhost
-// Device physique nécessite l'IP locale de vore machine
-const DEV_API_URL = Platform.select({
-  android: 'http://192.168.1.171:8000/api', // IP locale détectée (pour Device physique ET Emulateur)
-  ios: 'http://192.168.1.171:8000/api',
-  default: 'http://192.168.1.171:8000/api',
-})
+// IMPORTANT: Pour le développement mobile, on utilise l'IP locale du PC
+// car le téléphone ne peut pas accéder à "localhost" ou "127.0.0.1"
+// L'IP doit être celle de votre PC sur le réseau local (trouvée avec ipconfig)
 
-export const API_URL = __DEV__ ? DEV_API_URL : 'https://votre-api-prod.com/api'
+const PROD_API_URL = 'https://le-baff.com/api';
+const LOCAL_API_URL = 'http://192.168.236.173:8000/api'; // IP locale mise à jour
+
+export const API_BASE_URL = __DEV__
+  ? LOCAL_API_URL // En dev, on utilise le serveur local pour éviter les problèmes SSL/CORS
+  : PROD_API_URL;
+
+export const AUTH_TOKEN_KEY = 'auth_token';
+export const REFRESH_TOKEN_KEY = 'refresh_token';
 
 export const config = {
-  apiBaseUrl: API_URL,
+  apiBaseUrl: API_BASE_URL,
   timeout: 30000,
-}
+};

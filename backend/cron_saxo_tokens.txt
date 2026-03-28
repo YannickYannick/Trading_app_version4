@@ -1,0 +1,128 @@
+# Configuration Cron - Rafraîchissement des Tokens Saxo
+# ========================================================
+# Ce fichier contient la configuration cron pour rafraîchir automatiquement
+# les tokens OAuth2 des brokers Saxo toutes les 20 minutes.
+
+# IMPORTANT: Sur HostArmada/cPanel, les cron jobs se configurent via l'interface web
+# Référence: cPanel > Advanced > Cron Jobs
+
+# ----------------------------------------------------
+# CONFIGURATION CRON (via cPanel)
+# ----------------------------------------------------
+
+# Minute: */20 (toutes les 20 minutes)
+# Hour: * (toutes les heures)
+# Day: * (tous les jours)
+# Month: * (tous les mois)
+# Weekday: * (tous les jours de la semaine)
+
+# Commande complète à entrer dans cPanel (VERSION OPTIMALE - RECOMMANDÉE):
+# ----------------------------------------------------
+
+/home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/python /home/lebaffc1/Trading_app_version4/backend/manage.py refresh_broker_tokens --minutes-before 30 >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+
+# ----------------------------------------------------
+# COMMANDE ALTERNATIVE (avec activation virtualenv)
+# ----------------------------------------------------
+# Utilise cette version si la commande optimale ne fonctionne pas:
+
+# source /home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/activate && cd /home/lebaffc1/Trading_app_version4/backend && python manage.py refresh_broker_tokens --minutes-before 30 >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+
+# ----------------------------------------------------
+# EXPLICATION DE LA COMMANDE
+# ----------------------------------------------------
+#
+# 1. source /home/lebaffc1/virtualenv/.../activate
+#    → Active l'environnement virtuel Python 3.12
+#
+# 2. cd /home/lebaffc1/Trading_app_version4/backend
+#    → Se place dans le répertoire du backend Django
+#
+# 3. python manage.py refresh_broker_tokens
+#    → Execute la commande Django de refresh des tokens
+#
+# 4. --minutes-before 30
+#    → Rafraîchit les tokens expirant dans moins de 30 minutes
+#    → Avec une exécution toutes les 20 min, on garde une marge de sécurité
+#
+# 5. >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+#    → Redirige la sortie (stdout + stderr) vers un fichier de log
+#    → Permet de débugger en cas de problème
+
+# ----------------------------------------------------
+# EXPRESSION CRON COMPLÈTE (format cPanel)
+# ----------------------------------------------------
+# */20 * * * * [COMMANDE CI-DESSUS]
+
+# ----------------------------------------------------
+# ALTERNATIVES
+# ----------------------------------------------------
+
+# Option 1: Refresh toutes les 15 minutes (plus fréquent)
+# */15 * * * * source /home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/activate && cd /home/lebaffc1/Trading_app_version4/backend && python manage.py refresh_broker_tokens --minutes-before 20 >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+
+# Option 2: Refresh avec force (tous les tokens, même non expirés) - à utiliser avec précaution
+# 0 */6 * * * source /home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/activate && cd /home/lebaffc1/Trading_app_version4/backend && python manage.py refresh_broker_tokens --force >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+
+# Option 3: Refresh uniquement les comptes Saxo (déjà le défaut dans la commande)
+# */20 * * * * source /home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/activate && cd /home/lebaffc1/Trading_app_version4/backend && python manage.py refresh_broker_tokens --broker-type SAXO >> /home/lebaffc1/logs/cron_saxo_tokens.log 2>&1
+
+# ----------------------------------------------------
+# MONITORING DES LOGS
+# ----------------------------------------------------
+# Pour voir les logs en temps réel (via SSH):
+# tail -f /home/lebaffc1/logs/cron_saxo_tokens.log
+
+# Pour voir les dernières 50 lignes:
+# tail -n 50 /home/lebaffc1/logs/cron_saxo_tokens.log
+
+# Pour vider le fichier de log (si trop volumineux):
+# > /home/lebaffc1/logs/cron_saxo_tokens.log
+
+# ----------------------------------------------------
+# DÉPANNAGE
+# ----------------------------------------------------
+
+# Test manuel de la commande (via SSH):
+# ssh -p 19199 -i id_rsa_v2 lebaffc1@fra2.hostarmada.net
+# source /home/lebaffc1/virtualenv/Trading_app_version4/backend/3.12/bin/activate
+# cd /home/lebaffc1/Trading_app_version4/backend
+# python manage.py refresh_broker_tokens --help
+# python manage.py refresh_broker_tokens --force
+
+# Vérifier que le cron s'exécute:
+# grep CRON /var/log/syslog | grep refresh_broker_tokens
+
+# Vérifier les crons actifs pour l'utilisateur:
+# crontab -l
+
+# ----------------------------------------------------
+# NOTES IMPORTANTES
+# ----------------------------------------------------
+#
+# 1. SÉCURITÉ DES TOKENS
+#    - Les tokens Saxo ont une durée de vie limitée (généralement 20 minutes à 1 heure)
+#    - Le refresh_token permet de renouveler l'access_token sans demander à l'utilisateur de se reconnecter
+#    - Ne jamais partager ou logger les tokens en clair
+#
+# 2. FRÉQUENCE DE RAFRAÎCHISSEMENT
+#    - 20 minutes est optimal pour Saxo (tokens expirent en ~20-30 min)
+#    - Trop fréquent = sollicitation inutile de l'API Saxo
+#    - Pas assez fréquent = risque d'expiration et perte de connexion
+#
+# 3. GESTION DES ERREURS
+#    - Si le refresh échoue, l'utilisateur devra se reconnecter manuellement via l'interface
+#    - Logs à surveiller pour détecter les échecs répétés
+#    - Possibilité d'ajouter des alertes email en cas d'échec
+#
+# 4. PERFORMANCE
+#    - La commande est rapide (<5 secondes pour quelques comptes)
+#    - Pas d'impact sur les performances du serveur
+#    - Utilise le BrokerService existant (optimisé)
+
+# ----------------------------------------------------
+# CONFIGURATION EMAIL (OPTIONNEL)
+# ----------------------------------------------------
+# Pour recevoir un email en cas d'erreur, ajouter dans cPanel:
+# MAILTO=your-email@domain.com
+# Puis configurer la commande normalement

@@ -1,6 +1,5 @@
 .table-wrapper {
-  overflow-x: visible;
-  /* Changed from auto to allow dropdowns to overflow */
+  overflow-x: auto;
   border-radius: var(--border-radius-lg);
   max-width: 100%;
 }
@@ -28,8 +27,7 @@
 }
 
 .table td {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  white-space: nowrap;
 }
 
 .table th {
@@ -93,9 +91,7 @@
   color: var(--text-primary, #111827);
   font-size: inherit;
   font-family: inherit;
-}
-
-.table-cell-input:focus {
+}.table-cell-input:focus {
   outline: none;
   border-color: var(--primary-color, #3b82f6);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
@@ -105,8 +101,6 @@
   cursor: pointer;
   width: 1.25rem;
   height: 1.25rem;
-}
-
-.table-cell-input[type="number"] {
+}.table-cell-input[type="number"] {
   text-align: right;
 }

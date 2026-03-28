@@ -6,7 +6,21 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+# Static files served via WhiteNoise (for Passenger/shared hosting)
+# Insert WhiteNoise right after SecurityMiddleware in the MIDDLEWARE from base.py
+MIDDLEWARE.insert(
+    MIDDLEWARE.index('django.middleware.security.SecurityMiddleware') + 1,
+    'whitenoise.middleware.WhiteNoiseMiddleware'
+)
+
+# WhiteNoise configuration - using simple storage for reliability
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', '').split(',')
+    if h.strip()
+]
 
 # Database PostgreSQL pour la production
 DATABASES = {
@@ -24,6 +38,9 @@ DATABASES = {
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+# Railway / reverse proxy : le conteneur voit souvent du HTTP ; sans cela,
+# SECURE_SSL_REDIRECT peut renvoyer une 301 en boucle (Location = même URL).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
@@ -46,6 +63,11 @@ CORS_ALLOWED_ORIGINS = [
 if not CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = []
     # En production, NE PAS utiliser CORS_ALLOW_ALL_ORIGINS = True
+
+# Front Vercel (preview + prod) sans lister chaque URL (cf. Capital_Of_Fusion deploiement.md)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://[\w-]+\.vercel\.app$',
+]
 
 # URLs exposées dans les réponses CORS
 CORS_EXPOSE_HEADERS = [

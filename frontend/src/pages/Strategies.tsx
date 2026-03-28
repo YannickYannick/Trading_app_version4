@@ -10,6 +10,8 @@ import type { Strategy, BrokerAccount, AllAsset } from '@types'
 import AlgorithmParametersModal from '@components/strategies/AlgorithmParametersModal'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import StrategyParametersPanel from '@components/strategies/StrategyParametersPanel'
+import StrategyExecutionMonitor from '@components/strategies/StrategyExecutionMonitor'
+
 import './Strategies.css'
 
 // Algorithmes disponibles
@@ -183,8 +185,7 @@ export default function Strategies() {
         const params = { ...(row.parameters || {}) }
         params[key] = newValue ? parseFloat(newValue) : null
         updateData['parameters'] = params
-      } else if (key === 'max_position_size' || key === 'max_daily_loss' ||
-        key === 'target_min_quantity' || key === 'target_max_quantity' ||
+      } else if (key === 'target_min_quantity' || key === 'target_max_quantity' ||
         key === 'check_frequency') {
         updateData[key] = newValue ? parseFloat(newValue) : null
       } else if (key === 'is_active' || key === 'is_automated') {
@@ -202,12 +203,11 @@ export default function Strategies() {
             // Mettre à jour les champs directs
             if (key === 'asset_id' || key === 'name' || key === 'description' ||
               key === 'algorithm_type' || key === 'execution_mode' ||
-              key === 'check_frequency' || key === 'max_position_size' ||
-              key === 'max_daily_loss' || key === 'target_min_quantity' ||
+              key === 'check_frequency' ||
+              key === 'target_min_quantity' ||
               key === 'target_max_quantity' || key === 'risk_level' ||
               key === 'is_active' || key === 'is_automated') {
               if (key === 'target_min_quantity' || key === 'target_max_quantity' ||
-                key === 'max_position_size' || key === 'max_daily_loss' ||
                 key === 'check_frequency') {
                 updated[key as keyof Strategy] = newValue ? parseFloat(newValue) : null
               } else if (key === 'is_active' || key === 'is_automated') {
@@ -269,6 +269,20 @@ export default function Strategies() {
 
       // Sauvegarde asynchrone en arrière-plan (sans bloquer l'UI)
       strategyService.update(row.id, updateData)
+        .then((updatedStrategy) => {
+          // Si on change l'algorithme, ouvrir la modale de paramètres APRÈS la mise à jour
+          if (key === 'algorithm_type' && newValue) {
+            // Mettre à jour l'état avec la stratégie complète retournée par l'API
+            setStrategies(prevStrategies =>
+              prevStrategies.map(s => s.id === updatedStrategy.id ? updatedStrategy : s)
+            )
+            // Ouvrir la modale avec la stratégie mise à jour
+            setTimeout(() => {
+              setSelectedStrategyForParams(updatedStrategy)
+              setAlgorithmParamsModalOpen(true)
+            }, 100)
+          }
+        })
         .catch((err: any) => {
           console.error('Erreur lors de la sauvegarde:', err)
           // En cas d'erreur, recharger pour restaurer l'état correct
@@ -405,12 +419,11 @@ export default function Strategies() {
     { key: 'price_range', label: 'Prix (Min/Max)', defaultVisible: true },
     { key: 'portfolio_quantity', label: 'Portefeuille', defaultVisible: true },
     { key: 'check_frequency', label: 'Fréquence (min)', defaultVisible: true },
-    { key: 'max_position_size', label: 'Taille Max (%)', defaultVisible: true },
-    { key: 'max_daily_loss', label: 'Perte Max (%)', defaultVisible: true },
     { key: 'risk_level', label: 'Risque', defaultVisible: true },
     { key: 'is_active', label: 'Statut', defaultVisible: true },
     { key: 'is_automated', label: 'Auto', defaultVisible: true },
     { key: 'total_trades', label: 'Performance', defaultVisible: true },
+
     { key: 'yahoo_actions', label: 'Actions Yahoo', defaultVisible: true },
     { key: 'actions', label: 'Actions', defaultVisible: true },
   ]
@@ -703,30 +716,6 @@ export default function Strategies() {
       render: (value: number) => value || 45,
     },
     {
-      key: 'max_position_size',
-      label: 'Taille Max (%)',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'center' as const,
-      render: (_: any, row: Strategy) => {
-        const size = parseFloat(row.max_position_size?.toString() || '0')
-        return size > 0 ? `${size.toFixed(2)}%` : '-'
-      },
-    },
-    {
-      key: 'max_daily_loss',
-      label: 'Perte Max (%)',
-      editable: true,
-      cellType: 'number' as const,
-      onCellEdit: handleCellEdit,
-      align: 'center' as const,
-      render: (_: any, row: Strategy) => {
-        const loss = parseFloat(row.max_daily_loss?.toString() || '0')
-        return loss > 0 ? `${loss.toFixed(2)}%` : '-'
-      },
-    },
-    {
       key: 'risk_level',
       label: 'Risque',
       editable: true,
@@ -784,6 +773,7 @@ export default function Strategies() {
         )
       },
     },
+
     {
       key: 'yahoo_actions',
       label: 'Actions Yahoo',
@@ -1067,6 +1057,9 @@ export default function Strategies() {
           {showVisualization ? 'Masquer le graphique' : 'Afficher le graphique de stratégie'}
         </Button>
       </div>
+
+      {/* Panneau de monitoring des exécutions */}
+      <StrategyExecutionMonitor />
     </div>
   )
 }

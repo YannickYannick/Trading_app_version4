@@ -132,6 +132,26 @@ class Strategy(TimeStampedModel):
         help_text="Asset cible que cette stratégie trade"
     )
     
+    # Compte broker pour exécuter cette stratégie
+    broker_account = models.ForeignKey(
+        'BrokerAccount',
+        on_delete=models.SET_NULL,
+        null=True, # Garder null=True pour SET_NULL, mais blank=False pour le rendre obligatoire
+        blank=False,
+        related_name='strategies',
+        help_text="Compte broker pour exécuter cette stratégie"
+    )
+    
+    # Asset Saxo spécifique (optionnel, pour compatibilité)
+    asset = models.ForeignKey(
+        'Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='strategies',
+        help_text="Asset Saxo spécifique (optionnel)"
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     
@@ -143,37 +163,58 @@ class Strategy(TimeStampedModel):
         blank=True,
         help_text="Type d'algorithme de trading"
     )
+    execution_mode = models.CharField(
+        max_length=20,
+        choices=[
+            ('simulation', 'Simulation'),
+            ('paper_trading', 'Paper Trading'),
+            ('live_trading', 'Trading Réel'),
+        ],
+        default='live_trading',
+        help_text="Mode d'exécution de la stratégie"
+    )
     risk_level = models.CharField(
         max_length=10, choices=RiskLevel.choices, default=RiskLevel.MEDIUM
-    )
-    max_position_size = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Taille maximale d'une position en %"
-    )
-    max_daily_loss = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text="Perte maximale journalière en %"
     )
     
     # Quantité et budget
     min_quantity = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True,
-        help_text="Quantité minimale d'achat (1 pour actions, 0.0005 pour crypto)"
+        max_digits=20, decimal_places=10, default=0, null=False, blank=False,
+        help_text="Quantité minimale d'achat"
     )
     max_quantity = models.DecimalField(
-        max_digits=20, decimal_places=10, null=True, blank=True,
+        max_digits=20, decimal_places=10, default=1, null=False, blank=False,
         help_text="Quantité maximale d'achat"
     )
     budget = models.DecimalField(
-        max_digits=20, decimal_places=2, null=True, blank=True,
+        max_digits=20, decimal_places=2, default=1000, null=False, blank=False,
         help_text="Budget alloué à cette stratégie"
     )
     
     # Paramètres (JSONField conservé pour compatibilité backward)
     parameters = models.JSONField(default=dict, blank=True, help_text="Paramètres (ancien système - utilisé en fallback)")
     
-    is_active = models.BooleanField(default=True)
-    is_automated = models.BooleanField(default=False)
+    # Fréquence et portfolio
+    check_frequency = models.IntegerField(
+        default=45,
+        help_text="Fréquence de vérification en minutes"
+    )
+    portfolio_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        default=0,
+        help_text="Quantité actuellement détenue en portefeuille"
+    )
+    
+    # Statut
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Stratégie active"
+    )
+    is_automated = models.BooleanField(
+        default=True,
+        help_text="Trading automatique activé"
+    )
     
     class Meta:
         ordering = ['name']
@@ -345,3 +386,75 @@ class StrategyPerformance(TimeStampedModel):
             return 0
         return (self.winning_trades / self.total_trades) * 100
 
+
+class StrategyExecution(TimeStampedModel):
+    """Log d'exécution d'une stratégie."""
+    
+    STATUS_CHOICES = [
+        ('running', 'En cours'),
+        ('completed', 'Terminé'),
+        ('failed', 'Échoué'),
+    ]
+    
+    SIGNAL_CHOICES = [
+        ('BUY', 'Achat'),
+        ('SELL', 'Vente'),
+        ('HOLD', 'Conserver'),
+        ('NONE', 'Aucun signal'),
+    ]
+    
+    strategy = models.ForeignKey(
+        Strategy,
+        on_delete=models.CASCADE,
+        related_name='executions'
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='running'
+    )
+    
+    # Signal généré
+    signal = models.CharField(
+        max_length=10,
+        choices=SIGNAL_CHOICES,
+        default='NONE'
+    )
+    signal_price = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Prix au moment du signal"
+    )
+    signal_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        null=True,
+        blank=True,
+        help_text="Quantité recommandée"
+    )
+    
+    # Résultat
+    output = models.TextField(
+        blank=True,
+        help_text="Détails de l'exécution (JSON)"
+    )
+    error = models.TextField(
+        blank=True,
+        help_text="Message d'erreur si échec"
+    )
+    
+    class Meta:
+        ordering = ['-started_at']
+        verbose_name = 'Strategy Execution'
+        verbose_name_plural = 'Strategy Executions'
+        indexes = [
+            models.Index(fields=['-started_at']),
+            models.Index(fields=['strategy', '-started_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.strategy.name} - {self.started_at.strftime('%Y-%m-%d %H:%M:%S')} - {self.status}"

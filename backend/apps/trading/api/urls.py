@@ -20,6 +20,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from . import views
 from . import auth_views
+from . import sse_views
 from .health import health_check, ping
 
 # ============================================
@@ -93,8 +94,18 @@ router.register(r'orders', views.OrderViewSet, basename='order')
 #   GET  /strategies/{id}/positions/   → Positions de la stratégie
 #   POST /strategies/{id}/activate/    → Activer
 #   POST /strategies/{id}/deactivate/  → Désactiver
+#   POST /strategies/{id}/execute/     → Exécuter manuellement
+#   POST /strategies/execute-all/      → Exécuter toutes les stratégies actives
 # --------------------------------------------
 router.register(r'strategies', views.StrategyViewSet, basename='strategy')
+
+# --------------------------------------------
+# STRATEGY EXECUTIONS (Logs d'exécution)
+# Endpoints :
+#   GET  /strategy-executions/         → Liste des logs
+#   GET  /strategy-executions/recent/  → Logs récents
+# --------------------------------------------
+router.register(r'strategy-executions', views.StrategyExecutionViewSet, basename='strategy-execution')
 
 # --------------------------------------------
 # BROKERS
@@ -113,6 +124,13 @@ router.register(r'brokers', views.BrokerViewSet, basename='broker')
 # --------------------------------------------
 router.register(r'broker-accounts', views.BrokerAccountViewSet, basename='broker-account')
 
+# --------------------------------------------
+# ANALYTIQUE & DASHBOARD
+# Endpoints :
+#   GET /analytics/summary/ → KPI Dashboard
+# --------------------------------------------
+router.register(r'analytics', views.AnalyticsViewSet, basename='analytics')
+
 
 # ============================================
 # URLS FINALES
@@ -124,6 +142,11 @@ urlpatterns = [
     # ============================================
     path('health/', health_check, name='health-check'),
     path('ping/', ping, name='ping'),
+    
+    # ============================================
+    # SSE - Server-Sent Events (Real-time updates)
+    # ============================================
+    path('strategy-executions/stream/', sse_views.strategy_execution_stream, name='strategy-execution-stream'),
     
     # ============================================
     # DATATREE - Vue d'ensemble Assets avec Positions/Orders

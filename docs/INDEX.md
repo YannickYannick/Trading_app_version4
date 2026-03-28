@@ -90,6 +90,12 @@ python manage.py runserver
 # Swagger sur http://localhost:8000/api/docs/
 ```
 
+## ☁️ Déploiement cloud (Vercel + Railway)
+
+Guide pas à pas (aligné sur la doc du projet Capital_Of_Fusion V5, adapté Vite + `config_django`) : **[DEPLOIEMENT_VERCEL_RAILWAY.md](DEPLOIEMENT_VERCEL_RAILWAY.md)**.
+
+Hébergement classique HostArmada (le-baff.com) : voir `deployment_config/README.md` et `RAPPORT_DEPLOIEMENT_HOSTARMADA.md`.
+
 ## 📊 Base de données
 
 Connecté à **Supabase PostgreSQL** :
@@ -159,9 +165,7 @@ Problème rencontré lors de la récupération des prix Saxo pour la validation 
 - ✅ Solutions implémentées : gestion des structures multiples, priorités des champs, logging détaillé
 - ⚠️ Limitation : permissions du compte peuvent bloquer l'accès aux prix
 
-## 🔄 Migrations
-
-### [Migration Saxo : SIM → LIVE](migration-saxo-sim-to-live.md)
+## 🔄 Migrations### [Migration Saxo : SIM → LIVE](migration-saxo-sim-to-live.md)
 **Date :** 29 Décembre 2025
 
 Migration complète de l'environnement Saxo Bank de SIM vers LIVE :
@@ -170,4 +174,3 @@ Migration complète de l'environnement Saxo Bank de SIM vers LIVE :
 - ✅ Script de migration Django pour mettre à jour les comptes existants
 - ✅ Script de test de validation pour vérifier la migration
 - 🎯 Objectif : Éliminer les erreurs `NoAccess` en utilisant l'environnement LIVE
-

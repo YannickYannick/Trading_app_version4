@@ -1,0 +1,118 @@
+
+# ============================================
+# VIEWSET ANALYTICS
+# ============================================
+
+class AnalyticsViewSet(viewsets.ViewSet):
+    """
+    ViewSet pour les analyses et statistiques du dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """
+        GET /api/analytics/summary/
+        Retourne les KPIs principaux pour le dashboard.
+        """
+        user = request.user
+        
+        # 1. Calculer la Valeur Totale (Cash + Investi)
+        # ---------------------------------------------
+        broker_accounts = BrokerAccount.objects.filter(user=user, is_active=True)
+        open_positions = Position.objects.filter(user=user, is_open=True)
+        
+        # Cash: Somme des balances converties en EUR
+        total_cash = sum(account.balance or 0 for account in broker_accounts)
+        
+        # Investi: Somme de (Quantité * Prix Actuel)
+        # On utilise le prix actuel Yahoo s'il est dispo, sinon le prix d'entrée
+        total_invested = 0
+        for pos in open_positions:
+            price = pos.yahoo_current_price or pos.current_price or pos.entry_price or 0
+            if price and pos.quantity:
+                total_invested += float(price) * float(pos.quantity)
+                
+        total_value = float(total_cash) + total_invested
+        
+        # 2. Calculer le Taux de Réussite (Trades Fermés uniquement)
+        # ----------------------------------------------------------
+        # On considère un trade comme "gagnant" si PnL > 0
+        closed_trades = Trade.objects.filter(user=user)  # Vous pouvez filtrer par 'type' si besoin (ex: CLOSING)
+        # Note: Dans votre modèle Trade actuel, il n'y a pas de PnL direct stocké souvent,
+        # mais si vous avez des positions fermées, mieux vaut regarder les Positions fermées.
+        
+        closed_positions = Position.objects.filter(user=user, is_open=False)
+        total_closed = closed_positions.count()
+        winning_positions = closed_positions.filter(pnl__gt=0).count()
+        
+        win_rate = (winning_positions / total_closed * 100) if total_closed > 0 else 0
+        
+        # 3. Breakdown par Broker
+        # -----------------------
+        breakdown = []
+        for account in broker_accounts:
+            # Cash du broker
+            account_cash = float(account.balance or 0)
+            
+            # Valeur des positions sur ce broker
+            account_positions = open_positions.filter(broker=account.broker) # Attention: relation broker sur Position
+            # Si Position est liée à BrokerAccount (mieux), sinon on approxime via Broker
+            # Vérifions le modèle Position... il a 'broker' (Broker) et peut-être 'broker_account' (plus précis)
+            # Pour l'instant on suppose que 'broker' est suffisant ou on filtre par positions liées
+            
+            # Amélioration: Position devrait idéalement avoir un lien vers BrokerAccount pour être précis
+            # Ici on va faire une approximation si on n'a que le Broker
+            account_invested = 0
+            # Filtrer les positions qui correspondent au broker de ce compte
+            # Note: Si un user a 2 comptes sur le même broker, ça risque de mélanger.
+            # Idéalement ajouter broker_account à Position. Pour l'instant on fait simple.
+            pos_for_broker = [p for p in open_positions if p.broker_id == account.broker_id]
+            
+            for pos in pos_for_broker:
+                 price = pos.yahoo_current_price or pos.current_price or pos.entry_price or 0
+                 if price and pos.quantity:
+                    account_invested += float(price) * float(pos.quantity)
+            
+            breakdown.append({
+                'broker_name': account.name or account.broker.name,
+                'total': account_cash + account_invested,
+                'cash': account_cash,
+                'invested': account_invested
+            })
+
+        # 4. Historique (Graphique Evolution)
+        # -----------------------------------
+        # Récupérer les 30 derniers snapshots
+        snapshots = PortfolioSnapshot.objects.filter(user=user).order_by('date')[:30]
+        history = [
+            {
+                'date': s.date.isoformat(),
+                'total_value': float(s.total_value),
+                'invested': float(s.total_invested),
+                'cash': float(s.total_cash)
+            }
+            for s in snapshots
+        ]
+        
+        # Ajouter le point actuel "Live" à l'historique pour que le graphe soit à jour
+        from django.utils import timezone
+        history.append({
+            'date': timezone.now().isoformat(),
+            'total_value': total_value,
+            'invested': total_invested,
+            'cash': float(total_cash)
+        })
+
+        return Response({
+            'kpi': {
+                'total_value': round(total_value, 2),
+                'total_invested': round(total_invested, 2),
+                'total_cash': round(float(total_cash), 2),
+                'win_rate': round(win_rate, 2),
+                'total_closed_positions': total_closed,
+                'active_positions': open_positions.count()
+            },
+            'breakdown': breakdown,
+            'history': history
+        })
