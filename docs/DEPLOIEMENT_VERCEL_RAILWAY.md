@@ -68,6 +68,16 @@ railway run python manage.py createsuperuser
 
 (avec CLI liée au bon projet / service ; `DJANGO_SETTINGS_MODULE` peut être requis selon le contexte.)
 
+**Nom d’utilisateur admin :** préférer un identifiant en **minuscules** (ex. `le-baff`) pour éviter les erreurs de casse à la connexion. Pour renommer un compte existant (`Le-baff` → `le-baff`) sur la base liée au service :
+
+```powershell
+# Windows (PowerShell), depuis backend/ — remplacer les IDs par ceux de ton projet Railway
+$env:DJANGO_SETTINGS_MODULE='config_django.settings.production'
+railway run -p <PROJECT_ID> -e <ENV_ID> -s <SERVICE_ID> -- python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); u=U.objects.get(username='Le-baff'); u.username='le-baff'; u.save(); print('OK')"
+```
+
+Vérifier avant qu’aucun autre utilisateur n’utilise déjà le nom `le-baff`.
+
 Santé API : `GET https://<ton-backend>.up.railway.app/api/health/`
 
 ---
@@ -98,9 +108,21 @@ Dans **Settings → General → Node.js Version**, privilégier **20.x LTS** (é
 
 Le fichier `frontend/vercel.json` définit des **rewrites** SPA (toutes les routes → `index.html`) pour React Router.
 
-### 2.5 Variables d’environnement (à chaque déploiement / branche)
+### 2.5 Indiquer l’URL du backend (variables Vercel)
 
-Les variables **`VITE_*`** sont figées **au build** : après modification, faire un **Redeploy**.
+C’est **l’étape qui connecte le front Vercel à l’API Railway** (ou HostArmada).
+
+1. Dans le projet Vercel, ouvre l’onglet **Settings** (barre du haut du projet — pas seulement « Deployment Settings » sur une carte de déploiement).
+2. Menu de gauche : **Environment Variables**.
+3. Ajoute ou modifie :
+   - **Name :** `VITE_API_BASE_URL`
+   - **Value :** l’URL HTTPS du backend **avec** `/api` à la fin, ex. `https://trading-production-xxxx.up.railway.app/api`
+4. Coche les environnements concernés (**Production**, et **Preview** si tu veux le même backend pour les previews).
+5. **Save**, puis **Deployments** → menu **⋯** sur le dernier build → **Redeploy** (les `VITE_*` sont injectées **au moment du build** ; sans redéploiement, l’ancienne valeur reste).
+
+### 2.6 Tableau récap des variables
+
+Les variables **`VITE_*`** sont figées **au build** : toute modification impose un **Redeploy**.
 
 | Variable | Exemple | Rôle |
 |----------|---------|------|
@@ -139,8 +161,8 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 - [ ] Railway : Root = `backend`, variables `SECRET_KEY`, `ALLOWED_HOSTS`, DB, secrets métier
 - [ ] Railway : domaine public + port aligné sur `$PORT` / networking
 - [ ] `GET /api/health/` OK sur l’URL Railway
-- [ ] Vercel : Root = `frontend`, `VITE_API_BASE_URL` = `https://…railway.app/api`, `VITE_ENV=production`
-- [ ] Redéploiement Vercel après toute change de `VITE_*`
+- [ ] Vercel : **Settings → Environment Variables** : `VITE_API_BASE_URL` = `https://…railway.app/api`, optionnel `VITE_ENV=production`
+- [ ] Vercel : **Redeploy** après toute modification des `VITE_*`
 - [ ] Test : login / dashboard / appels API sans erreur CORS
 
 ---

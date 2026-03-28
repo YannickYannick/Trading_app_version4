@@ -72,14 +72,14 @@ python scripts/monitor_saxo_sync.py
 📊 1. COMPTES SAXO ACTIFS
 ----------------------------------------
 Comptes actifs: 1
-  - User: Le-baff
+  - User: le-baff
     Broker: Saxo Bank
     Account ID: qsdqsdqsd
     Is Active: True
 
 📈 2. POSITIONS OUVERTES
 ----------------------------------------
-User: Le-baff
+User: le-baff
 Positions ouvertes: 5
   - UIC_9580372 LONG qty=  100 entry=  150.00 current=  155.00 PnL=+500.00 (+3.33%)
 
