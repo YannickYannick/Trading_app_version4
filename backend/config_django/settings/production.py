@@ -38,6 +38,9 @@ DATABASES = {
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+# Railway / reverse proxy : le conteneur voit souvent du HTTP ; sans cela,
+# SECURE_SSL_REDIRECT peut renvoyer une 301 en boucle (Location = même URL).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
