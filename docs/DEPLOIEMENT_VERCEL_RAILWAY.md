@@ -86,10 +86,14 @@ Santé API : `GET https://<ton-backend>.up.railway.app/api/health/`
 
 - **Framework Preset** : **Vite** (ou « Other » avec les commandes ci-dessous).
 
+### 2.3.1 Version Node (Vercel)
+
+Dans **Settings → General → Node.js Version**, privilégier **20.x LTS** (évite npm très strict sur des versions « edge » type 24.x). Le `package.json` du front déclare `"engines": { "node": ">=20 <25" }`.
+
 ### 2.4 Build
 
 - **Install** : `npm install`
-- **Build** : `npm run build`
+- **Build** : `npm run build` → **`vite build`** (le script `build:check` lance aussi `tsc` en local pour la rigueur des types).
 - **Output** : `dist`
 
 Le fichier `frontend/vercel.json` définit des **rewrites** SPA (toutes les routes → `index.html`) pour React Router.
@@ -124,6 +128,7 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 | **502 / « Application failed to respond »** | Port public Railway = port d’écoute Gunicorn (`$PORT` dans le `Procfile`) ; lire les **logs** (crash DB, import, etc.). |
 | **CORS** | Regex `*.vercel.app` ; ajouter `CORS_ALLOWED_ORIGINS` pour un domaine perso. |
 | **Front sans données** | `VITE_API_BASE_URL` avec `/api`, **redéployer Vercel** après changement des `VITE_*`. |
+| **`npm install` ERESOLVE (@testing-library/react vs React 19)** | Utiliser `@testing-library/react` **^16** + `@testing-library/dom` **^10** (déjà dans le repo) ; Node **20.x** sur Vercel. |
 | **`gunicorn: command not found`** | `python -m gunicorn …` ou vérifier `pip install -r requirements.txt` dans les build logs. |
 
 ---

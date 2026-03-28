@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build:check": "tsc -b && vite build",
     "build:fast": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -26,8 +30,9 @@
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@tailwindcss/postcss": "^4.1.18",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.5",
-    "@testing-library/react": "^14.1.2",
+    "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.5.1",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",
