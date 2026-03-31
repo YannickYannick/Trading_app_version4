@@ -1,12 +1,12 @@
-
 import os
 import django
 import sys
 
-# Add project root to path
-sys.path.append(os.getcwd())
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, _BACKEND_ROOT)
+os.chdir(_BACKEND_ROOT)
 
-# Use the correct settings module as seen in manage.py
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config_django.settings.development")
 
 try:

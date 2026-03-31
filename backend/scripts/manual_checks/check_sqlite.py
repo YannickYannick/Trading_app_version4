@@ -1,9 +1,12 @@
-
-import sqlite3
 import os
+import sqlite3
+
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+os.chdir(_BACKEND_ROOT)
+_db = os.path.join(_BACKEND_ROOT, "db.sqlite3")
 
 try:
-    conn = sqlite3.connect('db.sqlite3')
+    conn = sqlite3.connect(_db)
     cursor = conn.cursor()
     
     print("Checking for asset 101173 in trading_allassets...")

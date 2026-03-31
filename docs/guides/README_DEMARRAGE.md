@@ -182,6 +182,22 @@ npm run preview
 
 ---
 
+## 🔧 Scripts manuels (diagnostic / smoke tests)
+
+Les scripts ponctuels (`test_*.py`, `check_*.py`, `quick_check.py`, `debug_env.py`) sont regroupés dans **`backend/scripts/manual_checks/`**. Ils fixent eux-mêmes le répertoire de travail sur `backend/`.
+
+Exemples (à lancer depuis n’importe quel dossier, en adaptant le chemin vers `backend/`) :
+
+```powershell
+cd backend
+python scripts/manual_checks/check_api.py
+python scripts/manual_checks/quick_check.py
+```
+
+Les **tests unitaires Django** restent sous `backend/apps/trading/tests/` (`python manage.py test` ou `pytest` avec `backend/pytest.ini`).
+
+---
+
 ## ✅ Checklist de Démarrage
 
 - [ ] Backend Django démarré sur le port 8000
