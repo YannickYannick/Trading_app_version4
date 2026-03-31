@@ -1,0 +1,66 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# --- Django (artefacts locaux ; ne pas versionner) ---
+*.log
+*.log.*
+backend/staticfiles/
+backend/media/
+
+# Logs dans backend/logs/ (garder le dossier via .gitkeep)
+backend/logs/*
+!backend/logs/.gitkeep
+
+# Fichiers sensibles / locaux (déjà trackés ? → à retirer du dépôt plus tard avec git rm --cached)
+# .env, *.pem, clés SSH — listés ici pour éviter tout nouvel ajout accidentel
+backend/.env
+backend/prod.env
+backend/id_rsa*
+*.pem
+
+# Base SQLite locale (dev)
+*.sqlite3
+
+# --- Node / front ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+**/.vite-temp/
+
+# --- Mobile (build) ---
+mobile/.expo/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.cxx/
+mobile/android/.gradle/
+
+# --- IDE & outils ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Tests / couverture ---
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- BMad / Cursor (artefacts locaux optionnels) ---
+# Décommenter si tu ne veux pas les versionner :
+# .cursor/
+# _bmad-output/
