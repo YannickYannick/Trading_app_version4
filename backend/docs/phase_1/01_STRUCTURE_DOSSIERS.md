@@ -55,8 +55,7 @@ Trading_app_version4/
 │   ├── media/                      # Fichiers uploadés
 │   ├── logs/                       # Logs applicatifs
 │   │
-│   ├── docs/                       # Documentation
-│   │   ├── INDEX.md
+│   ├── docs/                       # Phases détaillées, runbooks (index : docs/backend/INDEX.md)
 │   │   ├── phase_1/
 │   │   └── phase_2/
 │   │
