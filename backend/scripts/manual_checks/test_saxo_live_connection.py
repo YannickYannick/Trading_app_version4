@@ -4,8 +4,8 @@ Script de test pour vérifier la connexion à l'API Saxo Bank LIVE.
 Ce script teste la connexion et l'accès aux prix pour diagnostiquer
 les problèmes de NoAccess.
 
-Usage:
-    python test_saxo_live_connection.py
+Usage (depuis n’importe quel répertoire) :
+    python scripts/manual_checks/test_saxo_live_connection.py
 """
 
 import os
@@ -16,15 +16,15 @@ import requests
 try:
     from dotenv import load_dotenv
     import os
-    # Charger le .env depuis le répertoire racine du projet (parent de backend)
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    # Racine du dépôt (parent de backend)
+    project_root = os.path.dirname(_backend_root)
     env_path = os.path.join(project_root, '.env')
     if os.path.exists(env_path):
         load_dotenv(env_path)
         print(f"✅ Fichier .env chargé depuis: {env_path}")
     else:
-        # Essayer aussi depuis le répertoire backend
-        backend_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+        backend_env = os.path.join(_backend_root, '.env')
         if os.path.exists(backend_env):
             load_dotenv(backend_env)
             print(f"✅ Fichier .env chargé depuis: {backend_env}")
@@ -40,9 +40,10 @@ except Exception as e:
 django_available = False
 try:
     import django
-    # Ajouter le répertoire backend au path
-    backend_dir = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, backend_dir)
+    backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+    os.chdir(backend_dir)
     # Essayer différents modules de settings
     settings_modules = ['config_django.settings.development', 'config_django.settings.base', 'trading_app.settings']
     for settings_module in settings_modules:

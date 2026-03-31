@@ -1,6 +1,12 @@
 import os
+import sys
 import django
 from django.conf import settings
+
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, _BACKEND_ROOT)
+os.chdir(_BACKEND_ROOT)
 
 # Configurer l'environnement Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config_django.settings.production_test")

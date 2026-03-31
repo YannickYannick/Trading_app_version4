@@ -1,5 +1,7 @@
 # 🚀 Guide de Démarrage - Trading App v4
 
+> Emplacement : `docs/guides/README_DEMARRAGE.md` (lien depuis la racine : voir le [README principal](../../README.md)).
+
 ## Prérequis
 
 - Python 3.10+

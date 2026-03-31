@@ -102,6 +102,7 @@ Connecté à **Supabase PostgreSQL** :
 ```
 docs/
 ├── INDEX.md                    # Ce fichier
+├── runbooks/                   # Guides opérationnels (Supabase, Saxo cron, incidents, migrations)
 ├── phase_1/                    # Phase 1 - Backend
 │   ├── README.md
 │   ├── 01_STRUCTURE_DOSSIERS.md

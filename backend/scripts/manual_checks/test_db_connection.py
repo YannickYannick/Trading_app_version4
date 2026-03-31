@@ -1,6 +1,12 @@
 import os
+import sys
 import psycopg2
 from decouple import config
+
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, _BACKEND_ROOT)
+os.chdir(_BACKEND_ROOT)
 
 # Charger les variables (comme dans settings.py)
 DB_NAME = config('DB_NAME', default='postgres')
