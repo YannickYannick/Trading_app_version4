@@ -1,22 +1,23 @@
-import multiprocessing
-
 # Nom du processus
 proc_name = 'trading_app_v4'
 
 # Adresses d'écoute
 bind = '127.0.0.1:8000'
 
-# Workers
-# (2 x CPUs) + 1 est la formule recommandée
-workers = multiprocessing.cpu_count() * 2 + 1
+# Workers — fixed at 2 for Railway Hobby plan (0.5 vCPU, 0.5 GB RAM)
+workers = 2
 worker_class = 'sync'
 timeout = 120  # Augmenté pour les requêtes longues (backtests, etc.)
 keepalive = 5
 
-# Logging
-accesslog = 'logs/access.log'
+# Periodic worker restarts to prevent memory leaks
+max_requests = 1000
+max_requests_jitter = 100
+
+# Logging — access log disabled to reduce memory overhead; warnings only
+accesslog = None
 errorlog = 'logs/error.log'
-loglevel = 'info'
+loglevel = 'warning'
 
 # Daemon
 daemon = False

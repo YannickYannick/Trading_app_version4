@@ -43,6 +43,20 @@ DATABASES = {
     }
 }
 
+# Reuse DB connections for up to 5 minutes to reduce connection overhead
+DATABASES['default']['CONN_MAX_AGE'] = 300
+
+# Memory-limited cache — capped at 100 entries to stay within 0.5 GB RAM
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'OPTIONS': {
+            'MAX_ENTRIES': 100
+        }
+    }
+}
+
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
