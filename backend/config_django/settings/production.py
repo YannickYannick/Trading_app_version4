@@ -49,6 +49,41 @@ else:
 
 # #region agent log
 try:
+    _raw = os.environ.get("DATABASE_URL", "")
+    _p = urlsplit(_raw) if _raw else None
+    _data = {
+        "hypothesisId": "A",
+        "using_database_url": bool(_raw),
+        "db_url_host": getattr(_p, "hostname", None),
+        "db_url_port": getattr(_p, "port", None),
+        "db_url_user": getattr(_p, "username", None),
+        "db_url_dbname": (getattr(_p, "path", "") or "").lstrip("/") or None,
+        "db_url_password_set": bool(getattr(_p, "password", None)) if _p else False,
+        "db_url_password_len": (len(getattr(_p, "password", "")) if (getattr(_p, "password", None) is not None) else 0)
+        if _p
+        else 0,
+    }
+
+    # Log en stdout pour Railway (sans secrets)
+    print(
+        "[debug-e5b425] hypothesisD db_url",
+        "set=",
+        _data["using_database_url"],
+        "host=",
+        _data["db_url_host"],
+        "port=",
+        _data["db_url_port"],
+        "user=",
+        _data["db_url_user"],
+        "db=",
+        _data["db_url_dbname"],
+        "pwd_set=",
+        _data["db_url_password_set"],
+        "pwd_len=",
+        _data["db_url_password_len"],
+        flush=True,
+    )
+
     _p = (BASE_DIR.parent / "debug-e5b425.log").resolve()
     with open(_p, "a", encoding="utf-8") as _f:
         _f.write(
@@ -58,8 +93,7 @@ try:
                     "location": "production.py:DATABASES",
                     "message": "db config selected",
                     "data": {
-                        "hypothesisId": "A",
-                        "using_database_url": bool(os.environ.get("DATABASE_URL")),
+                        **_data,
                     },
                     "timestamp": int(time.time() * 1000),
                 }
