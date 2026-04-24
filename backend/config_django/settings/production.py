@@ -1,8 +1,11 @@
 """
 Configuration Django pour la production.
 """
+import json
 import os
+import time
 from .base import *
+from urllib.parse import urlsplit
 
 DEBUG = False
 
@@ -22,17 +25,50 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
-# Database PostgreSQL pour la production
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='trading_app'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# Database PostgreSQL : Railway/Render fournissent en général DATABASE_URL ;
+# DB_* seuls sinon (même principe que Projet bachata V5 docs deploy-verification).
+if os.environ.get("DATABASE_URL"):
+    import dj_database_url
+    # Lit DATABASE_URL dans os.environ (injectée par Railway quand la DB est liée).
+    _db = dj_database_url.config(conn_max_age=600)
+    DATABASES = {"default": _db}
+    DATABASES["default"].setdefault("OPTIONS", {})
+    DATABASES["default"]["OPTIONS"].setdefault("connect_timeout", 10)
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='trading_app'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'OPTIONS': {'connect_timeout': 10},
+        }
     }
-}
+
+# #region agent log
+try:
+    _p = (BASE_DIR.parent / "debug-e5b425.log").resolve()
+    with open(_p, "a", encoding="utf-8") as _f:
+        _f.write(
+            json.dumps(
+                {
+                    "sessionId": "e5b425",
+                    "location": "production.py:DATABASES",
+                    "message": "db config selected",
+                    "data": {
+                        "hypothesisId": "A",
+                        "using_database_url": bool(os.environ.get("DATABASE_URL")),
+                    },
+                    "timestamp": int(time.time() * 1000),
+                }
+            )
+            + "\n"
+        )
+except OSError:
+    pass
+# #endregion
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
@@ -53,10 +89,28 @@ SECURE_HSTS_PRELOAD = True
 # ============================================
 # Définir via variable d'environnement :
 # CORS_ALLOWED_ORIGINS=https://ton-site.com,https://www.ton-site.com
+def _normalize_cors_origin(raw: str) -> str | None:
+    """
+    django-cors-headers exige une origine sans path (pas de slash final).
+    Ex: 'https://exemple.com/' => 'https://exemple.com'
+    """
+    value = (raw or "").strip()
+    if not value:
+        return None
+
+    parts = urlsplit(value)
+    if not parts.scheme or not parts.netloc:
+        return None
+
+    normalized = f"{parts.scheme}://{parts.netloc}".rstrip("/")
+    return normalized or None
+
+
+_raw_cors_origins = config('CORS_ALLOWED_ORIGINS', default='')
 CORS_ALLOWED_ORIGINS = [
-    origin.strip() 
-    for origin in config('CORS_ALLOWED_ORIGINS', default='').split(',')
-    if origin.strip()
+    origin
+    for origin in (_normalize_cors_origin(v) for v in _raw_cors_origins.split(','))
+    if origin
 ]
 
 # Si aucune origine définie, utiliser une valeur par défaut sécurisée
