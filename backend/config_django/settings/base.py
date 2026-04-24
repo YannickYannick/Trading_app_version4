@@ -69,7 +69,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.trading.middleware.ErrorHandlerMiddleware',  # Gestion d'erreurs unifiée
 ]
 
 ROOT_URLCONF = 'config_django.urls'
