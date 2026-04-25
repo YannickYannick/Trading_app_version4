@@ -1,0 +1,3 @@
+# Railway (root): force détection Python + lance Django depuis /backend
+web: bash -lc "set -euo pipefail; cd backend; DJANGO_SETTINGS_MODULE=config_django.settings.production python -c \"import os,urllib.parse as u; v=os.getenv('DATABASE_URL',''); p=u.urlsplit(v); print('[debug-e5b425] hypothesisC database_url_set=',bool(v),'host=',p.hostname,'port=',p.port,'user=',p.username, flush=True)\"; DJANGO_SETTINGS_MODULE=config_django.settings.production python manage.py collectstatic --noinput; DJANGO_SETTINGS_MODULE=config_django.settings.production python manage.py migrate --noinput; echo [debug-e5b425] hypothesisB port=${PORT}; exec python -m gunicorn config_django.wsgi:application --bind 0.0.0.0:${PORT}"
+
