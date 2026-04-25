@@ -55,9 +55,9 @@ INSTALLED_APPS = [
     'corsheaders',              # Pour CORS avec React
     
     # Apps métier
-    'apps.trading',
-    'apps.macro_economics',
-    'apps.ai_assistant',
+    'apps.trading.apps.TradingConfig',
+    'apps.macro_economics.apps.MacroEconomicsConfig',
+    'apps.ai_assistant.apps.AiAssistantConfig',
 ]
 
 MIDDLEWARE = [
@@ -97,6 +97,59 @@ WSGI_APPLICATION = 'config_django.wsgi.application'
 # Pour basculer entre SQLite (dev) et Supabase (prod), utilisez USE_SUPABASE=true/false
 USE_SUPABASE = config('USE_SUPABASE', default=True, cast=cast_bool)
 
+# #region agent log
+try:
+    import json as _json
+    import time as _time
+
+    _db_user_env = os.environ.get("DB_USER")
+    _db_user_cfg = config("DB_USER", default=None)
+    _db_host_cfg = config("DB_HOST", default=None)
+    _db_port_cfg = config("DB_PORT", default=None)
+
+    print(
+        "[debug-e5b425] hypothesisE base_db_env",
+        "DATABASE_URL_set=",
+        bool(os.environ.get("DATABASE_URL")),
+        "USE_SUPABASE=",
+        USE_SUPABASE,
+        "DB_USER_env=",
+        _db_user_env,
+        "DB_USER_cfg=",
+        _db_user_cfg,
+        "DB_HOST_cfg=",
+        _db_host_cfg,
+        "DB_PORT_cfg=",
+        _db_port_cfg,
+        flush=True,
+    )
+
+    _p = (BASE_DIR.parent / "debug-e5b425.log").resolve()
+    with open(_p, "a", encoding="utf-8") as _f:
+        _f.write(
+            _json.dumps(
+                {
+                    "sessionId": "e5b425",
+                    "location": "base.py:DATABASES",
+                    "message": "db env snapshot",
+                    "data": {
+                        "hypothesisId": "E",
+                        "database_url_set": bool(os.environ.get("DATABASE_URL")),
+                        "use_supabase": bool(USE_SUPABASE),
+                        "db_user_env": _db_user_env,
+                        "db_user_cfg": _db_user_cfg,
+                        "db_host_cfg": _db_host_cfg,
+                        "db_port_cfg": _db_port_cfg,
+                    },
+                    "timestamp": int(_time.time() * 1000),
+                }
+            )
+            + "\n"
+        )
+except OSError:
+    pass
+# #endregion
+
 if USE_SUPABASE:
     # Configuration Supabase PostgreSQL
     DATABASES = {
@@ -112,6 +165,27 @@ if USE_SUPABASE:
             }
         }
     }
+
+    # #region agent log
+    try:
+        _db = DATABASES.get("default", {})
+        print(
+            "[debug-e5b425] hypothesisF base_db_computed",
+            "name=",
+            _db.get("NAME"),
+            "user=",
+            _db.get("USER"),
+            "host=",
+            _db.get("HOST"),
+            "port=",
+            _db.get("PORT"),
+            "pwd_set=",
+            bool(_db.get("PASSWORD")),
+            flush=True,
+        )
+    except Exception:
+        pass
+    # #endregion
 else:
     # Configuration SQLite (développement local sans internet)
     DATABASES = {
