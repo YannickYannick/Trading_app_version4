@@ -222,5 +222,26 @@ def get_binance_eur_balance(
         Solde total en EUR
     """
     converted = convert_binance_balances_to_eur(balances, broker_instance)
-    return converted.get('EUR', Decimal('0'))
+    eur = converted.get('EUR', Decimal('0'))
+    if eur == 0 and balances:
+        # Log léger pour diagnostiquer les "0€" en prod sans exposer de valeurs.
+        clean_keys = [
+            k
+            for k in balances.keys()
+            if not k.endswith('_free')
+            and not k.endswith('_locked')
+            and not k.endswith('_margin_available')
+            and not k.endswith('_total')
+        ]
+        logger.warning(
+            "Binance EUR balance is 0 after conversion",
+            extra={
+                "binance": {
+                    "assets_count": len(clean_keys),
+                    "assets": clean_keys[:25],  # échantillon
+                    "has_broker_instance": bool(broker_instance),
+                }
+            },
+        )
+    return eur
 

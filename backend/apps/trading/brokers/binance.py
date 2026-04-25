@@ -178,6 +178,7 @@ class BinanceBroker(BrokerBase):
             params['timestamp'] = timestamp
             params['signature'] = self._sign_params(params)
         
+        started_at = time.time()
         try:
             if method == 'GET':
                 response = requests.get(url, headers=headers, params=params, timeout=timeout)
@@ -213,9 +214,44 @@ class BinanceBroker(BrokerBase):
                 logger.debug(f"Binance: {error_msg}")
             else:
                 self._set_error(error_msg)
+                # Logs de debug prod (sans secrets) pour diagnostiquer Railway (451, 401, etc.)
+                try:
+                    elapsed_ms = int((time.time() - started_at) * 1000)
+                    logger.warning(
+                        "Binance API error",
+                        extra={
+                            "binance": {
+                                "method": method,
+                                "endpoint": endpoint,
+                                "status": getattr(e.response, "status_code", None),
+                                "base_url": self.base_url,
+                                "testnet": bool(self.is_testnet),
+                                "elapsed_ms": elapsed_ms,
+                            }
+                        },
+                    )
+                except Exception:
+                    pass
             return None
         except requests.exceptions.RequestException as e:
             self._set_error(f"Request error: {str(e)}")
+            try:
+                elapsed_ms = int((time.time() - started_at) * 1000)
+                logger.warning(
+                    "Binance request exception",
+                    extra={
+                        "binance": {
+                            "method": method,
+                            "endpoint": endpoint,
+                            "base_url": self.base_url,
+                            "testnet": bool(self.is_testnet),
+                            "elapsed_ms": elapsed_ms,
+                            "error": type(e).__name__,
+                        }
+                    },
+                )
+            except Exception:
+                pass
             return None
     
     def _get_binance_timestamp(self) -> int:
