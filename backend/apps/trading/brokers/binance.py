@@ -217,6 +217,12 @@ class BinanceBroker(BrokerBase):
                 # Logs de debug prod (sans secrets) pour diagnostiquer Railway (451, 401, etc.)
                 try:
                     elapsed_ms = int((time.time() - started_at) * 1000)
+                    # Message "plat" pour être sûr d'apparaître dans Railway, même si le formatter ignore `extra`.
+                    logger.warning(
+                        f"Binance API error: status={getattr(e.response, 'status_code', None)} "
+                        f"method={method} endpoint={endpoint} base_url={self.base_url} "
+                        f"testnet={bool(self.is_testnet)} elapsed_ms={elapsed_ms} msg={error_msg}"
+                    )
                     logger.warning(
                         "Binance API error",
                         extra={
@@ -237,6 +243,10 @@ class BinanceBroker(BrokerBase):
             self._set_error(f"Request error: {str(e)}")
             try:
                 elapsed_ms = int((time.time() - started_at) * 1000)
+                logger.warning(
+                    f"Binance request exception: method={method} endpoint={endpoint} base_url={self.base_url} "
+                    f"testnet={bool(self.is_testnet)} elapsed_ms={elapsed_ms} error={type(e).__name__} msg={e}"
+                )
                 logger.warning(
                     "Binance request exception",
                     extra={

@@ -808,7 +808,13 @@ class BrokerService:
             # Récupérer les credentials pour logging
             credentials = self._get_credentials_from_account(broker_account)
             logger.info(f"Getting balance for account {broker_account.id} (type: {broker_account.get_broker_type()})")
-            logger.debug(f"Credentials keys present: api_key={bool(credentials.get('api_key'))}, api_secret={bool(credentials.get('api_secret'))}, testnet={credentials.get('testnet', False)}")
+            # Important en prod: rester en INFO pour voir sur Railway sans activer DEBUG
+            logger.info(
+                "Credentials present for balance check "
+                f"(api_key={bool(credentials.get('api_key'))}, "
+                f"api_secret={bool(credentials.get('api_secret'))}, "
+                f"testnet={credentials.get('testnet', False)})"
+            )
             
             broker = self.get_broker_instance(broker_account)
             

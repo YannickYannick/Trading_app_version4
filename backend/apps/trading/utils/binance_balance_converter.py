@@ -234,6 +234,10 @@ def get_binance_eur_balance(
             and not k.endswith('_total')
         ]
         logger.warning(
+            f"Binance EUR balance is 0 after conversion: assets_count={len(clean_keys)} "
+            f"sample_assets={clean_keys[:25]} has_broker_instance={bool(broker_instance)}"
+        )
+        logger.warning(
             "Binance EUR balance is 0 after conversion",
             extra={
                 "binance": {
