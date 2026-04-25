@@ -69,7 +69,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.trading.middleware.ErrorHandlerMiddleware',  # Gestion d'erreurs unifiée
+    # 'apps.trading.middleware.ErrorHandlerMiddleware',  # Gestion d'erreurs unifiée — désactivé avec apps.trading
 ]
 
 ROOT_URLCONF = 'config_django.urls'
@@ -282,8 +282,8 @@ REST_FRAMEWORK = {
     ],
     # Documentation API (Swagger/OpenAPI)
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    # Handler d'exceptions personnalisé
-    'EXCEPTION_HANDLER': 'apps.trading.utils.error_utils.custom_exception_handler',
+    # Handler d'exceptions personnalisé — désactivé avec apps.trading
+    # 'EXCEPTION_HANDLER': 'apps.trading.utils.error_utils.custom_exception_handler',
 }
 
 # ============================================

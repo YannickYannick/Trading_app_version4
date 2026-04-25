@@ -148,6 +148,7 @@ JWT en header : pas de cookie cross-site pour l’API en général ; si tu utili
 |----------|--------|
 | **301 en boucle** (navigateur ou `curl -L` : trop de redirections ; `Location` = même URL) | Vérifier `SECURE_PROXY_SSL_HEADER` dans `production.py` (déjà en place sur la branche `deploiement`) et redéployer. |
 | **502 / « Application failed to respond »** | Port public Railway = port d’écoute Gunicorn (`$PORT` dans le `Procfile`) ; lire les **logs** (crash DB, import, etc.). |
+| **La page “charge dans le vide” + logs Railway qui répètent** `"[WSGI] wsgi.py imported"` / `Calling get_wsgi_application()...` | Souvent un **boot Django trop long** qui fait **redémarrer Gunicorn** (timeout par défaut), ou trop de **workers** qui saturent la DB/pool. Fix appliqué : forcer `--workers 2` et `--timeout 120` dans le `Procfile`, et envoyer `--access-logfile - --error-logfile -` sur stdout pour confirmer que les requêtes atteignent bien le service. |
 | **CORS** | Regex `*.vercel.app` ; ajouter `CORS_ALLOWED_ORIGINS` pour un domaine perso. |
 | **Front sans données** | `VITE_API_BASE_URL` avec `/api`, **redéployer Vercel** après changement des `VITE_*`. |
 | **`npm install` ERESOLVE (@testing-library/react vs React 19)** | Utiliser `@testing-library/react` **^16** + `@testing-library/dom` **^10** (déjà dans le repo) ; Node **20.x** sur Vercel. |
@@ -178,4 +179,4 @@ Différences Trading : **WSGI** `config_django.wsgi`, **settings** `config_djang
 
 Documentation voisine : **`GUIDE_MODES_ENVIRONNEMENT.md`** (modes dev / prod), **`deployment_config/README.md`** (HostArmada), **`RAPPORT_DEPLOIEMENT_HOSTARMADA.md`**.
 
-*Dernière mise à jour : 2026-03-28*
+*Dernière mise à jour : 2026-04-25*
