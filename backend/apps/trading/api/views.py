@@ -2843,6 +2843,7 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
         from ..services.broker_service import BrokerService
         import secrets
         import logging
+        import os
         
         logger = logging.getLogger('trading.api.brokers')
         
@@ -2855,6 +2856,18 @@ class BrokerAccountViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            # Si aucune redirect URI n'est définie en base, utiliser une valeur de prod.
+            # Cela évite de rediriger vers le domaine "fallback" historique (ex: le-baff.com)
+            # quand le frontend est désormais hébergé sur Vercel.
+            if not account.saxo_redirect_uri:
+                frontend_url = (
+                    os.environ.get("SAXO_REDIRECT_URI")
+                    or os.environ.get("FRONTEND_URL")
+                    or "https://trading-app-version4.vercel.app/"
+                )
+                account.saxo_redirect_uri = frontend_url.rstrip("/") + "/"
+                account.save(update_fields=["saxo_redirect_uri"])
+
             service = BrokerService(request.user)
             broker = service.get_broker_instance(account, use_cache=False)
             
