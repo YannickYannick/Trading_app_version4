@@ -87,7 +87,45 @@ Le frontend sera accessible sur : **http://localhost:3000**
 
 ---
 
-## 3. Test de l'authentification
+## 3. Application mobile (Expo / React Native)
+
+L’app dans `mobile/` est **opérationnelle** : authentification JWT, dashboard, données brokers (ex. Binance, Saxo) et navigation, en s’appuyant sur la même API que le web (`/api`).
+
+### Prérequis
+
+- Backend Django démarré sur le port **8000** (voir section 1).
+- Compte utilisateur valide sur la base utilisée par le backend (Supabase ou autre).
+
+### Installer et lancer
+
+```powershell
+cd mobile
+npm install
+npm start
+```
+
+Puis ouvrir avec **Expo Go** (QR code) ou l’émulateur Android / iOS.
+
+### URL de l’API en développement
+
+Le fichier `mobile/src/config/constants.ts` résout automatiquement la base URL :
+
+| Contexte | Comportement |
+|----------|----------------|
+| **Émulateur Android** | Hôte API par défaut **`10.0.2.2`** (alias vers la machine hôte). Un `python manage.py runserver` classique sur le PC suffit. Surcharge possible : `EXPO_PUBLIC_ANDROID_EMU_HOST`. |
+| **Téléphone Android (réseau Wi‑Fi)** | IP LAN du PC (`DEV_API_HOST_LAN`, à ajuster avec `ipconfig`). Lancer **`python manage.py runserver 0.0.0.0:8000`** pour que le port 8000 soit joignable sur le LAN ; vérifier le pare-feu Windows si besoin. |
+| **Simulateur iOS** | `http://127.0.0.1:8000/api` |
+| **Forcer la prod en dev** | `EXPO_PUBLIC_USE_PROD_API_IN_DEV=1` |
+
+URL complète de prod utilisée en build release : voir `PROD_API_URL` dans `constants.ts`.
+
+### Dépannage mobile
+
+- **`AxiosError: Network Error` au login** : backend arrêté, mauvaise IP, ou Django qui n’écoute pas sur toutes les interfaces (`0.0.0.0`) quand on utilise l’IP LAN. Vérifier les logs Metro (`[API] DEV base URL → …`).
+
+---
+
+## 4. Test de l'authentification
 
 ### Créer un utilisateur de test
 
@@ -95,11 +133,17 @@ Le frontend sera accessible sur : **http://localhost:3000**
 2. Se connecter avec le superutilisateur
 3. Créer un utilisateur dans "Users"
 
-### Se connecter depuis le frontend
+### Se connecter depuis le frontend web
 
 1. Accéder à http://localhost:3000/login
 2. Utiliser les identifiants créés
 3. L'authentification JWT devrait fonctionner
+
+### Se connecter depuis l’app mobile
+
+1. Démarrer le backend et l’app Expo (`npm start` dans `mobile/`).
+2. S’assurer que l’URL d’API affichée dans la console correspond à votre contexte (émulateur / appareil réel).
+3. S’identifier avec le même couple username / mot de passe que sur l’API.
 
 ---
 
@@ -202,10 +246,11 @@ Les **tests unitaires Django** restent sous `backend/apps/trading/tests/` (`pyth
 
 - [ ] Backend Django démarré sur le port 8000
 - [ ] Frontend React démarré sur le port 3000
+- [ ] (Optionnel) App mobile Expo : `npm start` dans `mobile/`, URL API correcte (émulateur / LAN)
 - [ ] Base de données PostgreSQL connectée
 - [ ] Migrations appliquées
 - [ ] Superutilisateur créé
 - [ ] Utilisateur de test créé
 - [ ] Fichier `.env` configuré dans `frontend/`
-- [ ] Authentification fonctionnelle
+- [ ] Authentification fonctionnelle (web et/ou mobile)
 

@@ -16,13 +16,13 @@ const FORCE_EMULATOR_API =
   process.env.EXPO_PUBLIC_FORCE_EMULATOR_API === 'true';
 
 /**
- * Hôte API depuis l’émulateur Android (sans adb reverse sur le port 8000).
- * Défaut = même IP LAN que les appareils physiques (`DEV_API_HOST_LAN`) : l’émulateur
- * atteint souvent le PC ainsi sous Windows quand 10.0.2.2 / 127.0.0.1 échouent.
- * Surcharges : EXPO_PUBLIC_ANDROID_EMU_HOST=10.0.2.2 | 127.0.0.1 (avec `npm run android:reverse` pour 127.0.0.1)
+ * Hôte API depuis l’émulateur Android → la machine hôte.
+ * Défaut `10.0.2.2` : alias standard vers le loopback du PC (Django `runserver` sur 127.0.0.1:8000).
+ * Si tu préfères l’IP LAN : EXPO_PUBLIC_ANDROID_EMU_HOST=192.168.x.x et lance
+ * `python manage.py runserver 0.0.0.0:8000` pour que le port soit joignable sur cette IP.
  */
 const ANDROID_EMU_API_HOST = (
-  process.env.EXPO_PUBLIC_ANDROID_EMU_HOST ?? DEV_API_HOST_LAN
+  process.env.EXPO_PUBLIC_ANDROID_EMU_HOST ?? '10.0.2.2'
 ).trim();
 
 /**
@@ -114,9 +114,13 @@ if (__DEV__) {
       console.log(
         '[API] Émulateur + 127.0.0.1 : lance `npm run android:reverse` (8081 + 8000) puis Django sur le PC.',
       )
+    } else if (ANDROID_EMU_API_HOST === '10.0.2.2') {
+      console.log(
+        '[API] Émulateur : Django sur le PC doit écouter sur le port 8000 (ex. `python manage.py runserver`). Hôte 10.0.2.2 → PC.',
+      )
     } else {
       console.log(
-        '[API] Émulateur : vérifie `ipconfig`, Django `runserver 0.0.0.0:8000`, pare-feu port 8000. Prod en dev : EXPO_PUBLIC_USE_PROD_API_IN_DEV=1',
+        '[API] Émulateur (IP LAN) : `python manage.py runserver 0.0.0.0:8000`, pare-feu port 8000. Prod en dev : EXPO_PUBLIC_USE_PROD_API_IN_DEV=1',
       )
     }
   }

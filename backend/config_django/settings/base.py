@@ -292,6 +292,9 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
+    # Refresh : ne pas renvoyer 500 si l'utilisateur du token n'existe plus en base
+    'TOKEN_REFRESH_SERIALIZER': 'apps.trading.api.jwt_serializers.SafeTokenRefreshSerializer',
+
     # Durée de vie des tokens
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),      # Token d'accès expire en 1h
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),      # Token de refresh expire en 7 jours
