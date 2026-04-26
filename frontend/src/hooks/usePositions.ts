@@ -24,6 +24,7 @@ export function usePositions(options: UsePositionsOptions = {}) {
   } | null>(null)
 
   const fetchPositions = useCallback(async () => {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     try {
       setLoading(true)
       setError(null)
@@ -36,15 +37,27 @@ export function usePositions(options: UsePositionsOptions = {}) {
       setPositions([])
     } finally {
       setLoading(false)
+      if (import.meta.env.DEV) {
+        const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        // eslint-disable-next-line no-console
+        console.info(`[HOOK PERF] usePositions.fetchPositions in ${Math.round(t1 - t0)}ms`)
+      }
     }
   }, [JSON.stringify(filters)])
 
   const fetchSummary = useCallback(async () => {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     try {
       const data = await positionService.getSummary()
       setSummary(data)
     } catch (err) {
       console.error('Erreur lors du chargement du résumé:', err)
+    } finally {
+      if (import.meta.env.DEV) {
+        const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        // eslint-disable-next-line no-console
+        console.info(`[HOOK PERF] usePositions.fetchSummary in ${Math.round(t1 - t0)}ms`)
+      }
     }
   }, [])
 

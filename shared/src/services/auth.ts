@@ -16,6 +16,8 @@ export interface ApiError {
 export interface ApiConfig {
   baseUrl: string
   timeout?: number
+  /** Défaut `false`. Sur React Native, `true` peut provoquer AxiosError: Network Error (cookies inutiles avec JWT). */
+  withCredentials?: boolean
 }
 
 // Client API abstrait
@@ -28,13 +30,15 @@ export class ApiClient {
     this.config = config
     this.storage = storage
 
+    const withCredentials = config.withCredentials ?? false
+
     this.instance = axios.create({
       baseURL: config.baseUrl,
       timeout: config.timeout || 30000,
       headers: {
         'Content-Type': 'application/json',
       },
-      withCredentials: true,
+      withCredentials,
     })
 
     this.setupInterceptors()
@@ -66,9 +70,11 @@ export class ApiClient {
           try {
             const refreshToken = await this.storage.getItem('refresh_token')
             if (refreshToken) {
-              const response = await axios.post(`${this.config.baseUrl}/auth/jwt/refresh/`, {
-                refresh: refreshToken,
-              })
+              const response = await axios.post(
+                `${this.config.baseUrl}/auth/jwt/refresh/`,
+                { refresh: refreshToken },
+                { withCredentials: this.config.withCredentials ?? false },
+              )
 
               const { access } = response.data
               await this.storage.setItem('access_token', access) // Await in case it's async

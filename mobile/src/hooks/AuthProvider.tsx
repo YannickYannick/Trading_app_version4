@@ -14,8 +14,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [])
 
     const checkAuth = async () => {
+        const timeoutMs = 8000
         try {
-            const isAuth = await authService.isAuthenticated()
+            const result = await Promise.race([
+                authService.isAuthenticated().then((v) => ({ t: 'auth' as const, v })),
+                new Promise<{ t: 'timeout' }>((resolve) =>
+                    setTimeout(() => resolve({ t: 'timeout' }), timeoutMs),
+                ),
+            ])
+            const isAuth = result.t === 'auth' ? result.v : false
             setIsAuthenticated(isAuth)
             if (isAuth) {
                 // Optionnel : charger le profil utilisateur ici

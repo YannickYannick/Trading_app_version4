@@ -864,7 +864,27 @@ class PositionViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filtrer par utilisateur connecté."""
-        return Position.objects.filter(user=self.request.user)
+        # Perf: éviter N+1 queries sur les relations utilisées par les serializers.
+        return (
+            Position.objects.filter(user=self.request.user)
+            .select_related('all_asset', 'asset', 'broker', 'strategy')
+            # Perf: évite de charger le JSON volumineux de l'historique prix
+            .defer('all_asset__price_history_json')
+        )
+
+    def get_serializer_class(self):
+        # Perf: pour la liste, on renvoie un payload minimal.
+        if getattr(self, 'action', None) == 'list':
+            from .serializers import PositionListSerializer
+            return PositionListSerializer
+        return super().get_serializer_class()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # Opt-in uniquement : sinon chaque position déclenche un appel Yahoo (très lent).
+        q = self.request.query_params.get('include_yahoo_price', '')
+        context['include_yahoo_price'] = str(q).lower() in ('1', 'true', 'yes')
+        return context
     
     def perform_create(self, serializer):
         """Ajouter l'utilisateur automatiquement lors de la création."""
@@ -983,7 +1003,27 @@ class TradeViewSet(viewsets.ModelViewSet):
     ordering = ['-executed_at']
     
     def get_queryset(self):
-        return Trade.objects.filter(user=self.request.user)
+        # Perf: éviter N+1 queries sur les relations utilisées par les serializers.
+        return (
+            Trade.objects.filter(user=self.request.user)
+            .select_related('all_asset', 'asset', 'broker', 'position', 'strategy')
+            # Perf: évite de charger le JSON volumineux de l'historique prix
+            .defer('all_asset__price_history_json')
+        )
+
+    def get_serializer_class(self):
+        # Perf: pour la liste, on renvoie un payload minimal.
+        if getattr(self, 'action', None) == 'list':
+            from .serializers import TradeListSerializer
+            return TradeListSerializer
+        return super().get_serializer_class()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # Opt-in uniquement : sinon chaque trade déclenche un appel Yahoo (très lent).
+        q = self.request.query_params.get('include_yahoo_price', '')
+        context['include_yahoo_price'] = str(q).lower() in ('1', 'true', 'yes')
+        return context
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

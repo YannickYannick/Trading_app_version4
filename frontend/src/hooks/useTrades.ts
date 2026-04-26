@@ -25,6 +25,7 @@ export function useTrades(options: UseTradesOptions = {}) {
   } | null>(null)
 
   const fetchTrades = useCallback(async () => {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     try {
       setLoading(true)
       setError(null)
@@ -37,15 +38,27 @@ export function useTrades(options: UseTradesOptions = {}) {
       setTrades([])
     } finally {
       setLoading(false)
+      if (import.meta.env.DEV) {
+        const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        // eslint-disable-next-line no-console
+        console.info(`[HOOK PERF] useTrades.fetchTrades in ${Math.round(t1 - t0)}ms`)
+      }
     }
   }, [JSON.stringify(filters)])
 
   const fetchStatistics = useCallback(async () => {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     try {
       const data = await tradeService.getStatistics(filters)
       setStatistics(data)
     } catch (err) {
       console.error('Erreur lors du chargement des statistiques:', err)
+    } finally {
+      if (import.meta.env.DEV) {
+        const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        // eslint-disable-next-line no-console
+        console.info(`[HOOK PERF] useTrades.fetchStatistics in ${Math.round(t1 - t0)}ms`)
+      }
     }
   }, [JSON.stringify(filters)])
 

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../hooks/useAuth'
 import { Button } from '../../components/common/Button'
 import { Input } from '../../components/common/Input'
+import { config } from '../../config/constants'
 
 export const LoginScreen = () => {
     const { login, isLoading } = useAuth()
@@ -32,7 +33,17 @@ export const LoginScreen = () => {
             await login({ username, password })
         } catch (e: any) {
             console.error(e)
-            setError('Identifiants incorrects ou problème de connexion')
+            const isNetwork =
+                e?.code === 'ERR_NETWORK' ||
+                e?.message === 'Network Error' ||
+                (typeof e?.message === 'string' && e.message.includes('Network'))
+            if (__DEV__ && isNetwork) {
+                setError(
+                    `Pas de réponse (${config.apiBaseUrl}). Lance le backend : « python manage.py runserver 0.0.0.0:8000 » depuis backend/, puis teste l’URL dans le navigateur PC. Sinon prod : EXPO_PUBLIC_USE_PROD_API_IN_DEV=1`,
+                )
+            } else {
+                setError('Identifiants incorrects ou problème de connexion')
+            }
         }
     }
 

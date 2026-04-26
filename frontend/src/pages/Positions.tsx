@@ -1,7 +1,7 @@
 /**
  * Page Positions - Liste et gestion des positions
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Modal, Input, YahooActions } from '@components/common'
 import { usePositions } from '@hooks/usePositions'
@@ -18,47 +18,62 @@ export default function Positions() {
   const [closePrice, setClosePrice] = useState('')
   const [isClosing, setIsClosing] = useState(false)
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
+  /** Si false : max 20 actifs uniques ; si true : tous les actifs uniques de la page courante */
+  const [loadAllPrices, setLoadAllPrices] = useState(false)
+  const [yahooPricesLoading, setYahooPricesLoading] = useState(false)
 
   const { positions, loading, error, summary, refetch } = usePositions({
     status: statusFilter,
   })
 
-  // Charger les prix Yahoo actuels pour tous les AllAssets
+  const allAssetsInPositions = useMemo(() => {
+    const ids = new Set<number>()
+    positions.forEach((p) => {
+      const id =
+        (p as any)?.all_asset_id ||
+        p.all_asset?.id ||
+        (typeof p.all_asset === 'number' ? p.all_asset : null)
+      if (id) ids.add(id)
+    })
+    return Array.from(ids)
+  }, [positions])
+
+  // Réinitialiser les prix affichés quand le filtre change (données potentiellement différentes)
   useEffect(() => {
-    if (positions.length > 0) {
-      const loadYahooPrices = async () => {
-        const priceMap: Record<number, number | null> = {}
-        const allAssetIds = positions
-          .map(p => p.all_asset?.id || (typeof p.all_asset === 'number' ? p.all_asset : null))
-          .filter((id): id is number => id !== null && id !== undefined)
+    setYahooPrices({})
+  }, [statusFilter])
 
-        // Charger les prix en parallèle (limité à 10 à la fois pour éviter de surcharger)
-        const batches = []
-        for (let i = 0; i < allAssetIds.length; i += 10) {
-          batches.push(allAssetIds.slice(i, i + 10))
-        }
+  const loadYahooPricesManual = useCallback(async () => {
+    if (allAssetsInPositions.length === 0) return
+    setYahooPricesLoading(true)
+    try {
+      const targetIds = loadAllPrices ? allAssetsInPositions : allAssetsInPositions.slice(0, 20)
+      const priceMap: Record<number, number | null> = {}
 
-        for (const batch of batches) {
-          const results = await Promise.allSettled(
-            batch.map(async (id) => {
-              const price = await assetService.getYahooCurrentPrice(id)
-              return { id, price }
-            })
-          )
-
-          results.forEach((result) => {
-            if (result.status === 'fulfilled') {
-              priceMap[result.value.id] = result.value.price
-            }
-          })
-        }
-
-        setYahooPrices(priceMap)
+      const batches: number[][] = []
+      for (let i = 0; i < targetIds.length; i += 10) {
+        batches.push(targetIds.slice(i, i + 10))
       }
 
-      loadYahooPrices()
+      for (const batch of batches) {
+        const results = await Promise.allSettled(
+          batch.map(async (id) => {
+            const price = await assetService.getYahooCurrentPrice(id)
+            return { id, price }
+          })
+        )
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            priceMap[result.value.id] = result.value.price
+          }
+        })
+      }
+
+      setYahooPrices(priceMap)
+    } finally {
+      setYahooPricesLoading(false)
     }
-  }, [positions])
+  }, [allAssetsInPositions, loadAllPrices])
 
   const handleClosePosition = async (id: number) => {
     try {
@@ -76,7 +91,8 @@ export default function Positions() {
     }
   }
 
-  const columns = [
+  const columns = useMemo(
+    () => [
     {
       key: 'all_asset_symbol',
       label: 'Symbole AllAsset',
@@ -128,7 +144,10 @@ export default function Positions() {
       align: 'center' as const,
       render: (_value: any, row: Position) => {
         // En priorité : prix Yahoo chargé en live (yahooPrices), sinon prix de l'objet row
-        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const allAssetId =
+          (row as any)?.all_asset_id ||
+          row?.all_asset?.id ||
+          (typeof row?.all_asset === 'number' ? row.all_asset : null)
         const livePrice = allAssetId ? yahooPrices[allAssetId] : null
 
         const price = livePrice ?? (row as any)?.yahoo_current_price ?? row?.current_price
@@ -207,7 +226,10 @@ export default function Positions() {
       label: 'Actions Yahoo',
       align: 'center' as const,
       render: (_value: any, row: Position) => {
-        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const allAssetId =
+          (row as any)?.all_asset_id ||
+          row?.all_asset?.id ||
+          (typeof row?.all_asset === 'number' ? row.all_asset : null)
         return (
           <YahooActions
             allAssetId={allAssetId}
@@ -228,7 +250,9 @@ export default function Positions() {
         )
       },
     },
-  ]
+    ],
+    [yahooPrices]
+  )
 
   if (loading) {
     return (
@@ -280,6 +304,26 @@ export default function Positions() {
             onClick={() => setStatusFilter('CLOSED')}
           >
             Fermées
+          </Button>
+          <Button
+            variant={loadAllPrices ? 'success' : 'outline'}
+            onClick={() => setLoadAllPrices(!loadAllPrices)}
+            disabled={yahooPricesLoading}
+            title={
+              loadAllPrices
+                ? 'Prochain chargement : tous les actifs uniques de la page (plus lent)'
+                : 'Prochain chargement : max 20 actifs uniques (plus rapide)'
+            }
+          >
+            {loadAllPrices ? '📊 Tous les actifs' : '⚡ Max 20 actifs'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => void loadYahooPricesManual()}
+            disabled={yahooPricesLoading || allAssetsInPositions.length === 0}
+            title="Interroge Yahoo via l’API pour remplir la colonne « Prix actuel »"
+          >
+            {yahooPricesLoading ? 'Chargement…' : 'Charger les prix Yahoo'}
           </Button>
         </div>
       </div>

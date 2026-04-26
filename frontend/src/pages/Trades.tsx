@@ -1,27 +1,31 @@
 /**
  * Page Trades - Historique des trades
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Input, YahooActions } from '@components/common'
 import { useTrades } from '@hooks/useTrades'
 import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
 import type { Trade, AllAsset } from '@types'
-import TradesChart from '@components/trades/TradesChart'
-import ChartControls from '@components/trades/ChartControls'
-import PriceHistoryTable from '@components/trades/PriceHistoryTable'
 import './Trades.css'
+
+const TradesChart = lazy(() => import('@components/trades/TradesChart'))
+const ChartControls = lazy(() => import('@components/trades/ChartControls'))
+const PriceHistoryTable = lazy(() => import('@components/trades/PriceHistoryTable'))
 
 export default function Trades() {
   const [sideFilter, setSideFilter] = useState<'BUY' | 'SELL' | undefined>(undefined)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [yahooPrices, setYahooPrices] = useState<Record<number, number | null>>({})
-  const [loadAllPrices, setLoadAllPrices] = useState(false) // Option utilisateur
+  /** Si false : max 20 actifs uniques ; si true : tous les actifs uniques de la page courante */
+  const [loadAllPrices, setLoadAllPrices] = useState(false)
+  const [yahooPricesLoading, setYahooPricesLoading] = useState(false)
   const [selectedAssets, setSelectedAssets] = useState<number[]>([])
   const [chartViewMode, setChartViewMode] = useState<'global' | 'per_asset'>('global')
-  const [showChart, setShowChart] = useState(true)
+  // Le graphique est coûteux à monter (requêtes + rendu). On le garde opt-in pour un TTI rapide.
+  const [showChart, setShowChart] = useState(false)
 
   const { trades, loading, error, statistics, total, refetch } = useTrades({
     side: sideFilter,
@@ -33,7 +37,10 @@ export default function Trades() {
   const allAssetsInTrades = useMemo(() => {
     const assetIds = new Set<number>()
     trades.forEach((trade) => {
-      const assetId = trade.all_asset?.id || (typeof trade.all_asset === 'number' ? trade.all_asset : null)
+      const assetId =
+        (trade as any)?.all_asset_id ||
+        trade.all_asset?.id ||
+        (typeof trade.all_asset === 'number' ? trade.all_asset : null)
       if (assetId) {
         assetIds.add(assetId)
       }
@@ -59,44 +66,45 @@ export default function Trades() {
     }
   }, [chartViewMode, allAssetsInTrades])
 
-  // Charger les prix Yahoo actuels pour tous les AllAssets
+  // Réinitialiser les prix affichés quand les filtres changent (données potentiellement différentes)
   useEffect(() => {
-    if (trades.length > 0) {
-      const loadYahooPrices = async () => {
-        const priceMap: Record<number, number | null> = {}
-        const allAssetIds = trades
-          .map(t => t.all_asset?.id || (typeof t.all_asset === 'number' ? t.all_asset : null))
-          .filter((id): id is number => id !== null && id !== undefined)
+    setYahooPrices({})
+  }, [sideFilter, dateFrom, dateTo])
 
-        // Charger les prix en parallèle (limité à 10 à la fois)
-        const batches = []
-        for (let i = 0; i < allAssetIds.length; i += 10) {
-          batches.push(allAssetIds.slice(i, i + 10))
-        }
+  const loadYahooPricesManual = useCallback(async () => {
+    if (allAssetsInTrades.length === 0) return
+    setYahooPricesLoading(true)
+    try {
+      const targetIds = loadAllPrices ? allAssetsInTrades : allAssetsInTrades.slice(0, 20)
+      const priceMap: Record<number, number | null> = {}
 
-        for (const batch of batches) {
-          const results = await Promise.allSettled(
-            batch.map(async (id) => {
-              const price = await assetService.getYahooCurrentPrice(id)
-              return { id, price }
-            })
-          )
-
-          results.forEach((result) => {
-            if (result.status === 'fulfilled') {
-              priceMap[result.value.id] = result.value.price
-            }
-          })
-        }
-
-        setYahooPrices(priceMap)
+      const batches: number[][] = []
+      for (let i = 0; i < targetIds.length; i += 10) {
+        batches.push(targetIds.slice(i, i + 10))
       }
 
-      loadYahooPrices()
-    }
-  }, [trades])
+      for (const batch of batches) {
+        const results = await Promise.allSettled(
+          batch.map(async (id) => {
+            const price = await assetService.getYahooCurrentPrice(id)
+            return { id, price }
+          })
+        )
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            priceMap[result.value.id] = result.value.price
+          }
+        })
+      }
 
-  const columns = [
+      setYahooPrices(priceMap)
+    } finally {
+      setYahooPricesLoading(false)
+    }
+  }, [allAssetsInTrades, loadAllPrices])
+
+  const columns = useMemo(
+    () => [
     {
       key: 'timestamp',
       label: 'Date',
@@ -128,7 +136,10 @@ export default function Trades() {
       label: 'Prix Yahoo',
       align: 'center' as const,
       render: (_value: any, row: Trade) => {
-        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const allAssetId =
+          (row as any)?.all_asset_id ||
+          row?.all_asset?.id ||
+          (typeof row?.all_asset === 'number' ? row.all_asset : null)
         const price = allAssetId ? yahooPrices[allAssetId] : null
         return price !== null && price !== undefined ? formatCurrency(price) : 'N/A'
       },
@@ -139,7 +150,7 @@ export default function Trades() {
       align: 'center' as const,
       render: (_value: any, row: Trade) => (
         <Link to={`/trades/${row?.id || ''}`} className="trade-symbol link-symbol">
-          {row?.asset?.symbol || 'N/A'}
+          {row?.asset?.symbol || row?.all_asset_symbol || row?.symbol || 'N/A'}
         </Link>
       ),
     },
@@ -185,7 +196,10 @@ export default function Trades() {
       label: 'Actions Yahoo',
       align: 'center' as const,
       render: (_value: any, row: Trade) => {
-        const allAssetId = row?.all_asset?.id || (typeof row?.all_asset === 'number' ? row.all_asset : null)
+        const allAssetId =
+          (row as any)?.all_asset_id ||
+          row?.all_asset?.id ||
+          (typeof row?.all_asset === 'number' ? row.all_asset : null)
         return (
           <YahooActions
             allAssetId={allAssetId}
@@ -214,7 +228,9 @@ export default function Trades() {
         )
       },
     },
-  ]
+    ],
+    [yahooPrices, refetch]
+  )
 
   if (loading) {
     return (
@@ -275,9 +291,22 @@ export default function Trades() {
           <Button
             variant={loadAllPrices ? 'success' : 'outline'}
             onClick={() => setLoadAllPrices(!loadAllPrices)}
-            title={loadAllPrices ? 'Charger tous les prix Yahoo (lent)' : 'Charger 20 prix Yahoo (rapide)'}
+            disabled={yahooPricesLoading}
+            title={
+              loadAllPrices
+                ? 'Prochain chargement : tous les actifs uniques de la page (plus lent)'
+                : 'Prochain chargement : max 20 actifs uniques (plus rapide)'
+            }
           >
-            {loadAllPrices ? '📊 Tous les prix' : '⚡ 20 prix'}
+            {loadAllPrices ? '📊 Tous les actifs' : '⚡ Max 20 actifs'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => void loadYahooPricesManual()}
+            disabled={yahooPricesLoading || allAssetsInTrades.length === 0}
+            title="Interroge Yahoo via l’API pour remplir la colonne « Prix Yahoo »"
+          >
+            {yahooPricesLoading ? 'Chargement…' : 'Charger les prix Yahoo'}
           </Button>
         </div>
       </div>
@@ -319,22 +348,24 @@ export default function Trades() {
           }
         >
           {showChart && (
-            <>
-              <ChartControls
-                selectedAssets={selectedAssets}
-                viewMode={chartViewMode}
-                onSelectedAssetsChange={setSelectedAssets}
-                onViewModeChange={setChartViewMode}
-                allAssetsInTrades={allAssetsInTrades}
-                allAssetsMap={allAssetsMap}
-              />
-              <TradesChart
-                trades={trades}
-                selectedAssets={selectedAssets}
-                viewMode={chartViewMode}
-                allAssetsMap={allAssetsMap}
-              />
-            </>
+            <Suspense fallback={<Loading text="Chargement du graphique..." />}>
+              <>
+                <ChartControls
+                  selectedAssets={selectedAssets}
+                  viewMode={chartViewMode}
+                  onSelectedAssetsChange={setSelectedAssets}
+                  onViewModeChange={setChartViewMode}
+                  allAssetsInTrades={allAssetsInTrades}
+                  allAssetsMap={allAssetsMap}
+                />
+                <TradesChart
+                  trades={trades}
+                  selectedAssets={selectedAssets}
+                  viewMode={chartViewMode}
+                  allAssetsMap={allAssetsMap}
+                />
+              </>
+            </Suspense>
           )}
         </Card>
       )}
@@ -345,17 +376,19 @@ export default function Trades() {
           title="Historique des Prix"
           className="price-history-card"
         >
-          {selectedAssets.map((assetId) => {
-            const asset = allAssetsMap.get(assetId)
-            return (
-              <PriceHistoryTable
-                key={assetId}
-                allAssetId={assetId}
-                allAssetSymbol={asset?.symbol || `Asset #${assetId}`}
-                days={365}
-              />
-            )
-          })}
+          <Suspense fallback={<Loading text="Chargement de l'historique..." />}>
+            {selectedAssets.map((assetId) => {
+              const asset = allAssetsMap.get(assetId)
+              return (
+                <PriceHistoryTable
+                  key={assetId}
+                  allAssetId={assetId}
+                  allAssetSymbol={asset?.symbol || `Asset #${assetId}`}
+                  days={365}
+                />
+              )
+            })}
+          </Suspense>
         </Card>
       )}
 

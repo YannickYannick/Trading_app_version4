@@ -53,15 +53,15 @@ class AllAssetsSerializer(serializers.ModelSerializer):
     
     def get_price_history_info(self, obj):
         """Informations sur l'historique des prix."""
-        if not obj.has_price_history:
+        # Perf: éviter de charger/itérer sur `price_history_json` (peut être volumineux)
+        # sur les listes où AllAssets est imbriqué (positions/trades).
+        if not (obj.price_history_days or obj.price_history_updated_at):
             return None
         return {
-            'days_count': obj.price_history_days or obj.get_price_history_count(),
+            'days_count': obj.price_history_days or 0,
             'updated_at': obj.price_history_updated_at.isoformat() if obj.price_history_updated_at else None,
-            'date_range': {
-                'first': obj.get_price_history_dates()[-1] if obj.get_price_history_dates() else None,
-                'last': obj.get_price_history_dates()[0] if obj.get_price_history_dates() else None
-            }
+            # Optionnel: coûteux à calculer si on doit inspecter un JSON volumineux.
+            'date_range': None,
         }
 
 
@@ -465,6 +465,8 @@ class PositionSerializer(serializers.ModelSerializer):
         Récupère le prix actuel depuis Yahoo Finance pour l'AllAsset.
         Retourne None si pas disponible.
         """
+        if not self.context.get('include_yahoo_price'):
+            return None
         if not obj.all_asset or not obj.all_asset.symbole_yahoo:
             return None
         
@@ -529,6 +531,59 @@ class PositionSerializer(serializers.ModelSerializer):
             return ((current_price - entry_price) / entry_price) * 100
         else:
             return ((entry_price - current_price) / entry_price) * 100
+
+
+class PositionListSerializer(serializers.ModelSerializer):
+    """
+    Serializer "léger" pour les listes (perf).
+    Évite l'objet `all_asset` imbriqué (très verbeux) et la plupart des relations.
+    """
+    all_asset_id = serializers.IntegerField(source='all_asset.id', read_only=True)
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+
+    # Compat: le frontend utilise `status` / `size`
+    status = serializers.SerializerMethodField()
+    size = serializers.DecimalField(source='quantity', max_digits=20, decimal_places=8, read_only=True)
+
+    pnl = serializers.SerializerMethodField()
+    pnl_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Position
+        fields = [
+            'id',
+            'all_asset_id', 'all_asset_symbol', 'all_asset_yahoo_symbol',
+            'side', 'quantity', 'size', 'entry_price', 'current_price',
+            'opened_at', 'closed_at',
+            'status',
+            'pnl', 'pnl_percent',
+        ]
+
+    def get_status(self, obj):
+        return 'OPEN' if getattr(obj, 'is_open', False) else 'CLOSED'
+
+    def get_pnl(self, obj):
+        # Utilise le prix DB (pas Yahoo) pour rester rapide.
+        if obj.current_price is None or not obj.entry_price:
+            return None
+        current_price = float(obj.current_price)
+        entry_price = float(obj.entry_price)
+        quantity = float(obj.quantity)
+        if obj.side == 'LONG':
+            return (current_price - entry_price) * quantity
+        return (entry_price - current_price) * quantity
+
+    def get_pnl_percent(self, obj):
+        if obj.current_price is None or not obj.entry_price:
+            return None
+        entry_price = float(obj.entry_price)
+        if entry_price == 0:
+            return 0.0
+        current_price = float(obj.current_price)
+        if obj.side == 'LONG':
+            return ((current_price - entry_price) / entry_price) * 100
+        return ((entry_price - current_price) / entry_price) * 100
 class TradeSerializer(serializers.ModelSerializer):
     """
     Serializer pour Trade.
@@ -598,7 +653,12 @@ class TradeSerializer(serializers.ModelSerializer):
         """
         Récupère le prix actuel depuis Yahoo Finance pour l'AllAsset.
         Retourne None si pas disponible.
+
+        Désactivé par défaut (évite N appels Yahoo sur les listes).
+        Activer : GET .../trades/?include_yahoo_price=1
         """
+        if not self.context.get('include_yahoo_price'):
+            return None
         if not obj.all_asset or not obj.all_asset.symbole_yahoo:
             return None
         
@@ -627,6 +687,33 @@ class TradeSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Le prix doit être positif")
         return value
+
+
+class TradeListSerializer(serializers.ModelSerializer):
+    """
+    Serializer "léger" pour les listes (perf).
+    Évite l'objet `all_asset` imbriqué (très verbeux) et les champs inutiles.
+    """
+    all_asset_id = serializers.IntegerField(source='all_asset.id', read_only=True)
+    all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
+
+    # Compat frontend
+    side = serializers.CharField(source='trade_type', read_only=True)
+    timestamp = serializers.DateTimeField(source='executed_at', read_only=True)
+    size = serializers.DecimalField(source='quantity', max_digits=20, decimal_places=8, read_only=True)
+
+    class Meta:
+        model = Trade
+        fields = [
+            'id',
+            'all_asset_id', 'all_asset_symbol', 'all_asset_yahoo_symbol',
+            'trade_type', 'side',
+            'quantity', 'size',
+            'price', 'fees',
+            'executed_at', 'timestamp',
+            'broker_trade_id',
+        ]
 
 
 class OrderSerializer(serializers.ModelSerializer):

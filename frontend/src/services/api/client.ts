@@ -20,6 +20,9 @@ const apiClient: AxiosInstance = axios.create({
 // Intercepteur pour les requêtes
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Perf: horodatage début requête (dev)
+    ;(config as any).metadata = { startedAt: (typeof performance !== 'undefined' ? performance.now() : Date.now()) }
+
     // Ajouter le token JWT si disponible
     const accessToken = localStorage.getItem('access_token')
     if (accessToken) {
@@ -46,9 +49,48 @@ apiClient.interceptors.request.use(
 
 // Intercepteur pour les réponses
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    try {
+      const meta = (response.config as any).metadata
+      const startedAt = meta?.startedAt
+      const durationMs =
+        typeof startedAt === 'number'
+          ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt
+          : null
+
+      if (import.meta.env.DEV && durationMs !== null) {
+        const method = (response.config.method || 'GET').toUpperCase()
+        const url = response.config.url || ''
+        // Log compact + stable (filtrable via "[API PERF]")
+        // eslint-disable-next-line no-console
+        console.info(`[API PERF] ${method} ${url} -> ${response.status} in ${Math.round(durationMs)}ms`)
+      }
+    } catch {
+      // ignore
+    }
+    return response
+  },
   async (error: AxiosError<ApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+
+    // Perf: log durée même sur erreurs (dev)
+    try {
+      const meta = (originalRequest as any)?.metadata
+      const startedAt = meta?.startedAt
+      const durationMs =
+        typeof startedAt === 'number'
+          ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt
+          : null
+      if (import.meta.env.DEV && durationMs !== null) {
+        const method = (originalRequest.method || 'GET').toUpperCase()
+        const url = originalRequest.url || ''
+        const status = error.response?.status ?? 'ERR'
+        // eslint-disable-next-line no-console
+        console.warn(`[API PERF] ${method} ${url} -> ${status} in ${Math.round(durationMs)}ms`)
+      }
+    } catch {
+      // ignore
+    }
     
     // Masquer les erreurs 400/404 attendues pour les requêtes current_price
     // (pas de symbole Yahoo valide - c'est normal et ne doit pas polluer la console)
