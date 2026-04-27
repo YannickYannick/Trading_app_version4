@@ -41,10 +41,9 @@ frontend/.vite/
 
 # --- Mobile (build) ---
 mobile/.expo/
-mobile/android/app/build/
-mobile/android/build/
-mobile/android/.cxx/
-mobile/android/.gradle/
+# Dossiers natifs générés localement (prebuild / run:android) — ne pas versionner
+mobile/android/
+mobile/ios/
 
 # --- IDE & outils ---
 .idea/

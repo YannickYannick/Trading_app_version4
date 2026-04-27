@@ -1,0 +1,25 @@
+# EAS upload (monorepo) : exclusions lourdes / inutiles pour le build mobile.
+# Voir https://docs.expo.dev/build-reference/easignore/
+
+backend/
+frontend/
+docs/
+deployment_config/
+supabase/
+_bmad/
+.cursor/
+.claude/
+agent-transcripts/
+terminals/
+venv/
+.venv/
+node_modules/
+**/*.sqlite3
+*.log
+
+# Artefacts locaux mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/.idea/

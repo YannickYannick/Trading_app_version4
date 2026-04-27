@@ -1,0 +1,46 @@
+# EAS : si .easignore existe, il remplace .gitignore pour l’upload — reprendre d’abord le .gitignore du dossier mobile.
+# Voir https://docs.expo.dev/build-reference/easignore/
+
+# --- Copié depuis mobile/.gitignore ---
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+/ios
+/android
+
+# IDE / local
+.idea/
+
+# Monorepo : ne pas uploader le reste du dépôt depuis mobile/
+../backend/
+../frontend/
+../docs/
+../deployment_config/
+../supabase/
+../_bmad/
+../.cursor/
+../.claude/
+../agent-transcripts/
+../terminals/
+../venv/
+../.venv/
+../node_modules/
+../*.sqlite3
+../*.log

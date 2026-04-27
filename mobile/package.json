@@ -8,16 +8,19 @@
     "android:reverse": "adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8000 tcp:8000",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:android:apk": "eas build --platform android --profile preview",
+    "build:android:bundle": "eas build --platform android --profile production"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
-    "@trading-app/shared": "file:../shared",
+    "@trading-app/shared": "*",
     "axios": "^1.13.2",
-    "expo": "~54.0.30",
+    "babel-preset-expo": "~54.0.10",
+    "expo": "~54.0.33",
     "expo-build-properties": "~1.0.10",
     "expo-device": "~8.0.10",
     "expo-secure-store": "~15.0.8",
@@ -32,7 +35,6 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "babel-plugin-module-resolver": "^5.0.2",
-    "babel-preset-expo": "^54.0.9",
     "typescript": "~5.9.2"
   },
   "private": true
