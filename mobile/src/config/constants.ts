@@ -2,7 +2,8 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 
-const PROD_API_URL = 'https://le-baff.com/api';
+// URL API en production (Railway). Doit pointer vers la racine API "/api".
+const PROD_API_URL = 'https://trading-production-edd7.up.railway.app/api';
 
 /**
  * IP LAN de ton PC (voir `ipconfig`) pour un téléphone Android physique.
