@@ -1,0 +1,10 @@
+{
+  "name": "trading-app-version4",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Racine npm workspaces pour mobile + shared (EAS Build / monorepo)",
+  "workspaces": [
+    "mobile",
+    "shared"
+  ]
+}
