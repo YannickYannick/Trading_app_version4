@@ -60,6 +60,8 @@ htmlcov/
 .tox/
 
 # --- BMad / Cursor (artefacts locaux optionnels) ---
-# Décommenter si tu ne veux pas les versionner :
-# .cursor/
-# _bmad-output/
+# Ne pas versionner les artefacts Cursor / BMad
+.cursor/
+.claude/
+_bmad/
+_bmad-output/
