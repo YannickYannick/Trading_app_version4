@@ -21,6 +21,7 @@ export default function Positions() {
   /** Si false : max 20 actifs uniques ; si true : tous les actifs uniques de la page courante */
   const [loadAllPrices, setLoadAllPrices] = useState(false)
   const [yahooPricesLoading, setYahooPricesLoading] = useState(false)
+  const [yahooProgress, setYahooProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
 
   const { positions, loading, error, summary, refetch } = usePositions({
     status: statusFilter,
@@ -41,6 +42,7 @@ export default function Positions() {
   // Réinitialiser les prix affichés quand le filtre change (données potentiellement différentes)
   useEffect(() => {
     setYahooPrices({})
+    setYahooProgress({ done: 0, total: 0 })
   }, [statusFilter])
 
   const loadYahooPricesManual = useCallback(async () => {
@@ -49,6 +51,7 @@ export default function Positions() {
     try {
       const targetIds = loadAllPrices ? allAssetsInPositions : allAssetsInPositions.slice(0, 20)
       const priceMap: Record<number, number | null> = {}
+      setYahooProgress({ done: 0, total: targetIds.length })
 
       const batches: number[][] = []
       for (let i = 0; i < targetIds.length; i += 10) {
@@ -67,6 +70,10 @@ export default function Positions() {
             priceMap[result.value.id] = result.value.price
           }
         })
+        setYahooProgress((prev) => ({
+          done: Math.min(prev.total, prev.done + batch.length),
+          total: prev.total,
+        }))
       }
 
       setYahooPrices(priceMap)
@@ -107,11 +114,16 @@ export default function Positions() {
       key: 'all_asset_name',
       label: 'Nom',
       align: 'left' as const,
-      render: (_value: any, row: Position) => (
-        <span className="all-asset-name">
-          {row?.all_asset_name || row?.all_asset?.name || row?.asset?.name || '—'}
-        </span>
-      ),
+      render: (_value: any, row: Position) => {
+        const raw =
+          row?.all_asset_name ||
+          (row as any)?.all_asset?.name ||
+          row?.asset?.name ||
+          ''
+        const name = String(raw).trim()
+        const fallback = row?.all_asset_symbol || row?.all_asset?.symbol || row?.asset?.symbol || '—'
+        return <span className="all-asset-name">{name ? name : fallback}</span>
+      },
     },
     {
       key: 'yahoo_symbol',
@@ -337,6 +349,25 @@ export default function Positions() {
           </Button>
         </div>
       </div>
+
+      {yahooPricesLoading && yahooProgress.total > 0 && (
+        <div className="yahoo-progress">
+          <div className="yahoo-progress-top">
+            <span>Chargement des prix Yahoo</span>
+            <span>
+              {yahooProgress.done}/{yahooProgress.total}
+            </span>
+          </div>
+          <div className="yahoo-progress-bar">
+            <div
+              className="yahoo-progress-bar-fill"
+              style={{
+                width: `${Math.round((yahooProgress.done / yahooProgress.total) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {summary && (
         <div className="positions-summary">

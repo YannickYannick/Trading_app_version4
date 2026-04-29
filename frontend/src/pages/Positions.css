@@ -31,6 +31,37 @@
   flex-wrap: wrap;
 }
 
+.yahoo-progress {
+  margin: calc(var(--spacing-xl) * -0.5) 0 var(--spacing-xl);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.yahoo-progress-top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.yahoo-progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.yahoo-progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #d4af37, #2ecc71);
+  transition: width 200ms ease;
+}
+
 .positions-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
