@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Plateforme d'Analyse Pétrolière Avancée</title>
+    <style>
+      :root {
+        --oil-gold: #d4af37;
+        --oil-black: #0a0a0a;
+        --industrial-grey: #161616;
+        --text-grey: #bbb;
+        --price-up: #2ecc71;
+        --danger: #e74c3c;
+        --vapeur: #f39c12;
+        --liquide: #3498db;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #0f0f0f;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #e0e0e0;
+        overflow-x: hidden;
+      }
+
+      .page-wrapper {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Section Carte */
+      #chart-container {
+        width: 100%;
+        height: 65vh;
+        position: relative;
+        background: radial-gradient(circle, #1a1a1a 0%, #0a0a0a 100%);
+        border-bottom: 2px solid var(--oil-gold);
+      }
+      #chartdiv {
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Sections Infographie */
+      .section {
+        padding: 40px 20px;
+        max-width: 1300px;
+        margin: 0 auto;
+        width: 95%;
+      }
+      .grid-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 25px;
+      }
+
+      .info-card {
+        background: var(--industrial-grey);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 25px;
+        position: relative;
+      }
+      .full-width-card {
+        grid-column: 1 / -1;
+      }
+
+      .info-card h3 {
+        color: var(--oil-gold);
+        margin-top: 0;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-size: 1rem;
+        margin-bottom: 20px;
+      }
+
+      /* Cartes de données */
+      .barrel-box {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 15px;
+      }
+      .barrel-icon-large {
+        width: 60px;
+        height: 80px;
+        background: linear-gradient(90deg, #000 0%, #333 50%, #000 100%);
+        border-radius: 5px / 15px;
+        border: 1px solid #444;
+        position: relative;
+      }
+      .barrel-icon-large::before,
+      .barrel-icon-large::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: #222;
+        left: 0;
+      }
+      .barrel-icon-large::before {
+        top: 25%;
+      }
+      .barrel-icon-large::after {
+        bottom: 25%;
+      }
+
+      .usage-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+      .usage-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: #eee;
+      }
+
+      .brent-wti-row {
+        margin-bottom: 15px;
+      }
+      .brent-wti-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        margin-bottom: 5px;
+      }
+      .progress-bg {
+        height: 8px;
+        background: #222;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 15px;
+      }
+      .progress-fill {
+        height: 100%;
+        background: var(--oil-gold);
+        border-radius: 4px;
+      }
+
+      /* Contrôles du Graphique */
+      .chart-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #0a0a0a;
+        border-radius: 8px;
+        border: 1px solid #222;
+        align-items: center;
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 5px;
+        background: #222;
+        padding: 4px;
+        border-radius: 6px;
+      }
+
+      .btn-toggle {
+        background: #222;
+        border: 1px solid #444;
+        color: #888;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+      }
+      .btn-toggle.active {
+        color: #fff;
+        border-color: var(--oil-gold);
+        box-shadow: 0 0 5px rgba(212, 175, 55, 0.3);
+      }
+      .btn-toggle.special {
+        background: #333;
+        border-color: var(--oil-gold);
+        color: var(--oil-gold);
+      }
+      .btn-toggle.special.active {
+        background: var(--oil-gold);
+        color: #000;
+        font-weight: bold;
+      }
+
+      .period-btn {
+        background: #111;
+        border: none;
+        color: #666;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+      }
+      .period-btn.active {
+        color: var(--oil-gold);
+        font-weight: bold;
+      }
+
+      #linechartdiv,
+      #ratiochartdiv {
+        width: 100%;
+        height: 450px;
+      }
+
+      .ratio-selector {
+        background: #222;
+        color: #fff;
+        border: 1px solid #444;
+        padding: 5px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+
+      /* RAFFINAGE */
+      .refining-container {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 50px;
+        padding: 60px 0;
+        background: #0a0a0a;
+        border-radius: 12px;
+        margin-top: 20px;
+        position: relative;
+        flex-wrap: wrap;
+      }
+
+      .furnace-wrapper {
+        position: relative;
+        width: 140px;
+        text-align: center;
+      }
+      .furnace-body {
+        width: 120px;
+        height: 150px;
+        background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
+        border: 3px solid #444;
+        border-radius: 15px 15px 5px 5px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .furnace-coil {
+        width: 60px;
+        height: 80px;
+        border: 3px solid var(--danger);
+        border-radius: 10px;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 10px,
+          var(--danger) 10px,
+          var(--danger) 12px
+        );
+        box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+      }
+      .furnace-label {
+        margin-top: 10px;
+        font-weight: bold;
+        color: var(--danger);
+        font-size: 0.8rem;
+      }
+
+      .tower-complex {
+        display: flex;
+        align-items: stretch;
+        gap: 20px;
+      }
+      .main-tower {
+        width: 160px;
+        height: 550px;
+        background: #1a1a1a;
+        border: 4px solid #444;
+        border-radius: 80px 80px 10px 10px;
+        position: relative;
+        display: flex;
+        flex-direction: column-reverse;
+        overflow: visible;
+      }
+      .level-slot {
+        flex: 1;
+        border-top: 1px dashed rgba(255, 255, 255, 0.05);
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .level-slot:nth-child(1) {
+        background: #2d1810;
+        border-radius: 0 0 5px 5px;
+      }
+      .level-slot:nth-child(2) {
+        background: #4a2512;
+      }
+      .level-slot:nth-child(3) {
+        background: #733e15;
+      }
+      .level-slot:nth-child(4) {
+        background: #a65d1a;
+      }
+      .level-slot:nth-child(5) {
+        background: #d98c26;
+      }
+      .level-slot:nth-child(6) {
+        background: #f2c45e;
+        border-radius: 76px 76px 0 0;
+      }
+
+      .exit-pipe {
+        position: absolute;
+        right: -30px;
+        width: 40px;
+        height: 4px;
+        background: var(--oil-gold);
+      }
+      .exit-pipe::after {
+        content: '▶';
+        position: absolute;
+        right: -10px;
+        top: -7px;
+        color: var(--oil-gold);
+        font-size: 10px;
+      }
+
+      .pipe-top {
+        position: absolute;
+        top: -25px;
+        left: 80px;
+        width: 110px;
+        height: 40px;
+        border-top: 4px solid #8ab4f8;
+        border-right: 4px solid #8ab4f8;
+        border-top-right-radius: 10px;
+        z-index: 10;
+      }
+      .pipe-top::after {
+        content: '▶';
+        position: absolute;
+        right: -5px;
+        bottom: -12px;
+        color: #8ab4f8;
+        font-size: 14px;
+      }
+
+      .pipe-bottom {
+        position: absolute;
+        bottom: -25px;
+        left: 80px;
+        width: 110px;
+        height: 40px;
+        border-bottom: 4px solid #8d6e63;
+        border-right: 4px solid #8d6e63;
+        border-bottom-right-radius: 10px;
+        z-index: 10;
+      }
+      .pipe-bottom::after {
+        content: '▶';
+        position: absolute;
+        right: -5px;
+        top: -12px;
+        color: #8d6e63;
+        font-size: 14px;
+      }
+
+      .residues-list {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0 5px;
+        font-size: 0.85rem;
+        color: #aaa;
+        border-left: 2px solid #444;
+        padding-left: 10px;
+      }
+      .residues-list li {
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .product-labels-column {
+        display: flex;
+        flex-direction: column-reverse;
+        justify-content: space-around;
+        height: 550px;
+        padding-left: 10px;
+      }
+      .product-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        height: 16.6%;
+      }
+      .prod-icon {
+        font-size: 1.5rem;
+        width: 30px;
+      }
+      .prod-info {
+        display: flex;
+        flex-direction: column;
+      }
+      .prod-temp {
+        color: var(--oil-gold);
+        font-weight: bold;
+        font-size: 0.8rem;
+      }
+      .prod-name {
+        color: #fff;
+        font-weight: bold;
+        font-size: 0.95rem;
+      }
+
+      h2.section-title {
+        text-align: center;
+        font-size: 2.2rem;
+        color: #fff;
+        margin-bottom: 10px;
+      }
+      .divider {
+        width: 80px;
+        height: 4px;
+        background: var(--oil-gold);
+        margin: 0 auto 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-wrapper">
+      <section id="chart-container">
+        <div id="chartdiv"></div>
+      </section>
+
+      <!-- COMPRENDRE L'INDUSTRIE -->
+      <section class="section">
+        <h2 class="section-title">Comprendre l'Industrie</h2>
+        <div class="divider"></div>
+        <div class="grid-container">
+          <div class="info-card">
+            <h3>Le Baril Standard</h3>
+            <div class="barrel-box">
+              <div class="barrel-icon-large"></div>
+              <div>
+                <div style="font-size: 2rem; font-weight: bold; color: #fff;">
+                  159 Litres
+                </div>
+                <div style="color: #888; font-size: 0.9rem;">
+                  Unité : 42 Gallons US (bbl)
+                </div>
+              </div>
+            </div>
+            <p style="font-size: 0.9rem; color: #bbb;">
+              Unité fiscale et volumétrique universelle du marché.
+            </p>
+          </div>
+
+          <div class="info-card">
+            <h3>Brent vs WTI</h3>
+            <div class="brent-wti-row">
+              <div class="brent-wti-header">
+                <span>Brent (Europe)</span
+                ><span style="color: var(--oil-gold);">Référence Mondiale</span>
+              </div>
+              <div class="progress-bg">
+                <div class="progress-fill" style="width: 85%;"></div>
+              </div>
+              <div class="brent-wti-header">
+                <span>WTI (USA)</span><span>Léger & Doux</span>
+              </div>
+              <div class="progress-bg">
+                <div class="progress-fill" style="width: 70%;"></div>
+              </div>
+            </div>
+            <p
+              style="
+                font-size: 0.9rem;
+                color: #bbb;
+                margin-top: 15px;
+                line-height: 1.4;
+              "
+            >
+              Le <strong>Brent</strong> (Mer du Nord) est la référence des prix
+              pour environ 60% du pétrole mondial. Le <strong>WTI</strong>
+              (Texas) est un brut plus léger et contenant moins de soufre, ce qui
+              le rend plus facile et moins coûteux à raffiner en essence.
+            </p>
+          </div>
+
+          <div class="info-card">
+            <h3>Usage du Brut</h3>
+            <div class="usage-grid">
+              <div class="usage-item">🚗 Transport (60%)</div>
+              <div class="usage-item">🏠 Chauffage</div>
+              <div class="usage-item">📦 Plastiques</div>
+              <div class="usage-item">💊 Médicaments</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ANALYSE MARCHÉ -->
+      <section class="section">
+        <h2 class="section-title">Analyse du Marché & Production</h2>
+        <div class="divider"></div>
+        <div class="grid-container">
+          <div class="info-card full-width-card">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+              "
+            >
+              <h3>Courbes de Performance</h3>
+              <div class="btn-group">
+                <button class="period-btn" data-period="1">1M</button>
+                <button class="period-btn" data-period="6">6M</button>
+                <button class="period-btn" data-period="12">1AN</button>
+                <button class="period-btn active" data-period="60">5ANS</button>
+              </div>
+            </div>
+
+            <div class="chart-controls">
+              <button class="btn-toggle active" data-series="brent">Brent</button>
+              <button class="btn-toggle active" data-series="wti">WTI</button>
+              <button class="btn-toggle active" data-series="essence">
+                Essence
+              </button>
+              <button class="btn-toggle active" data-series="diesel">
+                Gazole
+              </button>
+              <button class="btn-toggle" data-series="or">Or</button>
+              <button class="btn-toggle" data-series="dollar">Dollar</button>
+              <button class="btn-toggle" data-series="litres">
+                Production (L)
+              </button>
+              <div style="flex-grow: 1;"></div>
+              <button class="btn-toggle special" id="bounds-toggle">
+                Min/Max
+              </button>
+              <button class="btn-toggle special" id="norm-toggle">
+                Base 100
+              </button>
+            </div>
+            <div id="linechartdiv"></div>
+          </div>
+
+          <div class="info-card full-width-card">
+            <h3>Analyse de Ratio</h3>
+            <div style="margin-bottom: 20px;">
+              <select id="ratio-num" class="ratio-selector">
+                <option value="or">Or</option>
+                <option value="brent" selected>Brent</option>
+              </select>
+              <span> / </span>
+              <select id="ratio-den" class="ratio-selector">
+                <option value="brent">Brent</option>
+                <option value="wti" selected>WTI</option>
+              </select>
+            </div>
+            <div id="ratiochartdiv"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RAFFINAGE -->
+      <section class="section">
+        <h2 class="section-title">Le Processus de Raffinage</h2>
+        <div class="divider"></div>
+
+        <div class="refining-container">
+          <div class="furnace-wrapper">
+            <div
+              style="
+                position: absolute;
+                left: -140px;
+                bottom: 40px;
+                text-align: right;
+                width: 120px;
+              "
+            >
+              <span style="display: block; font-weight: bold; color: #fff;"
+                >PÉTROLE BRUT</span
+              >
+              <span style="font-size: 0.7rem; color: #888;">1 Litre entrant</span>
+            </div>
+            <div class="furnace-body"><div class="furnace-coil"></div></div>
+            <div class="furnace-label">FOUR ± 350°C</div>
+          </div>
+
+          <div class="tower-complex">
+            <div class="main-tower">
+              <div class="level-slot"><div class="pipe-bottom"></div></div>
+              <div class="level-slot"><div class="exit-pipe"></div></div>
+              <div class="level-slot"><div class="exit-pipe"></div></div>
+              <div class="level-slot"><div class="exit-pipe"></div></div>
+              <div class="level-slot"><div class="exit-pipe"></div></div>
+              <div class="level-slot"><div class="pipe-top"></div></div>
+            </div>
+
+            <div class="product-labels-column">
+              <div
+                class="product-item"
+                style="
+                  align-items: flex-start;
+                  height: auto;
+                  margin-bottom: -30px;
+                  margin-top: 20px;
+                "
+              >
+                <div class="prod-icon" style="margin-top: 5px;">⬇️</div>
+                <div class="prod-info">
+                  <span class="prod-temp">BAS DE TOUR ± 350°C+</span>
+                  <span class="prod-name">RÉSIDUS LOURDS</span>
+                  <ul class="residues-list">
+                    <li>🛣️ Bitume (Routes)</li>
+                    <li>🛢️ Lubrifiants</li>
+                    <li>🚢 Fioul (Navires)</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="product-item">
+                <div class="prod-icon">🚚</div>
+                <div class="prod-info">
+                  <span class="prod-temp">± 320°C</span
+                  ><span class="prod-name">GAZOLE / DIESEL</span>
+                </div>
+              </div>
+              <div class="product-item">
+                <div class="prod-icon">✈️</div>
+                <div class="prod-info">
+                  <span class="prod-temp">± 250°C</span
+                  ><span class="prod-name">KÉROSÈNE</span>
+                </div>
+              </div>
+              <div class="product-item">
+                <div class="prod-icon">🧪</div>
+                <div class="prod-info">
+                  <span class="prod-temp">± 110°C</span
+                  ><span class="prod-name">NAPHTA</span>
+                </div>
+              </div>
+              <div class="product-item">
+                <div class="prod-icon">🚗</div>
+                <div class="prod-info">
+                  <span class="prod-temp">± 70°C</span
+                  ><span class="prod-name">ESSENCE</span>
+                </div>
+              </div>
+              <div
+                class="product-item"
+                style="height: auto; margin-top: -30px; margin-bottom: 20px;"
+              >
+                <div class="prod-icon">☁️</div>
+                <div class="prod-info">
+                  <span class="prod-temp">HAUT DE TOUR &lt; 20°C</span>
+                  <span class="prod-name">GAZ DE PÉTROLE</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/xy.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/map.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/geodata/worldLow.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+
+    <script>
+      am5.ready(function () {
+        var root = am5.Root.new("chartdiv");
+        var lineRoot = am5.Root.new("linechartdiv");
+        var ratioRoot = am5.Root.new("ratiochartdiv");
+
+        const oilTheme = am5.Theme.new(root);
+        oilTheme.rule("InterfaceColors").setAll({
+          primaryButton: am5.color(0x333333),
+          primaryButtonHover: am5.color(0x444444),
+          primaryButtonDown: am5.color(0x111111),
+          primaryButtonActive: am5.color(0xd4af37),
+          primaryButtonText: am5.color(0xffffff),
+          secondaryButton: am5.color(0x222222),
+          secondaryButtonText: am5.color(0xbbbbbb),
+          background: am5.color(0x1a1a1a),
+          text: am5.color(0xeeeeee),
+        });
+
+        root.setThemes([am5themes_Animated.new(root), oilTheme]);
+        lineRoot.setThemes([am5themes_Animated.new(lineRoot), oilTheme]);
+        ratioRoot.setThemes([am5themes_Animated.new(ratioRoot), oilTheme]);
+
+        // --- 1. GLOBE INTERACTIF & MAP (RESTORATION COMPLÈTE) ---
+        root.container.set("background", am5.Rectangle.new(root, {
+          fill: am5.color(0x111111),
+          fillPattern: am5.GrainPattern.new(root, {
+            density: 0.3,
+            maxOpacity: 0.1,
+            colors: [am5.color(0x000000)],
+          }),
+        }));
+
+        var crudeBlack = am5.color(0x0a0a0a);
+        var steelGrey = am5.color(0x444444);
+        var pipeGold = am5.color(0xd4af37);
+        var oceanDeep = am5.color(0x151a21);
+        var landGrey = am5.color(0x2a2a2a);
+
+        var chart = root.container.children.push(am5map.MapChart.new(root, {
+          panX: "translateX",
+          panY: "translateY",
+          projection: am5map.geoMercator(),
+          minZoomLevel: 1,
+          zoomLevel: 1.2,
+        }));
+
+        var bgSeries = chart.series.push(am5map.MapPolygonSeries.new(root, {}));
+        bgSeries.mapPolygons.template.setAll({
+          fill: oceanDeep,
+          fillOpacity: 0,
+          strokeOpacity: 0,
+        });
+        bgSeries.data.push({ geometry: am5map.getGeoRectangle(90, 180, -90, -180) });
+
+        var graticuleSeries = chart.series.push(am5map.GraticuleSeries.new(root, {}));
+        graticuleSeries.mapLines.template.setAll({
+          stroke: am5.color(0xffffff),
+          strokeOpacity: 0.05,
+          strokeWidth: 0.5,
+        });
+
+        var polygonSeries = chart.series.push(am5map.MapPolygonSeries.new(root, {
+          geoJSON: am5geodata_worldLow,
+        }));
+        polygonSeries.mapPolygons.template.setAll({
+          fill: landGrey,
+          stroke: steelGrey,
+          strokeWidth: 0.5,
+          strokeOpacity: 0.5,
+          interactive: true,
+        });
+
+        var producers = ["SA", "RU", "US", "IQ", "AE", "KW", "NO", "NG"];
+        var hubs = ["CN", "IN", "NL", "SG", "KR"];
+
+        polygonSeries.events.on("datavalidated", function () {
+          am5.array.each(polygonSeries.dataItems, function (di) {
+            var id = di.get("id");
+            if (id && producers.includes(id)) {
+              di.get("mapPolygon").setAll({
+                fill: am5.color(0x1a1a1a),
+                stroke: pipeGold,
+                strokeWidth: 1,
+              });
+            } else if (id && hubs.includes(id)) {
+              di.get("mapPolygon").setAll({ fill: am5.color(0x3a3a3a) });
+            }
+          });
+        });
+
+        var sankeySeries = chart.series.push(am5map.MapSankeySeries.new(root, {
+          polygonSeries: polygonSeries,
+          maxWidth: 3,
+          controlPointDistance: 0.2,
+          resolution: 40,
+          nodePadding: 0.5,
+        }));
+        sankeySeries.mapPolygons.template.setAll({
+          fill: pipeGold,
+          fillOpacity: 0.4,
+          strokeOpacity: 0,
+          tooltipText: "{sourceNode.name} > {targetNode.name}\n{value}M barils/jour",
+        });
+        sankeySeries.nodes.mapPolygons.template.setAll({
+          fill: crudeBlack,
+          stroke: pipeGold,
+          strokeWidth: 1,
+          fillOpacity: 1,
+          tooltipText: "{name}\nTotal: {sum}M barils/jour",
+        });
+
+        sankeySeries.bullets.push(function () {
+          return am5.Bullet.new(root, {
+            locationX: 0,
+            autoRotate: true,
+            sprite: am5.Graphics.new(root, {
+              svgPath:
+                "M0,0 C0,0 -4,6 -4,10 C-4,12.2 -2.2,14 0,14 C2.2,14 4,12.2 4,10 C4,6 0,0 0,0 Z",
+              fill: crudeBlack,
+              stroke: pipeGold,
+              strokeWidth: 0.5,
+              centerX: am5.p50,
+              centerY: am5.p50,
+              scale: 0.6,
+              visible: false,
+            }),
+          });
+        });
+
+        sankeySeries.data.setAll([
+          { sourceId: "SA", targetId: "CN", value: 1.7 },
+          { sourceId: "SA", targetId: "JP", value: 1.1 },
+          { sourceId: "SA", targetId: "IN", value: 0.8 },
+          { sourceId: "SA", targetId: "US", value: 0.5 },
+          { sourceId: "RU", targetId: "CN", value: 2.0 },
+          { sourceId: "RU", targetId: "IN", value: 1.5 },
+          { sourceId: "RU", targetId: "DE", value: 0.3 },
+          { sourceId: "IQ", targetId: "CN", value: 1.0 },
+          { sourceId: "AE", targetId: "JP", value: 0.8 },
+          { sourceId: "KW", targetId: "KR", value: 0.4 },
+          { sourceId: "US", targetId: "NL", value: 0.6 },
+          { sourceId: "US", targetId: "KR", value: 0.4 },
+          { sourceId: "NO", targetId: "GB", value: 0.5 },
+          { sourceId: "NG", targetId: "IN", value: 0.4 },
+          { sourceId: "NL", targetId: "DE", value: 0.4 },
+          { sourceId: "CN", targetId: "JP", value: 0.2 },
+        ]);
+
+        var countryNames = {
+          SA: "Arabie Saoudite",
+          RU: "Russie",
+          US: "États-Unis",
+          IQ: "Irak",
+          AE: "Émirats Arabes Unis",
+          CN: "Chine",
+          IN: "Inde",
+          JP: "Japon",
+          KR: "Corée du Sud",
+          NL: "Pays-Bas",
+          DE: "Allemagne",
+          GB: "Royaume-Uni",
+          NO: "Norvège",
+          NG: "Nigeria",
+          KW: "Koweït",
+        };
+
+        sankeySeries.events.on("datavalidated", function () {
+          am5.array.each(sankeySeries.nodes.dataItems, function (di) {
+            var id = di.get("id");
+            if (id && countryNames[id]) di.set("name", countryNames[id]);
+          });
+
+          am5.array.each(sankeySeries.dataItems, function (dataItem) {
+            var bullets = dataItem.bullets;
+            if (bullets) {
+              am5.array.each(bullets, function (bullet) {
+                var randomDur = 4000 + Math.random() * 4000;
+                var delay = Math.random() * randomDur;
+                setTimeout(function () {
+                  var sprite = bullet.get("sprite");
+                  if (sprite) sprite.set("visible", true);
+                  bullet.animate({
+                    key: "locationX",
+                    from: 0,
+                    to: 1,
+                    duration: randomDur,
+                    easing: am5.ease.linear,
+                    loops: Infinity,
+                  });
+                }, delay);
+              });
+            }
+          });
+        });
+
+        var titleCont = chart.children.push(am5.Container.new(root, {
+          layout: root.verticalLayout,
+          x: am5.p50,
+          centerX: am5.p50,
+          y: am5.p100,
+          centerY: am5.p100,
+          position: "absolute",
+          paddingBottom: 30,
+        }));
+        titleCont.children.push(am5.Label.new(root, {
+          text: "Chaîne d'Approvisionnement Pétrolière Mondiale",
+          fontSize: 26,
+          fontWeight: "700",
+          fill: pipeGold,
+          x: am5.p50,
+          centerX: am5.p50,
+        }));
+        titleCont.children.push(am5.Label.new(root, {
+          text: "Principaux flux de brut (Millions de barils par jour)",
+          fontSize: 13,
+          fill: am5.color(0x888888),
+          x: am5.p50,
+          centerX: am5.p50,
+        }));
+
+        var switchCont = chart.children.push(am5.Container.new(root, {
+          layout: root.horizontalLayout,
+          x: 20,
+          y: 40,
+        }));
+        switchCont.children.push(am5.Label.new(root, {
+          centerY: am5.p50,
+          text: "Carte",
+          fill: am5.color(0xaaaaaa),
+          fontSize: 14,
+        }));
+        var switchButton = switchCont.children.push(am5.Button.new(root, {
+          themeTags: ["switch"],
+          centerY: am5.p50,
+          icon: am5.Circle.new(root, { themeTags: ["icon"] }),
+        }));
+        switchCont.children.push(am5.Label.new(root, {
+          centerY: am5.p50,
+          text: "Globe",
+          fill: am5.color(0xaaaaaa),
+          fontSize: 14,
+        }));
+
+        var easing = am5.ease.inOut(am5.ease.cubic);
+        var duration = 1200;
+        var rotationAnimation = null;
+
+        function zoomToGlobe() {
+          chart.set("projection", am5map.geoOrthographic());
+          chart.set("panX", "rotateX");
+          chart.set("panY", "rotateY");
+          chart.animate({ key: "rotationX", to: 10, duration: duration, easing: easing });
+          chart.animate({ key: "rotationY", to: -15, duration: duration, easing: easing });
+          chart.animate({ key: "zoomLevel", to: 0.9, duration: duration, easing: easing });
+          bgSeries.mapPolygons.template.set("fillOpacity", 1);
+
+          if (!rotationAnimation) {
+            rotationAnimation = chart.animate({
+              key: "rotationX",
+              from: 10,
+              to: 10 + 360,
+              duration: 150000,
+              loops: Infinity,
+              easing: am5.ease.linear,
+            });
+          } else {
+            rotationAnimation.play();
+          }
+        }
+
+        function zoomToMap() {
+          chart.set("projection", am5map.geoMercator());
+          chart.set("panX", "translateX");
+          chart.set("panY", "translateY");
+          chart.animate({ key: "rotationX", to: 0, duration: duration, easing: easing });
+          chart.animate({ key: "rotationY", to: 0, duration: duration, easing: easing });
+          chart.animate({ key: "zoomLevel", to: 1.2, duration: duration, easing: easing });
+          bgSeries.mapPolygons.template.set("fillOpacity", 0);
+
+          if (rotationAnimation) rotationAnimation.stop();
+        }
+
+        switchButton.on("active", function () {
+          chart.goHome(duration);
+          setTimeout(function () {
+            if (switchButton.get("active")) {
+              zoomToGlobe();
+            } else {
+              zoomToMap();
+            }
+          }, 200);
+        });
+
+        var zoomControl = chart.set("zoomControl", am5map.ZoomControl.new(root, {}));
+        zoomControl.homeButton.set("visible", true);
+
+        chart.chartContainer.events.on("pointerdown", function () {
+          if (rotationAnimation) {
+            rotationAnimation.stop();
+          }
+        });
+
+        chart.appear(1000, 100);
+
+        // --- 2. DONNÉES SIMULÉES ET COURBES PERFORMANCE ---
+        function generateData() {
+          var data = [];
+          var bases = { brent: 75, wti: 70, essence: 1.6, diesel: 1.55, or: 1800, dollar: 100, litres: 15.2 };
+          for (var i = 0; i < 1825; i++) {
+            var date = new Date();
+            date.setDate(date.getDate() - (1825 - i));
+            Object.keys(bases).forEach((k) => {
+              bases[k] += (Math.random() - 0.5) * (bases[k] * 0.01);
+              if (bases[k] < 0.1) bases[k] = 0.1;
+            });
+            data.push({
+              date: date.getTime(),
+              brent: bases.brent,
+              wti: bases.wti,
+              essence: bases.essence,
+              diesel: bases.diesel,
+              or: bases.or,
+              dollar: bases.dollar,
+              litres: bases.litres * 1e9,
+            });
+          }
+          return data;
+        }
+        const rawData = generateData();
+
+        var lineChart = lineRoot.container.children.push(
+          am5xy.XYChart.new(lineRoot, { panX: true, panY: true, wheelX: "panX", wheelY: "zoomX" })
+        );
+        var xAxis = lineChart.xAxes.push(
+          am5xy.DateAxis.new(lineRoot, {
+            baseInterval: { timeUnit: "day", count: 1 },
+            renderer: am5xy.AxisRendererX.new(lineRoot, {}),
+          })
+        );
+        var yAxis = lineChart.yAxes.push(
+          am5xy.ValueAxis.new(lineRoot, { renderer: am5xy.AxisRendererY.new(lineRoot, {}) })
+        );
+
+        var seriesMap = {};
+        const colors = {
+          brent: 0xd4af37,
+          wti: 0x888888,
+          essence: 0x2ecc71,
+          diesel: 0xe67e22,
+          or: 0xf1c40f,
+          dollar: 0x3498db,
+          litres: 0x9b59b6,
+        };
+
+        Object.keys(colors).forEach((id) => {
+          var series = lineChart.series.push(
+            am5xy.LineSeries.new(lineRoot, {
+              name: id.toUpperCase(),
+              xAxis: xAxis,
+              yAxis: yAxis,
+              valueXField: "date",
+              valueYField: id,
+              stroke: am5.color(colors[id]),
+            })
+          );
+          series.data.setAll(rawData);
+          seriesMap[id] = series;
+          if (["or", "dollar", "litres"].includes(id)) series.hide();
+        });
+
+        document.querySelectorAll(".period-btn").forEach((btn) => {
+          btn.onclick = function () {
+            document.querySelectorAll(".period-btn").forEach((b) => b.classList.remove("active"));
+            this.classList.add("active");
+            let startDate = new Date(rawData[rawData.length - 1].date);
+            startDate.setMonth(startDate.getMonth() - parseInt(this.dataset.period));
+            xAxis.zoomToDates(startDate, new Date(rawData[rawData.length - 1].date));
+          };
+        });
+
+        document.getElementById("norm-toggle").onclick = function () {
+          this.classList.toggle("active");
+          let norm = this.classList.contains("active");
+          Object.keys(seriesMap).forEach((id) => {
+            let first = rawData[0][id];
+            seriesMap[id].data.setAll(
+              rawData.map((d) => ({ ...d, [id]: norm ? (d[id] / first) * 100 : d[id] }))
+            );
+          });
+        };
+
+        document.getElementById("bounds-toggle").onclick = function () {
+          this.classList.toggle("active");
+          yAxis.set("min", this.classList.contains("active") ? undefined : 0);
+        };
+
+        document.querySelectorAll('.btn-toggle[data-series]').forEach((btn) => {
+          btn.onclick = function () {
+            let id = this.dataset.series;
+            this.classList.toggle("active") ? seriesMap[id].show() : seriesMap[id].hide();
+          };
+        });
+
+        // --- 3. ANALYSE RATIO ---
+        var ratioChart = ratioRoot.container.children.push(
+          am5xy.XYChart.new(ratioRoot, { panX: true, wheelX: "panX" })
+        );
+        var rxAxis = ratioChart.xAxes.push(
+          am5xy.DateAxis.new(ratioRoot, {
+            baseInterval: { timeUnit: "day", count: 1 },
+            renderer: am5xy.AxisRendererX.new(ratioRoot, {}),
+          })
+        );
+        var ryAxis = ratioChart.yAxes.push(
+          am5xy.ValueAxis.new(ratioRoot, { renderer: am5xy.AxisRendererY.new(ratioRoot, {}) })
+        );
+        var rSeries = ratioChart.series.push(
+          am5xy.LineSeries.new(ratioRoot, {
+            xAxis: rxAxis,
+            yAxis: ryAxis,
+            valueXField: "date",
+            valueYField: "ratio",
+            stroke: am5.color(0x3498db),
+          })
+        );
+        rSeries.fills.template.setAll({ fillOpacity: 0.2, visible: true });
+
+        function updateRatio() {
+          let n = document.getElementById("ratio-num").value,
+            d = document.getElementById("ratio-den").value;
+          rSeries.data.setAll(rawData.map((v) => ({ date: v.date, ratio: v[n] / v[d] })));
+        }
+        document.getElementById("ratio-num").onchange = updateRatio;
+        document.getElementById("ratio-den").onchange = updateRatio;
+        updateRatio();
+
+        xAxis.on("start", (ev) => rxAxis.set("start", ev));
+        xAxis.on("end", (ev) => rxAxis.set("end", ev));
+        lineChart.set("cursor", am5xy.XYCursor.new(lineRoot, { behavior: "zoomX" }));
+        ratioChart.set("cursor", am5xy.XYCursor.new(ratioRoot, { behavior: "zoomX" }));
+
+        lineChart.appear(1000, 100);
+      });
+    </script>
+  </body>
+</html>

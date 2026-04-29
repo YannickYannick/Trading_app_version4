@@ -1,0 +1,34 @@
+.blog-article-page {
+  height: calc(100vh - 32px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.blog-article-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.blog-article-back {
+  text-decoration: none;
+  color: #d4af37;
+}
+
+.blog-article-title {
+  font-weight: 700;
+  color: #e8e8e8;
+  text-align: right;
+}
+
+.blog-article-frame {
+  flex: 1;
+  width: 100%;
+  border: 1px solid #2b2b2b;
+  border-radius: 12px;
+  background: #0f0f0f;
+}
+
