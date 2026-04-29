@@ -104,6 +104,16 @@ export default function Positions() {
       ),
     },
     {
+      key: 'all_asset_name',
+      label: 'Nom',
+      align: 'left' as const,
+      render: (_value: any, row: Position) => (
+        <span className="all-asset-name">
+          {row?.all_asset_name || row?.all_asset?.name || row?.asset?.name || '—'}
+        </span>
+      ),
+    },
+    {
       key: 'yahoo_symbol',
       label: 'Symbole Yahoo',
       align: 'center' as const,
@@ -364,7 +374,11 @@ export default function Positions() {
           setSelectedPosition(null)
           setClosePrice('')
         }}
-        title={selectedPosition ? `Position ${selectedPosition.asset?.symbol || 'N/A'}` : 'Détails'}
+        title={
+          selectedPosition
+            ? `Position ${selectedPosition.all_asset_symbol || selectedPosition.asset?.symbol || 'N/A'}`
+            : 'Détails'
+        }
         size="md"
       >
         {selectedPosition && (
@@ -374,11 +388,18 @@ export default function Positions() {
               <div className="detail-grid">
                 <div>
                   <span className="detail-label">Symbole</span>
-                  <span className="detail-value">{selectedPosition.asset?.symbol || 'N/A'}</span>
+                  <span className="detail-value">
+                    {selectedPosition.all_asset_symbol || selectedPosition.asset?.symbol || 'N/A'}
+                  </span>
                 </div>
                 <div>
                   <span className="detail-label">Nom</span>
-                  <span className="detail-value">{selectedPosition.asset?.name || 'N/A'}</span>
+                  <span className="detail-value">
+                    {selectedPosition.all_asset_name ||
+                      selectedPosition.all_asset?.name ||
+                      selectedPosition.asset?.name ||
+                      'N/A'}
+                  </span>
                 </div>
                 <div>
                   <span className="detail-label">Statut</span>

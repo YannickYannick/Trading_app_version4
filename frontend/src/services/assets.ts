@@ -4,6 +4,14 @@
 import apiClient from './api/client'
 import type { ApiResponse, Asset, AllAsset, ApiError, AssetWithChildren, AssetsOverviewResponse } from '@types'
 
+type CachedPrice = { price: number | null; timestamp: number }
+
+// Cache & déduplication pour éviter de spammer l’API Yahoo (surtout en tableau).
+const CACHE_TIMEOUT = 60_000 // 60s
+const priceCache = new Map<number, CachedPrice>()
+const inFlightRequests = new Map<number, Promise<number | null>>()
+const autoValidateAttempted = new Set<number>()
+
 export interface AssetFilters {
   platform?: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
   asset_type?: string
@@ -281,14 +289,43 @@ export const assetService = {
         inFlightRequests.delete(allAssetId)
         return null
       } catch (error: any) {
+        const status = error?.response?.status
+
         // Ignorer silencieusement les 404 et 400 (AllAsset n'existe pas ou pas de symbole Yahoo valide)
         // NE PAS logger ces erreurs car elles sont attendues et polluent la console
         // L'intercepteur axios marque ces erreurs avec silent: true
         if (
           error?.silent ||
-          error?.response?.status === 404 ||
-          error?.response?.status === 400
+          status === 404 ||
+          status === 400
         ) {
+          // Si pas de symbole Yahoo validé (400), tenter une auto-validation 1 seule fois,
+          // puis retenter current_price.
+          if (status === 400 && !autoValidateAttempted.has(allAssetId)) {
+            autoValidateAttempted.add(allAssetId)
+            try {
+              const validation = await assetService.validateYahoo(allAssetId)
+              if (validation?.success) {
+                try {
+                  const retry = await apiClient.get<{
+                    success: boolean
+                    price: number
+                  }>(`/all-assets/${allAssetId}/current_price/`)
+                  if (retry.data.success && retry.data.price !== null && retry.data.price !== undefined) {
+                    const price = retry.data.price
+                    priceCache.set(allAssetId, { price, timestamp: Date.now() })
+                    inFlightRequests.delete(allAssetId)
+                    return price
+                  }
+                } catch {
+                  // ignore et fallback null
+                }
+              }
+            } catch {
+              // ignore et fallback null
+            }
+          }
+
           // Mettre en cache null pour éviter les requêtes répétées (cache court pour réessayer plus tard si le symbole est validé)
           priceCache.set(allAssetId, { price: null, timestamp: Date.now() })
           inFlightRequests.delete(allAssetId)
