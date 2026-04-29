@@ -61,8 +61,16 @@ export default function Positions() {
       for (const batch of batches) {
         const results = await Promise.allSettled(
           batch.map(async (id) => {
-            const price = await assetService.getYahooCurrentPrice(id)
-            return { id, price }
+            try {
+              const price = await assetService.getYahooCurrentPrice(id)
+              return { id, price }
+            } finally {
+              // Progression "asset par asset" (au fur et à mesure des réponses réseau)
+              setYahooProgress((prev) => ({
+                done: Math.min(prev.total, prev.done + 1),
+                total: prev.total,
+              }))
+            }
           })
         )
         results.forEach((result) => {
@@ -70,10 +78,6 @@ export default function Positions() {
             priceMap[result.value.id] = result.value.price
           }
         })
-        setYahooProgress((prev) => ({
-          done: Math.min(prev.total, prev.done + batch.length),
-          total: prev.total,
-        }))
       }
 
       setYahooPrices(priceMap)

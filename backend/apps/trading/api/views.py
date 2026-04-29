@@ -201,6 +201,83 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             })
         
         return Response({'results': results})
+
+    @action(detail=False, methods=['post'], url_path='populate-names-yahoo')
+    def populate_names_yahoo(self, request):
+        """
+        POST /api/all-assets/populate-names-yahoo/
+
+        Remplit `AllAssets.name` depuis Yahoo (yfinance) pour les lignes dont le nom
+        est vide ou équivalent au symbole (ex: 'NVDA:xnas').
+
+        Body (optionnel):
+        - limit: int (défaut 200)
+        - dry_run: bool (défaut false)
+        """
+        from ..services.data_providers.yahoo_finance import YahooFinanceService
+        import logging
+
+        logger = logging.getLogger('trading.api.assets')
+
+        limit = int(request.data.get('limit', 200) or 200)
+        dry_run = bool(request.data.get('dry_run', False))
+
+        service = YahooFinanceService()
+        if not service.is_available:
+            return Response(
+                {'success': False, 'error': 'yfinance not available on server'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Candidats: seulement ceux avec un symbole Yahoo validé (sinon aucune source fiable)
+        candidates = (
+            self.get_queryset()
+            .exclude(symbole_yahoo__in=['Not_searched', 'not_found', 'manual', ''])
+            .order_by('id')[: max(1, limit)]
+        )
+
+        updated = 0
+        checked = 0
+        details = []
+
+        for asset in candidates:
+            checked += 1
+
+            current_name = (asset.name or '').strip()
+            symbol_like = (asset.symbol or '').strip()
+
+            # Si déjà un nom "réel" (différent du symbole), on skip
+            if current_name and current_name.lower() != symbol_like.lower():
+                continue
+
+            new_name = service.get_display_name(asset.symbole_yahoo)
+            if not new_name:
+                continue
+
+            if not dry_run:
+                asset.name = new_name
+                asset.save(update_fields=['name', 'last_updated'])
+
+            updated += 1
+            if len(details) < 25:
+                details.append({
+                    'id': asset.id,
+                    'symbol': asset.symbol,
+                    'yahoo_symbol': asset.symbole_yahoo,
+                    'name': new_name,
+                })
+
+        logger.info(
+            f"[populate-names-yahoo] checked={checked} updated={updated} dry_run={dry_run}"
+        )
+
+        return Response({
+            'success': True,
+            'checked': checked,
+            'updated': updated,
+            'dry_run': dry_run,
+            'sample': details,
+        })
     
     @action(detail=False, methods=['post'], url_path='validate-yahoo-symbols')
     def validate_yahoo_symbols(self, request):

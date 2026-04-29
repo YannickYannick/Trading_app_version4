@@ -140,6 +140,31 @@ class YahooFinanceService:
         except Exception as e:
             logger.error(f"Error getting multiple prices: {e}")
             return {s: None for s in symbols}
+
+    # ============================================
+    # ASSET / COMPANY INFO
+    # ============================================
+
+    def get_display_name(self, symbol: str) -> Optional[str]:
+        """
+        Retourne un nom lisible pour un ticker (ex: 'NVIDIA Corporation').
+
+        Utilise `Ticker.info` (longName/shortName). Peut être lent et/ou limité par Yahoo.
+        """
+        if not YFINANCE_AVAILABLE:
+            return None
+
+        try:
+            ticker = self._get_ticker(symbol)
+            info = getattr(ticker, "info", None) or {}
+            name = info.get("longName") or info.get("shortName") or info.get("name")
+            if not name:
+                return None
+            name = str(name).strip()
+            return name or None
+        except Exception as e:
+            logger.error(f"Error getting display name for {symbol}: {e}")
+            return None
     
     # ============================================
     # HISTORICAL DATA
