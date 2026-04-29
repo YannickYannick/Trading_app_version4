@@ -163,6 +163,11 @@ const AIAdvisor: React.FC = () => {
 
                                 <h3 className="card-title">{analysis.scope_description}</h3>
                                 <p className="card-summary">{analysis.summary}</p>
+                                {analysis.status === 'FAILED' && analysis.error_message && (
+                                    <p className="card-error">
+                                        <strong>Détails :</strong> {analysis.error_message}
+                                    </p>
+                                )}
 
                                 <div className="card-footer">
                                     <span className="card-date">{formatDate(analysis.created_at)}</span>
@@ -188,6 +193,13 @@ const AIAdvisor: React.FC = () => {
                         </div>
 
                         <div className="modal-body">
+                            {/* Erreur */}
+                            {selectedAnalysis.status === 'FAILED' && selectedAnalysis.error_message && (
+                                <section className="detail-section error-section">
+                                    <h3>❌ Détails de l'échec</h3>
+                                    <pre className="error-details">{selectedAnalysis.error_message}</pre>
+                                </section>
+                            )}
                             {/* Résumé */}
                             <section className="detail-section">
                                 <h3>📋 Résumé</h3>

@@ -99,6 +99,7 @@ class AIAnalysisListSerializer(serializers.ModelSerializer):
             'strategy_name',
             'asset_symbol',
             'summary',
+            'error_message',
             'confidence_score',
             'is_daily_report',
             'created_at',

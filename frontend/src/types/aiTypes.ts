@@ -41,6 +41,7 @@ export interface AIAnalysisListItem {
     strategy_name: string | null;
     asset_symbol: string | null;
     summary: string;
+    error_message?: string;
     confidence_score: number | null;
     is_daily_report: boolean;
     created_at: string;

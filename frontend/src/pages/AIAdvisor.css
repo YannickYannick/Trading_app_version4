@@ -218,6 +218,31 @@
     overflow: hidden;
 }
 
+.card-error {
+    margin: -8px 0 16px 0;
+    color: #fca5a5;
+    font-size: 13px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.error-section {
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.error-details {
+    margin: 8px 0 0 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.35);
+    color: #fecaca;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .card-footer {
     display: flex;
     justify-content: space-between;
