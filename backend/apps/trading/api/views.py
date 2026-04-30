@@ -298,6 +298,122 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
             'dry_run': dry_run,
             'sample': details,
         })
+
+    @action(detail=False, methods=['post'], url_path='enrich-yahoo-meta')
+    def enrich_yahoo_meta(self, request):
+        """
+        POST /api/all-assets/enrich-yahoo-meta/
+
+        Enrichit un sous-ensemble d'AllAssets (name/sector/industry) depuis Yahoo, à partir d'une
+        liste d'IDs. Conçu pour le workflow UI (Positions → « Charger prix Yahoo »).
+
+        Body:
+        - all_asset_ids: number[] (requis)
+        - dry_run: bool (défaut false)
+        """
+        from ..services.data_providers.yahoo_finance import YahooFinanceService
+        import logging
+
+        logger = logging.getLogger('trading.api.assets')
+
+        ids = request.data.get('all_asset_ids') or []
+        dry_run = bool(request.data.get('dry_run', False))
+
+        if not isinstance(ids, list) or not ids:
+            return Response(
+                {'success': False, 'error': 'all_asset_ids est requis (liste non vide)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Sanitize IDs
+        safe_ids = []
+        for x in ids:
+            try:
+                safe_ids.append(int(x))
+            except (TypeError, ValueError):
+                continue
+
+        if not safe_ids:
+            return Response(
+                {'success': False, 'error': 'Aucun all_asset_id valide fourni'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        service = YahooFinanceService()
+        if not service.is_available:
+            return Response(
+                {'success': False, 'error': 'yfinance not available on server'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        qs = (
+            self.get_queryset()
+            .filter(id__in=safe_ids)
+            .exclude(symbole_yahoo__in=['Not_searched', 'not_found', 'manual', ''])
+            .order_by('id')
+        )
+
+        checked = 0
+        updated = 0
+        details = []
+
+        for asset in qs:
+            checked += 1
+            current_name = (asset.name or '').strip()
+            symbol_like = (asset.symbol or '').strip()
+            current_sector = (getattr(asset, 'sector', '') or '').strip()
+            current_industry = (getattr(asset, 'industry', '') or '').strip()
+
+            needs_name = not current_name or current_name.lower() == symbol_like.lower()
+            needs_meta = (not current_sector) or (not current_industry)
+            if not (needs_name or needs_meta):
+                continue
+
+            info = service.get_asset_info(asset.symbole_yahoo) or {}
+            new_name = (info.get('name') or service.get_display_name(asset.symbole_yahoo) or '').strip()
+            new_sector = (info.get('sector') or '').strip()
+            new_industry = (info.get('industry') or '').strip()
+
+            if needs_name and not new_name:
+                continue
+
+            if not dry_run:
+                dirty_fields = []
+                if needs_name and new_name and new_name != asset.name:
+                    asset.name = new_name
+                    dirty_fields.append('name')
+                if new_sector and new_sector != getattr(asset, 'sector', ''):
+                    asset.sector = new_sector
+                    dirty_fields.append('sector')
+                if new_industry and new_industry != getattr(asset, 'industry', ''):
+                    asset.industry = new_industry
+                    dirty_fields.append('industry')
+                if dirty_fields:
+                    dirty_fields.append('last_updated')
+                    asset.save(update_fields=dirty_fields)
+
+            updated += 1
+            if len(details) < 25:
+                details.append({
+                    'id': asset.id,
+                    'symbol': asset.symbol,
+                    'yahoo_symbol': asset.symbole_yahoo,
+                    'name': new_name or asset.name,
+                    'sector': new_sector or getattr(asset, 'sector', ''),
+                    'industry': new_industry or getattr(asset, 'industry', ''),
+                })
+
+        logger.info(
+            f"[enrich-yahoo-meta] checked={checked} updated={updated} ids={len(safe_ids)} dry_run={dry_run}"
+        )
+
+        return Response({
+            'success': True,
+            'checked': checked,
+            'updated': updated,
+            'dry_run': dry_run,
+            'sample': details,
+        })
     
     @action(detail=False, methods=['post'], url_path='validate-yahoo-symbols')
     def validate_yahoo_symbols(self, request):

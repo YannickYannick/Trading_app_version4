@@ -224,6 +224,31 @@ export const assetService = {
   },
 
   /**
+   * Enrichit name/sector/industry depuis Yahoo pour une liste d'AllAssets (IDs).
+   */
+  async enrichYahooMeta(allAssetIds: number[], dryRun: boolean = false): Promise<{
+    success: boolean
+    checked?: number
+    updated?: number
+    dry_run?: boolean
+    sample?: any[]
+    error?: string
+  }> {
+    const response = await apiClient.post<{
+      success: boolean
+      checked?: number
+      updated?: number
+      dry_run?: boolean
+      sample?: any[]
+      error?: string
+    }>(
+      '/all-assets/enrich-yahoo-meta/',
+      { all_asset_ids: allAssetIds, dry_run: dryRun },
+    )
+    return response.data
+  },
+
+  /**
    * Récupérer le prix Yahoo actuel (dernier prix disponible)
    * Récupère directement depuis Yahoo Finance, pas depuis l'historique stocké
    * Utilise un cache et une déduplication pour éviter les requêtes multiples

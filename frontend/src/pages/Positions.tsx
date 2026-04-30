@@ -22,6 +22,7 @@ export default function Positions() {
   const [loadAllPrices, setLoadAllPrices] = useState(false)
   const [yahooPricesLoading, setYahooPricesLoading] = useState(false)
   const [yahooProgress, setYahooProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
+  const [yahooError, setYahooError] = useState<string | null>(null)
 
   const { positions, loading, error, summary, refetch } = usePositions({
     status: statusFilter,
@@ -43,13 +44,22 @@ export default function Positions() {
   useEffect(() => {
     setYahooPrices({})
     setYahooProgress({ done: 0, total: 0 })
+    setYahooError(null)
   }, [statusFilter])
 
   const loadYahooPricesManual = useCallback(async () => {
     if (allAssetsInPositions.length === 0) return
     setYahooPricesLoading(true)
+    setYahooError(null)
     try {
       const targetIds = loadAllPrices ? allAssetsInPositions : allAssetsInPositions.slice(0, 20)
+      // 1) Enrichir name/sector/industry via Yahoo pour ces AllAssets (workflow prévu)
+      // (ne bloque pas si ça échoue, mais permet de rafraîchir les colonnes Secteur/Industrie)
+      try {
+        await assetService.enrichYahooMeta(targetIds)
+      } catch {
+        // ignore (on affiche quand même les prix)
+      }
       const priceMap: Record<number, number | null> = {}
       setYahooProgress({ done: 0, total: targetIds.length })
 
@@ -58,6 +68,7 @@ export default function Positions() {
         batches.push(targetIds.slice(i, i + 10))
       }
 
+      let rejectedCount = 0
       for (const batch of batches) {
         const results = await Promise.allSettled(
           batch.map(async (id) => {
@@ -76,15 +87,29 @@ export default function Positions() {
         results.forEach((result) => {
           if (result.status === 'fulfilled') {
             priceMap[result.value.id] = result.value.price
+          } else {
+            rejectedCount += 1
           }
         })
       }
 
       setYahooPrices(priceMap)
+      // 2) Rafraîchir les positions pour récupérer secteur/industrie mis à jour
+      refetch()
+
+      // 3) Feedback utilisateur si rien n'a pu être chargé
+      const nonNullCount = Object.values(priceMap).filter((v) => v !== null && v !== undefined).length
+      if (nonNullCount === 0) {
+        setYahooError(
+          rejectedCount > 0
+            ? 'Impossible de charger les prix Yahoo (erreurs API). Vérifie la session et/ou les symboles Yahoo.'
+            : 'Aucun prix Yahoo disponible pour les actifs sélectionnés (symbole Yahoo non validé ou non trouvé).'
+        )
+      }
     } finally {
       setYahooPricesLoading(false)
     }
-  }, [allAssetsInPositions, loadAllPrices])
+  }, [allAssetsInPositions, loadAllPrices, refetch])
 
   const handleClosePosition = async (id: number) => {
     try {
@@ -390,6 +415,13 @@ export default function Positions() {
               }}
             />
           </div>
+        </div>
+      )}
+
+      {yahooError && (
+        <div className="error-banner">
+          <Badge variant="danger">Yahoo</Badge>
+          <span>{yahooError}</span>
         </div>
       )}
 
