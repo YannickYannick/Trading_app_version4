@@ -65,13 +65,18 @@ export default function StrategiesV3() {
   const [inlineEdit, setInlineEdit] = useState<Record<number, Record<string, any>>>({})
   const [savingId, setSavingId] = useState<number | null>(null)
   
-  // Asset search state
+  // Asset search state (autocomplete like Orders page)
   const [assetSearchQuery, setAssetSearchQuery] = useState('')
-  const [assetSearchResults, setAssetSearchResults] = useState<AllAsset[]>([])
-  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const [autocompleteResults, setAutocompleteResults] = useState<any[]>([])
+  const [loadingAutocomplete, setLoadingAutocomplete] = useState(false)
   const [showAssetDropdown, setShowAssetDropdown] = useState<number | null>(null)
-  const assetSearchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const assetDropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Execution details modal state
+  const [executionModalOpen, setExecutionModalOpen] = useState(false)
+  const [executionResult, setExecutionResult] = useState<any>(null)
+  const [executingId, setExecutingId] = useState<number | null>(null)
   
   // Filters
   const [search, setSearch] = useState('')
@@ -110,44 +115,47 @@ export default function StrategiesV3() {
       if (assetDropdownRef.current && !assetDropdownRef.current.contains(e.target as Node)) {
         setShowAssetDropdown(null)
         setAssetSearchQuery('')
-        setAssetSearchResults([])
+        setAutocompleteResults([])
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Search assets with debounce
-  const searchAssets = useCallback((query: string) => {
-    if (assetSearchTimeout.current) {
-      clearTimeout(assetSearchTimeout.current)
+  // Search assets with autocomplete (like Orders page)
+  const handleAssetSearch = useCallback((query: string) => {
+    setAssetSearchQuery(query)
+    
+    if (autocompleteTimeoutRef.current) {
+      clearTimeout(autocompleteTimeoutRef.current)
     }
     
     if (query.length < 2) {
-      setAssetSearchResults([])
+      setAutocompleteResults([])
       return
     }
     
-    setAssetSearchLoading(true)
-    assetSearchTimeout.current = setTimeout(async () => {
+    setLoadingAutocomplete(true)
+    autocompleteTimeoutRef.current = setTimeout(async () => {
       try {
-        const results = await assetService.searchAllAssets(query)
-        setAssetSearchResults(results.slice(0, 10))
+        const results = await assetService.autocompleteAllAssets(query)
+        setAutocompleteResults(results.slice(0, 15))
       } catch (err) {
         console.error('Erreur recherche assets:', err)
+        setAutocompleteResults([])
       } finally {
-        setAssetSearchLoading(false)
+        setLoadingAutocomplete(false)
       }
-    }, 300)
+    }, 200)
   }, [])
 
-  const handleAssetSelect = (strategyId: number, asset: AllAsset) => {
+  const handleAssetSelect = (strategyId: number, asset: any) => {
     updateInlineEdit(strategyId, 'all_asset', asset.id)
     updateInlineEdit(strategyId, 'all_asset_name', asset.name || asset.symbol)
     updateInlineEdit(strategyId, 'all_asset_symbol', asset.symbol)
+    setAssetSearchQuery(asset.symbol)
     setShowAssetDropdown(null)
-    setAssetSearchQuery('')
-    setAssetSearchResults([])
+    setAutocompleteResults([])
   }
 
   const loadData = useCallback(async () => {
@@ -279,11 +287,24 @@ export default function StrategiesV3() {
   }
 
   const handleExecute = async (s: Strategy) => {
+    setExecutingId(s.id)
     try {
-      await strategyExecutionService.execute(s.id)
+      const result = await strategyExecutionService.execute(s.id)
+      setExecutionResult({
+        strategy: s,
+        ...result
+      })
+      setExecutionModalOpen(true)
       loadData()
-    } catch (err) {
-      alert('Erreur lors de l\'exécution')
+    } catch (err: any) {
+      setExecutionResult({
+        strategy: s,
+        status: 'error',
+        error: err?.response?.data?.error || err?.message || 'Erreur lors de l\'exécution'
+      })
+      setExecutionModalOpen(true)
+    } finally {
+      setExecutingId(null)
     }
   }
 
@@ -569,7 +590,13 @@ export default function StrategiesV3() {
                       {s.is_active ? 'PAU' : 'RUN'}
                     </button>
                     <button className="v3-action-btn" onClick={() => openWizard(s)}>CFG</button>
-                    <button className="v3-action-btn" onClick={() => handleExecute(s)}>EXE</button>
+                    <button 
+                      className={`v3-action-btn ${executingId === s.id ? 'executing' : ''}`}
+                      onClick={() => handleExecute(s)}
+                      disabled={executingId === s.id}
+                    >
+                      {executingId === s.id ? '...' : 'EXE'}
+                    </button>
                     <button className="v3-action-btn" onClick={() => handleDuplicate(s)}>DUP</button>
                     <button className="v3-action-btn delete" onClick={() => handleDelete(s)}>X</button>
                   </div>
@@ -643,39 +670,48 @@ export default function StrategiesV3() {
                         
                         <div className="v3-config-separator" />
                         
-                        {/* Asset Selection */}
-                        <div className="v3-config-row">
+                        {/* Asset Selection - Autocomplete like Orders page */}
+                        <div className="v3-config-row asset-config">
                           <span className="config-key">Asset</span>
                           <div className="v3-asset-selector" ref={showAssetDropdown === s.id ? assetDropdownRef : null} onClick={(e) => e.stopPropagation()}>
                             <input
                               type="text"
-                              className="v3-inline-input asset-search"
-                              placeholder={edits.all_asset_name || getAssetName(s)}
-                              value={showAssetDropdown === s.id ? assetSearchQuery : ''}
-                              onChange={(e) => {
-                                setAssetSearchQuery(e.target.value)
-                                searchAssets(e.target.value)
+                              className="v3-asset-input"
+                              placeholder="Rechercher un asset..."
+                              value={showAssetDropdown === s.id ? assetSearchQuery : (edits.all_asset_symbol || getAssetSymbol(s))}
+                              onChange={(e) => handleAssetSearch(e.target.value)}
+                              onFocus={() => {
+                                setShowAssetDropdown(s.id)
+                                setAssetSearchQuery('')
                               }}
-                              onFocus={() => setShowAssetDropdown(s.id)}
+                              onBlur={() => {
+                                setTimeout(() => {
+                                  setShowAssetDropdown(null)
+                                  setAssetSearchQuery('')
+                                  setAutocompleteResults([])
+                                }, 200)
+                              }}
                             />
                             {showAssetDropdown === s.id && (
-                              <div className="v3-asset-dropdown">
-                                {assetSearchLoading && (
-                                  <div className="v3-asset-dropdown-item loading">Recherche...</div>
+                              <div className="v3-autocomplete-dropdown">
+                                {loadingAutocomplete ? (
+                                  <div className="v3-autocomplete-item loading">Recherche...</div>
+                                ) : assetSearchQuery.length >= 2 && autocompleteResults.length === 0 ? (
+                                  <div className="v3-autocomplete-item empty">Aucun résultat</div>
+                                ) : (
+                                  autocompleteResults.map(asset => (
+                                    <div
+                                      key={asset.id}
+                                      className="v3-autocomplete-item"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => handleAssetSelect(s.id, asset)}
+                                    >
+                                      <span className="autocomplete-symbol">{asset.symbol}</span>
+                                      <span className="autocomplete-name">{asset.name}</span>
+                                      <span className="autocomplete-platform">{asset.platform}</span>
+                                    </div>
+                                  ))
                                 )}
-                                {!assetSearchLoading && assetSearchQuery.length >= 2 && assetSearchResults.length === 0 && (
-                                  <div className="v3-asset-dropdown-item empty">Aucun résultat</div>
-                                )}
-                                {assetSearchResults.map(asset => (
-                                  <div
-                                    key={asset.id}
-                                    className="v3-asset-dropdown-item"
-                                    onClick={() => handleAssetSelect(s.id, asset)}
-                                  >
-                                    <span className="asset-name">{asset.name || asset.symbol}</span>
-                                    <span className="asset-symbol">{asset.symbol}</span>
-                                  </div>
-                                ))}
                               </div>
                             )}
                             {edits.all_asset && edits.all_asset !== getAssetId(s) && (
@@ -994,6 +1030,164 @@ export default function StrategiesV3() {
                   {editTarget ? 'Enregistrer' : 'Créer la stratégie'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Execution Details Modal */}
+      {executionModalOpen && executionResult && (
+        <div className="v3-modal-overlay" onClick={() => setExecutionModalOpen(false)}>
+          <div className="v3-modal execution-modal" onClick={e => e.stopPropagation()}>
+            <div className="v3-modal-header">
+              <span className="v3-modal-title">
+                Résultat de l'exécution
+              </span>
+              <button 
+                className="v3-modal-close"
+                onClick={() => setExecutionModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="v3-modal-body">
+              {/* Strategy Info */}
+              <div className="execution-section">
+                <h4 className="execution-section-title">Stratégie</h4>
+                <div className="execution-info-grid">
+                  <div className="execution-info-item">
+                    <span className="info-label">Nom</span>
+                    <span className="info-value">{executionResult.strategy?.name}</span>
+                  </div>
+                  <div className="execution-info-item">
+                    <span className="info-label">Asset</span>
+                    <span className="info-value">{getAssetName(executionResult.strategy)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="execution-section">
+                <h4 className="execution-section-title">Statut</h4>
+                <div className={`execution-status-badge ${executionResult.status}`}>
+                  {executionResult.status === 'success' ? '✓ Succès' : '✕ Erreur'}
+                </div>
+                {executionResult.error && (
+                  <div className="execution-error">
+                    <span className="error-label">Erreur:</span>
+                    <span className="error-message">{executionResult.error}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signal */}
+              {executionResult.signal && (
+                <div className="execution-section">
+                  <h4 className="execution-section-title">Signal</h4>
+                  <div className="execution-info-grid">
+                    <div className="execution-info-item">
+                      <span className="info-label">Type</span>
+                      <span className={`info-value signal-${executionResult.signal.toLowerCase()}`}>
+                        {executionResult.signal}
+                      </span>
+                    </div>
+                    {executionResult.signal_price && (
+                      <div className="execution-info-item">
+                        <span className="info-label">Prix</span>
+                        <span className="info-value">
+                          {Number(executionResult.signal_price).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                        </span>
+                      </div>
+                    )}
+                    {executionResult.signal_quantity && (
+                      <div className="execution-info-item">
+                        <span className="info-label">Quantité</span>
+                        <span className="info-value">{executionResult.signal_quantity}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Output Details */}
+              {executionResult.output && (
+                <div className="execution-section">
+                  <h4 className="execution-section-title">Détails</h4>
+                  <div className="execution-info-grid">
+                    <div className="execution-info-item">
+                      <span className="info-label">Points de données</span>
+                      <span className="info-value">{executionResult.output.price_data_count || 'N/A'}</span>
+                    </div>
+                    <div className="execution-info-item">
+                      <span className="info-label">Ordres en attente</span>
+                      <span className="info-value">{executionResult.output.pending_orders_count ?? 'N/A'}</span>
+                    </div>
+                    {executionResult.output.execution_executed && (
+                      <div className="execution-info-item full-width">
+                        <span className="info-label">Ordre exécuté</span>
+                        <span className="info-value text-signal-green">✓ Oui</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Signals Details */}
+                  {executionResult.output.signals && (
+                    <div className="execution-signals">
+                      <h5>Signaux de l'algorithme</h5>
+                      <pre className="signals-json">
+                        {JSON.stringify(executionResult.output.signals, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Broker API Response */}
+                  {executionResult.output.broker_api_url && (
+                    <div className="execution-broker-api">
+                      <h5>Réponse API Broker</h5>
+                      <div className="api-url">
+                        <span className="api-label">URL:</span>
+                        <code>{executionResult.output.broker_api_url}</code>
+                      </div>
+                      {executionResult.output.broker_api_response && (
+                        <div className="api-response">
+                          <span className="api-label">Réponse:</span>
+                          <pre className="api-json">
+                            {JSON.stringify(executionResult.output.broker_api_response, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {executionResult.output.broker_api_error && (
+                        <div className="api-error">
+                          <span className="api-label">Erreur API:</span>
+                          <pre className="api-json error">
+                            {JSON.stringify(executionResult.output.broker_api_error, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Portfolio */}
+                  {executionResult.output.portfolio && (
+                    <div className="execution-portfolio">
+                      <h5>Portfolio</h5>
+                      <pre className="portfolio-json">
+                        {JSON.stringify(executionResult.output.portfolio, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="v3-modal-footer">
+              <button
+                className="v3-btn-secondary"
+                onClick={() => setExecutionModalOpen(false)}
+              >
+                Fermer
+              </button>
             </div>
           </div>
         </div>
