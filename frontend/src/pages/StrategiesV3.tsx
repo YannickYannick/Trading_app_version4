@@ -78,6 +78,13 @@ export default function StrategiesV3() {
   const [executionResult, setExecutionResult] = useState<any>(null)
   const [executingId, setExecutingId] = useState<number | null>(null)
   
+  // Yahoo data sync state
+  const [syncingYahooId, setSyncingYahooId] = useState<number | null>(null)
+  const [yahooSyncResult, setYahooSyncResult] = useState<Record<number, { success: boolean; message: string }>>({})
+  
+  // Key to force chart remount after sync
+  const [chartKey, setChartKey] = useState(0)
+  
   // Filters
   const [search, setSearch] = useState('')
   const [filterAlgo, setFilterAlgo] = useState('all')
@@ -156,6 +163,47 @@ export default function StrategiesV3() {
     setAssetSearchQuery(asset.symbol)
     setShowAssetDropdown(null)
     setAutocompleteResults([])
+  }
+
+  // Sync Yahoo price data for a strategy's asset
+  const handleSyncYahoo = async (s: Strategy) => {
+    const assetId = getAssetId(s)
+    if (!assetId) {
+      alert('Pas d\'asset associé à cette stratégie')
+      return
+    }
+
+    setSyncingYahooId(s.id)
+    setYahooSyncResult(prev => ({ ...prev, [s.id]: { success: false, message: 'Synchronisation...' } }))
+
+    try {
+      // First validate Yahoo symbol if needed
+      await assetService.validateYahoo(assetId)
+      
+      // Then sync price history (365 days)
+      const result = await assetService.syncPriceHistory(assetId, 365, '1d')
+      
+      if (result.success) {
+        setYahooSyncResult(prev => ({
+          ...prev,
+          [s.id]: { success: true, message: `${result.records || 0} points chargés` }
+        }))
+        // Force chart remount to reload data
+        setChartKey(prev => prev + 1)
+      } else {
+        setYahooSyncResult(prev => ({
+          ...prev,
+          [s.id]: { success: false, message: result.error || 'Erreur inconnue' }
+        }))
+      }
+    } catch (err: any) {
+      setYahooSyncResult(prev => ({
+        ...prev,
+        [s.id]: { success: false, message: err?.response?.data?.error || err?.message || 'Erreur de synchronisation' }
+      }))
+    } finally {
+      setSyncingYahooId(null)
+    }
   }
 
   const loadData = useCallback(async () => {
@@ -613,8 +661,23 @@ export default function StrategiesV3() {
                 return (
                   <div className="v3-strategy-expanded">
                     <div className="v3-chart-section">
-                      <h4>Prix & Signaux — {edits.all_asset_name || getAssetName(s)}</h4>
+                      <div className="v3-chart-header">
+                        <h4>Prix & Signaux — {edits.all_asset_name || getAssetName(s)}</h4>
+                        <button
+                          className={`v3-sync-btn ${syncingYahooId === s.id ? 'syncing' : ''} ${yahooSyncResult[s.id]?.success ? 'success' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); handleSyncYahoo(s); }}
+                          disabled={syncingYahooId === s.id}
+                        >
+                          {syncingYahooId === s.id ? '⏳ Chargement...' : '📊 Charger données Yahoo'}
+                        </button>
+                      </div>
+                      {yahooSyncResult[s.id] && (
+                        <div className={`v3-sync-message ${yahooSyncResult[s.id].success ? 'success' : 'error'}`}>
+                          {yahooSyncResult[s.id].success ? '✓' : '✕'} {yahooSyncResult[s.id].message}
+                        </div>
+                      )}
                       <StrategyVisualizationChart
+                        key={`chart-${s.id}-${chartKey}`}
                         strategy={s}
                         parameters={edits}
                       />
