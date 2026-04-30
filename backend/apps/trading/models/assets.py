@@ -25,6 +25,9 @@ class AllAssets(models.Model):
     
     symbol = models.CharField(max_length=50)
     name = models.CharField(max_length=200)
+    # Métadonnées Yahoo (optionnelles) pour affichage rapide côté Positions/Trades/Orders
+    sector = models.CharField(max_length=150, blank=True, default='')
+    industry = models.CharField(max_length=150, blank=True, default='')
     platform = models.CharField(max_length=20, choices=BROKER_CHOICES)
     asset_type = models.CharField(max_length=50)
     market = models.CharField(max_length=50)

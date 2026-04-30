@@ -38,7 +38,7 @@ class AllAssetsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AllAssets
         fields = [
-            'id', 'symbol', 'name', 'display_name', 'platform', 'asset_type', 'market',
+            'id', 'symbol', 'name', 'sector', 'industry', 'display_name', 'platform', 'asset_type', 'market',
             'currency', 'exchange', 'is_tradable', 'last_updated', 'created_at',
             'saxo_uic', 'saxo_exchange_id', 'saxo_country_code',
             'symbole_yahoo', 'yahoo_validation_method', 'yahoo_validated_at',
@@ -540,6 +540,9 @@ class PositionListSerializer(serializers.ModelSerializer):
     """
     all_asset_id = serializers.IntegerField(source='all_asset.id', read_only=True)
     all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
+    all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
+    all_asset_sector = serializers.CharField(source='all_asset.sector', read_only=True)
+    all_asset_industry = serializers.CharField(source='all_asset.industry', read_only=True)
     all_asset_yahoo_symbol = serializers.CharField(source='all_asset.symbole_yahoo', read_only=True)
 
     # Compat: le frontend utilise `status` / `size`
@@ -553,7 +556,7 @@ class PositionListSerializer(serializers.ModelSerializer):
         model = Position
         fields = [
             'id',
-            'all_asset_id', 'all_asset_symbol', 'all_asset_yahoo_symbol',
+            'all_asset_id', 'all_asset_symbol', 'all_asset_name', 'all_asset_sector', 'all_asset_industry', 'all_asset_yahoo_symbol',
             'side', 'quantity', 'size', 'entry_price', 'current_price',
             'opened_at', 'closed_at',
             'status',

@@ -15,6 +15,8 @@ const PositionItem = ({ position }: { position: Position }) => {
     // Fallbacks for display
     const symbol = position.all_asset_symbol || position.asset?.symbol || `Asset #${position.asset?.id || position.id}`
     const name = position.all_asset_name || position.all_asset?.name || position.asset?.name || ''
+    const sector = (position as any).all_asset_sector || position.all_asset?.sector || ''
+    const industry = (position as any).all_asset_industry || position.all_asset?.industry || ''
     const qty = Number(position.size) || 0
     const entryPrice = Number(position.entry_price) || 0
     const currentPrice = Number(position.current_price || position.yahoo_current_price) || entryPrice
@@ -25,6 +27,11 @@ const PositionItem = ({ position }: { position: Position }) => {
                 <View>
                     <Text style={styles.symbol}>{symbol}</Text>
                     {!!name && <Text style={styles.name}>{name}</Text>}
+                    {!!(sector || industry) && (
+                        <Text style={styles.meta}>
+                            {[sector, industry].filter(Boolean).join(' • ')}
+                        </Text>
+                    )}
                     <Text style={[styles.side, { color: position.side === 'BUY' ? '#2196F3' : '#FF9800' }]}>
                         {position.side}
                     </Text>
@@ -136,6 +143,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#757575',
         maxWidth: 220,
+    },
+    meta: {
+        marginTop: 2,
+        fontSize: 11,
+        color: '#9E9E9E',
+        maxWidth: 240,
     },
     side: {
         fontSize: 12,

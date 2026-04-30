@@ -31,6 +31,8 @@ export interface AllAsset {
   id: number
   symbol: string
   name: string
+  sector?: string
+  industry?: string
   platform: 'SAXO' | 'BINANCE' | 'IB' | 'OTHER'
   asset_type: string
   market: string
@@ -62,6 +64,8 @@ export interface Position {
   all_asset?: AllAsset
   all_asset_symbol?: string
   all_asset_name?: string
+  all_asset_sector?: string
+  all_asset_industry?: string
   all_asset_platform?: string
   all_asset_yahoo_symbol?: string
   size: number

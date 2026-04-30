@@ -130,6 +130,26 @@ export default function Positions() {
       },
     },
     {
+      key: 'all_asset_sector',
+      label: 'Secteur',
+      align: 'left' as const,
+      render: (_value: any, row: Position) => {
+        const raw = (row as any)?.all_asset_sector || row?.all_asset?.sector || ''
+        const val = String(raw).trim()
+        return <span>{val || '—'}</span>
+      },
+    },
+    {
+      key: 'all_asset_industry',
+      label: 'Industrie',
+      align: 'left' as const,
+      render: (_value: any, row: Position) => {
+        const raw = (row as any)?.all_asset_industry || row?.all_asset?.industry || ''
+        const val = String(raw).trim()
+        return <span>{val || '—'}</span>
+      },
+    },
+    {
       key: 'yahoo_symbol',
       label: 'Symbole Yahoo',
       align: 'center' as const,

@@ -207,8 +207,8 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
         """
         POST /api/all-assets/populate-names-yahoo/
 
-        Remplit `AllAssets.name` depuis Yahoo (yfinance) pour les lignes dont le nom
-        est vide ou équivalent au symbole (ex: 'NVDA:xnas').
+        Remplit `AllAssets.name` (et métadonnées `sector` / `industry`) depuis Yahoo (yfinance).
+        Utile quand la liste Positions affiche 2× le symbole (name = symbol).
 
         Body (optionnel):
         - limit: int (défaut 200)
@@ -245,18 +245,36 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
 
             current_name = (asset.name or '').strip()
             symbol_like = (asset.symbol or '').strip()
+            current_sector = (getattr(asset, 'sector', '') or '').strip()
+            current_industry = (getattr(asset, 'industry', '') or '').strip()
 
-            # Si déjà un nom "réel" (différent du symbole), on skip
-            if current_name and current_name.lower() != symbol_like.lower():
+            needs_name = not current_name or current_name.lower() == symbol_like.lower()
+            needs_meta = (not current_sector) or (not current_industry)
+            if not (needs_name or needs_meta):
                 continue
 
-            new_name = service.get_display_name(asset.symbole_yahoo)
-            if not new_name:
+            info = service.get_asset_info(asset.symbole_yahoo) or {}
+            new_name = (info.get('name') or service.get_display_name(asset.symbole_yahoo) or '').strip()
+            new_sector = (info.get('sector') or '').strip()
+            new_industry = (info.get('industry') or '').strip()
+
+            if needs_name and not new_name:
                 continue
 
             if not dry_run:
-                asset.name = new_name
-                asset.save(update_fields=['name', 'last_updated'])
+                dirty_fields = []
+                if needs_name and new_name and new_name != asset.name:
+                    asset.name = new_name
+                    dirty_fields.append('name')
+                if new_sector and new_sector != getattr(asset, 'sector', ''):
+                    asset.sector = new_sector
+                    dirty_fields.append('sector')
+                if new_industry and new_industry != getattr(asset, 'industry', ''):
+                    asset.industry = new_industry
+                    dirty_fields.append('industry')
+                if dirty_fields:
+                    dirty_fields.append('last_updated')
+                    asset.save(update_fields=dirty_fields)
 
             updated += 1
             if len(details) < 25:
@@ -264,7 +282,9 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                     'id': asset.id,
                     'symbol': asset.symbol,
                     'yahoo_symbol': asset.symbole_yahoo,
-                    'name': new_name,
+                    'name': new_name or asset.name,
+                    'sector': new_sector or getattr(asset, 'sector', ''),
+                    'industry': new_industry or getattr(asset, 'industry', ''),
                 })
 
         logger.info(
