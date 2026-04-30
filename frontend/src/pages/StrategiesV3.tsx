@@ -61,6 +61,10 @@ export default function StrategiesV3() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   
+  // Inline edit state
+  const [inlineEdit, setInlineEdit] = useState<Record<number, Record<string, any>>>({})
+  const [savingId, setSavingId] = useState<number | null>(null)
+  
   // Filters
   const [search, setSearch] = useState('')
   const [filterAlgo, setFilterAlgo] = useState('all')
@@ -112,6 +116,69 @@ export default function StrategiesV3() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Initialize inline edit state when expanding a strategy
+  const initInlineEdit = (s: Strategy) => {
+    if (!inlineEdit[s.id]) {
+      const params = s.parameters || {}
+      setInlineEdit(prev => ({
+        ...prev,
+        [s.id]: {
+          algorithm_type: s.algorithm_type || 'threshold',
+          risk_level: s.risk_level || 'MEDIUM',
+          target_min_quantity: s.target_min_quantity ?? 1,
+          target_max_quantity: s.target_max_quantity ?? 10,
+          check_frequency: s.check_frequency ?? 45,
+          is_automated: s.is_automated ?? false,
+          ...params,
+        }
+      }))
+    }
+  }
+
+  const updateInlineEdit = (strategyId: number, key: string, value: any) => {
+    setInlineEdit(prev => ({
+      ...prev,
+      [strategyId]: {
+        ...prev[strategyId],
+        [key]: value,
+      }
+    }))
+  }
+
+  const saveInlineEdit = async (s: Strategy) => {
+    const edits = inlineEdit[s.id]
+    if (!edits) return
+
+    setSavingId(s.id)
+    try {
+      // Separate algo params from strategy fields
+      const algoParamKeys = ALGORITHM_PARAMS[edits.algorithm_type || s.algorithm_type || 'threshold']?.map(p => p.key) || []
+      const parameters: Record<string, number> = {}
+      algoParamKeys.forEach(key => {
+        if (edits[key] !== undefined) {
+          parameters[key] = parseFloat(edits[key]) || 0
+        }
+      })
+
+      await strategyService.update(s.id, {
+        algorithm_type: edits.algorithm_type,
+        risk_level: edits.risk_level,
+        target_min_quantity: parseFloat(edits.target_min_quantity) || 0,
+        target_max_quantity: parseFloat(edits.target_max_quantity) || 0,
+        check_frequency: parseInt(edits.check_frequency) || 45,
+        is_automated: edits.is_automated,
+        parameters,
+      })
+      
+      loadData()
+    } catch (err) {
+      console.error('Erreur sauvegarde:', err)
+      alert('Erreur lors de la sauvegarde')
+    } finally {
+      setSavingId(null)
+    }
+  }
 
   // Filtered strategies
   const filtered = useMemo(() => {
@@ -436,56 +503,146 @@ export default function StrategiesV3() {
               </div>
 
               {/* Expanded */}
-              {expandedId === s.id && (
-                <div className="v3-strategy-expanded">
-                  <div className="v3-chart-section">
-                    <h4>Prix & Signaux — {getAssetSymbol(s)}</h4>
-                    <StrategyVisualizationChart
-                      strategy={s}
-                      parameters={s.parameters || {}}
-                    />
-                  </div>
-                  <div className="v3-config-section">
-                    <h4>Configuration</h4>
-                    <div className="v3-config-list">
-                      <div className="v3-config-row">
-                        <span className="config-key">Algorithme</span>
-                        <span className="config-value">{ALGORITHM_LABELS[s.algorithm_type || ''] || s.algorithm_type}</span>
+              {expandedId === s.id && (() => {
+                initInlineEdit(s)
+                const edits = inlineEdit[s.id] || {}
+                const currentAlgo = edits.algorithm_type || s.algorithm_type || 'threshold'
+                const algoParams = ALGORITHM_PARAMS[currentAlgo] || []
+                
+                return (
+                  <div className="v3-strategy-expanded">
+                    <div className="v3-chart-section">
+                      <h4>Prix & Signaux — {getAssetSymbol(s)}</h4>
+                      <StrategyVisualizationChart
+                        strategy={s}
+                        parameters={edits}
+                      />
+                    </div>
+                    <div className="v3-config-section">
+                      <div className="v3-config-header">
+                        <h4>Configuration</h4>
+                        <button 
+                          className="v3-save-btn"
+                          onClick={(e) => { e.stopPropagation(); saveInlineEdit(s); }}
+                          disabled={savingId === s.id}
+                        >
+                          {savingId === s.id ? 'Sauvegarde...' : '✓ Sauvegarder'}
+                        </button>
                       </div>
-                      {s.parameters && Object.entries(s.parameters).map(([key, val]) => (
-                        <div key={key} className="v3-config-row">
-                          <span className="config-key">{key}</span>
-                          <span className="config-value">{val}</span>
+                      <div className="v3-config-list">
+                        {/* Algorithme */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Algorithme</span>
+                          <select
+                            className="v3-inline-select"
+                            value={currentAlgo}
+                            onChange={(e) => {
+                              updateInlineEdit(s.id, 'algorithm_type', e.target.value)
+                              // Reset params to defaults for new algo
+                              const newParams = ALGORITHM_PARAMS[e.target.value] || []
+                              newParams.forEach(p => {
+                                updateInlineEdit(s.id, p.key, p.default)
+                              })
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {Object.entries(ALGORITHM_LABELS).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
                         </div>
-                      ))}
-                      <div className="v3-config-row" style={{ borderTop: '1px solid hsl(240, 4%, 16%)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                        <span className="config-key">Broker</span>
-                        <span className="config-value">{s.broker_name || 'N/A'}</span>
-                      </div>
-                      <div className="v3-config-row">
-                        <span className="config-key">Risque</span>
-                        <span className={`config-value ${s.risk_level === 'HIGH' ? 'text-signal-red' : s.risk_level === 'MEDIUM' ? 'text-signal-yellow' : 'text-signal-green'}`}>
-                          {s.risk_level}
-                        </span>
-                      </div>
-                      <div className="v3-config-row">
-                        <span className="config-key">Quantité</span>
-                        <span className="config-value">{s.target_min_quantity} – {s.target_max_quantity}</span>
-                      </div>
-                      <div className="v3-config-row">
-                        <span className="config-key">Fréquence</span>
-                        <span className="config-value">{s.check_frequency || 45} min</span>
-                      </div>
-                      <div className="v3-config-row">
-                        <span className="config-key">Automatisé</span>
-                        <span className={`config-value ${s.is_automated ? 'text-signal-green' : ''}`}>
-                          {s.is_automated ? 'OUI' : 'NON'}
-                        </span>
+                        
+                        {/* Algo Parameters */}
+                        {algoParams.map(param => (
+                          <div key={param.key} className="v3-config-row">
+                            <span className="config-key">{param.label}</span>
+                            <input
+                              type="number"
+                              className="v3-inline-input"
+                              value={edits[param.key] ?? param.default}
+                              onChange={(e) => updateInlineEdit(s.id, param.key, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              step="any"
+                            />
+                          </div>
+                        ))}
+                        
+                        <div className="v3-config-separator" />
+                        
+                        {/* Broker (read-only) */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Broker</span>
+                          <span className="config-value">{s.broker_name || 'N/A'}</span>
+                        </div>
+                        
+                        {/* Risk Level */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Risque</span>
+                          <div className="v3-inline-options" onClick={(e) => e.stopPropagation()}>
+                            {['LOW', 'MEDIUM', 'HIGH'].map(level => (
+                              <button
+                                key={level}
+                                className={`v3-inline-option ${edits.risk_level === level ? 'selected' : ''} risk-${level.toLowerCase()}`}
+                                onClick={() => updateInlineEdit(s.id, 'risk_level', level)}
+                              >
+                                {level}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {/* Quantity Range */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Quantité</span>
+                          <div className="v3-inline-range" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              className="v3-inline-input small"
+                              value={edits.target_min_quantity ?? s.target_min_quantity ?? 1}
+                              onChange={(e) => updateInlineEdit(s.id, 'target_min_quantity', e.target.value)}
+                              step="any"
+                            />
+                            <span className="range-separator">–</span>
+                            <input
+                              type="number"
+                              className="v3-inline-input small"
+                              value={edits.target_max_quantity ?? s.target_max_quantity ?? 10}
+                              onChange={(e) => updateInlineEdit(s.id, 'target_max_quantity', e.target.value)}
+                              step="any"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Frequency */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Fréquence</span>
+                          <div className="v3-inline-range" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              className="v3-inline-input small"
+                              value={edits.check_frequency ?? s.check_frequency ?? 45}
+                              onChange={(e) => updateInlineEdit(s.id, 'check_frequency', e.target.value)}
+                              min={1}
+                            />
+                            <span className="range-unit">min</span>
+                          </div>
+                        </div>
+                        
+                        {/* Automated */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Automatisé</span>
+                          <button
+                            className={`v3-inline-toggle ${edits.is_automated ? 'active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); updateInlineEdit(s.id, 'is_automated', !edits.is_automated); }}
+                          >
+                            {edits.is_automated ? '✓ OUI' : 'NON'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           ))
         )}
