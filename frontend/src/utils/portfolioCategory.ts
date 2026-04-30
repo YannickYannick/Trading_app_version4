@@ -29,11 +29,15 @@ export function saveCategoryOverrides(overrides: CategoryOverrides) {
   localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides))
 }
 
-export function getPositionValueEURish(p: Position): number {
-  // On reste “monnaie de référence” côté UI (déjà le cas ailleurs).
+export function getPositionValueForAnalyticsParity(p: Position): number {
+  /**
+   * IMPORTANT: doit rester cohérent avec le backend `GET /api/analytics/summary/`
+   * qui valorise avec `current_price` puis fallback `entry_price`.
+   *
+   * On évite `yahoo_current_price` ici pour ne pas créer d’écarts vs KPI dashboard.
+   */
   const qty = Number((p as any).quantity ?? (p as any).size ?? 0) || 0
-  const px =
-    Number((p as any).yahoo_current_price ?? p.current_price ?? p.entry_price ?? 0) || 0
+  const px = Number(p.current_price ?? p.entry_price ?? 0) || 0
   return qty * px
 }
 
@@ -129,7 +133,7 @@ export function buildCategoryBreakdown(
   const map = new Map<PortfolioCategory, number>()
   for (const p of positions) {
     const cat = categorizePosition(p, overrides)
-    const val = getPositionValueEURish(p)
+    const val = getPositionValueForAnalyticsParity(p)
     map.set(cat, (map.get(cat) ?? 0) + val)
   }
   if (totalCash && totalCash > 0) {

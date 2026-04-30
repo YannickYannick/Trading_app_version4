@@ -4,9 +4,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, Table, Badge, Loading, Modal, Input, YahooActions } from '@components/common'
+import { PortfolioCategoryChart } from '@components/dashboard/PortfolioCategoryChart'
 import { usePositions } from '@hooks/usePositions'
 import { positionService } from '@services'
 import { assetService } from '@services/assets'
+import api from '@services/api'
 import { formatCurrency, formatPercent, formatDate } from '@utils/format'
 import type { Position } from '@types'
 import './Positions.css'
@@ -23,10 +25,25 @@ export default function Positions() {
   const [yahooPricesLoading, setYahooPricesLoading] = useState(false)
   const [yahooProgress, setYahooProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
   const [yahooError, setYahooError] = useState<string | null>(null)
+  const [totalCash, setTotalCash] = useState<number>(0)
 
   const { positions, loading, error, summary, refetch } = usePositions({
     status: statusFilter,
   })
+
+  // Cash (pour inclure dans le diagramme catégories)
+  useEffect(() => {
+    const loadCash = async () => {
+      try {
+        const data = await api.getAnalyticsSummary()
+        const cash = Number(data?.kpi?.total_cash || 0) || 0
+        setTotalCash(cash)
+      } catch {
+        setTotalCash(0)
+      }
+    }
+    loadCash()
+  }, [])
 
   const allAssetsInPositions = useMemo(() => {
     const ids = new Set<number>()
@@ -439,6 +456,15 @@ export default function Positions() {
           </Card>
         </div>
       )}
+
+      {/* Diagramme catégories (positions filtrées + cash global) */}
+      <div style={{ marginBottom: '24px' }}>
+        <PortfolioCategoryChart
+          positions={positions}
+          totalCash={statusFilter === 'OPEN' ? totalCash : 0}
+          title="Allocation par catégories (positions)"
+        />
+      </div>
 
       <Card title={`${positions.length} position(s)`}>
         {positions.length > 0 ? (

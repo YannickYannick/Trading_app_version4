@@ -47,21 +47,45 @@ const CATEGORY_OPTIONS: PortfolioCategory[] = [
   'Other',
 ]
 
+function groupSmallSlices(
+  slices: Array<{ name: string; value: number }>,
+  minPercent: number
+): Array<{ name: string; value: number }> {
+  const total = slices.reduce((acc, x) => acc + x.value, 0)
+  if (!total || total <= 0) return slices
+
+  let other = 0
+  const kept: Array<{ name: string; value: number }> = []
+  for (const s of slices) {
+    const pct = (s.value / total) * 100
+    if (pct < minPercent) {
+      other += s.value
+    } else {
+      kept.push(s)
+    }
+  }
+  if (other > 0) kept.push({ name: 'Other', value: other })
+  return kept.sort((a, b) => b.value - a.value)
+}
+
 export function PortfolioCategoryChart({
   positions,
   totalCash,
+  title = 'Allocation par catégories (heuristiques + overrides)',
 }: {
   positions: Position[]
   totalCash: number
+  title?: string
 }) {
   const [isOverrideOpen, setIsOverrideOpen] = useState(false)
   const [overrides, setOverrides] = useState<CategoryOverrides>(() => loadCategoryOverrides())
   const [filter, setFilter] = useState('')
 
-  const data = useMemo(
+  const rawData = useMemo(
     () => buildCategoryBreakdown(positions, totalCash, overrides),
     [positions, totalCash, overrides]
   )
+  const data = useMemo(() => groupSmallSlices(rawData, 2), [rawData])
 
   const symbols = useMemo(() => uniqueSymbols(positions), [positions])
   const filteredSymbols = useMemo(() => {
@@ -78,7 +102,7 @@ export function PortfolioCategoryChart({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h3 style={{ marginBottom: '6px', fontSize: '1.1rem', fontWeight: 600 }}>
-              Allocation par catégories (heuristiques + overrides)
+              {title}
             </h3>
             <div style={{ fontSize: '0.85rem', color: '#999' }}>
               Total: {formatCurrency(total)}
@@ -90,28 +114,45 @@ export function PortfolioCategoryChart({
         </div>
 
         <div style={{ width: '100%', height: 320, marginTop: 16 }}>
-          <ResponsiveContainer>
-            <PieChart>
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={110}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {data.map((_entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                formatter={(value: number) => [`${value.toFixed(2)} €`, '']}
-              />
-              <Legend verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
+          {total <= 0 ? (
+            <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+              Aucune donnée à afficher (valeurs à 0).
+            </div>
+          ) : (
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={118}
+                  innerRadius={62}
+                  labelLine={false}
+                >
+                  {data.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                  formatter={(value: number, _name, props: any) => {
+                    const pct =
+                      total > 0 && typeof props?.payload?.value === 'number'
+                        ? ` (${((props.payload.value / total) * 100).toFixed(1)}%)`
+                        : ''
+                    return [`${Number(value).toFixed(2)} €${pct}`, '']
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={90}
+                  wrapperStyle={{ maxHeight: 90, overflowY: 'auto' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
