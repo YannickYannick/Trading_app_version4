@@ -14,6 +14,7 @@ function Sidebar() {
     { path: '/trades', label: 'Trades', icon: '📈' },
     { path: '/orders', label: 'Ordres', icon: '📋' },
     { path: '/strategies', label: 'Stratégies', icon: '🎯' },
+    { path: '/strategies-v2', label: 'Stratégies V2', icon: '✨' },
     { path: '/assets', label: 'Assets', icon: '💰' },
     { path: '/brokers', label: 'Brokers', icon: '🏦' },
     { path: '/blog', label: 'Blog', icon: '📰' },

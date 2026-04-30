@@ -97,6 +97,17 @@
   border-color: var(--color-secondary-dark);
 }
 
+.btn-warning {
+  background-color: var(--color-warning, #f59e0b);
+  color: var(--color-text-inverse, white);
+  border-color: var(--color-warning, #f59e0b);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: var(--color-warning-dark, #d97706);
+  border-color: var(--color-warning-dark, #d97706);
+}
+
 .btn-outline {
   background-color: transparent;
   color: var(--color-text);

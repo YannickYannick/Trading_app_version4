@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import './Button.css'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'buy' | 'sell' | 'outline'
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'buy' | 'sell' | 'outline'
   size?: 'sm' | 'md' | 'lg'
   children: ReactNode
   fullWidth?: boolean

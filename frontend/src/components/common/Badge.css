@@ -50,3 +50,14 @@
   color: var(--color-primary);
 }
 
+.badge-secondary {
+  background-color: var(--color-bg-secondary, #f3f4f6);
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* Sizes */
+.badge-small {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+}
+
