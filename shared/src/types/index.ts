@@ -64,6 +64,8 @@ export interface Position {
   all_asset_sector?: string
   all_asset_industry?: string
   all_asset_platform?: string
+  all_asset_asset_type?: string
+  all_asset_currency?: string
   all_asset_yahoo_symbol?: string
   size: number
   entry_price: number

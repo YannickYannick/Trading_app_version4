@@ -10,6 +10,7 @@ import { formatCurrency, formatPercent, formatDate } from '@utils/format'
 import type { Position } from '@types'
 import AIInsightWidget from '@components/AIInsightWidget'
 import { AnalyticsCharts } from '@components/dashboard/AnalyticsCharts'
+import { PortfolioCategoryChart } from '@components/dashboard/PortfolioCategoryChart'
 import api from '@services/api'
 import './Dashboard.css'
 
@@ -162,6 +163,11 @@ export default function Dashboard() {
 
       {/* Nouveaux Graphiques d'Analytique */}
       <AnalyticsCharts history={history} breakdown={breakdown} />
+
+      {/* Allocation portefeuille (catégories) */}
+      <div style={{ marginBottom: '24px' }}>
+        <PortfolioCategoryChart positions={positions} totalCash={kpi?.total_cash || 0} />
+      </div>
 
       <div className="dashboard-sections-grid">
         {/* Positions récentes */}

@@ -11,6 +11,7 @@ Application de trading avec backend Django et frontend React.
 - [Index doc backend (phases, stack)](docs/backend/INDEX.md)
 - [IA — Suggestions de diversification (Orders)](docs/AI_DIVERSIFY_ORDERS.md)
 - [Workflow Yahoo — Positions (prix + secteur/industrie)](docs/YAHOO_POSITIONS_WORKFLOW.md)
+- [Diagramme catégories portefeuille (heuristiques + overrides UI)](docs/PORTFOLIO_CATEGORY_DIAGRAM.md)
 
 ## Fonctionnalités
 - Trading multi-brokers (Saxo Bank, Binance)
