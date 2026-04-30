@@ -2,11 +2,11 @@
  * StrategiesV3 - Interface style terminal de trading
  * Inspiré de bot-bloom-forge
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { strategyService } from '@services'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { strategyService, assetService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
 import { useToast } from '@hooks/useToast'
-import type { Strategy } from '@types'
+import type { Strategy, AllAsset } from '@types'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import './StrategiesV3.css'
 
@@ -65,6 +65,14 @@ export default function StrategiesV3() {
   const [inlineEdit, setInlineEdit] = useState<Record<number, Record<string, any>>>({})
   const [savingId, setSavingId] = useState<number | null>(null)
   
+  // Asset search state
+  const [assetSearchQuery, setAssetSearchQuery] = useState('')
+  const [assetSearchResults, setAssetSearchResults] = useState<AllAsset[]>([])
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const [showAssetDropdown, setShowAssetDropdown] = useState<number | null>(null)
+  const assetSearchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const assetDropdownRef = useRef<HTMLDivElement>(null)
+  
   // Filters
   const [search, setSearch] = useState('')
   const [filterAlgo, setFilterAlgo] = useState('all')
@@ -95,6 +103,52 @@ export default function StrategiesV3() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // Close asset dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (assetDropdownRef.current && !assetDropdownRef.current.contains(e.target as Node)) {
+        setShowAssetDropdown(null)
+        setAssetSearchQuery('')
+        setAssetSearchResults([])
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Search assets with debounce
+  const searchAssets = useCallback((query: string) => {
+    if (assetSearchTimeout.current) {
+      clearTimeout(assetSearchTimeout.current)
+    }
+    
+    if (query.length < 2) {
+      setAssetSearchResults([])
+      return
+    }
+    
+    setAssetSearchLoading(true)
+    assetSearchTimeout.current = setTimeout(async () => {
+      try {
+        const results = await assetService.searchAllAssets(query)
+        setAssetSearchResults(results.slice(0, 10))
+      } catch (err) {
+        console.error('Erreur recherche assets:', err)
+      } finally {
+        setAssetSearchLoading(false)
+      }
+    }, 300)
+  }, [])
+
+  const handleAssetSelect = (strategyId: number, asset: AllAsset) => {
+    updateInlineEdit(strategyId, 'all_asset', asset.id)
+    updateInlineEdit(strategyId, 'all_asset_name', asset.name || asset.symbol)
+    updateInlineEdit(strategyId, 'all_asset_symbol', asset.symbol)
+    setShowAssetDropdown(null)
+    setAssetSearchQuery('')
+    setAssetSearchResults([])
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -130,6 +184,9 @@ export default function StrategiesV3() {
           target_max_quantity: s.target_max_quantity ?? 10,
           check_frequency: s.check_frequency ?? 45,
           is_automated: s.is_automated ?? false,
+          all_asset: getAssetId(s),
+          all_asset_name: getAssetName(s),
+          all_asset_symbol: getAssetSymbol(s),
           ...params,
         }
       }))
@@ -161,7 +218,7 @@ export default function StrategiesV3() {
         }
       })
 
-      await strategyService.update(s.id, {
+      const updateData: Record<string, any> = {
         algorithm_type: edits.algorithm_type,
         risk_level: edits.risk_level,
         target_min_quantity: parseFloat(edits.target_min_quantity) || 0,
@@ -169,7 +226,14 @@ export default function StrategiesV3() {
         check_frequency: parseInt(edits.check_frequency) || 45,
         is_automated: edits.is_automated,
         parameters,
-      })
+      }
+
+      // Include asset if modified
+      if (edits.all_asset && edits.all_asset !== getAssetId(s)) {
+        updateData.all_asset = edits.all_asset
+      }
+
+      await strategyService.update(s.id, updateData)
       
       loadData()
     } catch (err) {
@@ -328,6 +392,16 @@ export default function StrategiesV3() {
     return s.all_asset_symbol || (typeof s.all_asset === 'object' ? s.all_asset?.symbol : null) || 'N/A'
   }
 
+  const getAssetName = (s: Strategy) => {
+    return s.all_asset_name || (typeof s.all_asset === 'object' ? s.all_asset?.name : null) || getAssetSymbol(s)
+  }
+
+  const getAssetId = (s: Strategy): number | null => {
+    if (typeof s.all_asset === 'number') return s.all_asset
+    if (typeof s.all_asset === 'object' && s.all_asset?.id) return s.all_asset.id
+    return null
+  }
+
   const formatPnl = (val: number) => {
     return (val >= 0 ? '+' : '') + val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
   }
@@ -444,12 +518,12 @@ export default function StrategiesV3() {
                     <span className={`v3-algo-badge ${s.algorithm_type}`}>
                       {ALGORITHM_LABELS[s.algorithm_type || ''] || s.algorithm_type}
                     </span>
-                    <span className="v3-asset-symbol">{getAssetSymbol(s)}</span>
+                    <span className="v3-asset-name">{getAssetName(s)}</span>
                     <span className={`v3-mode-tag ${s.execution_mode}`}>
                       [{MODE_LABELS[s.execution_mode || ''] || s.execution_mode || 'SIM'}]
                     </span>
                   </div>
-                  <span className="v3-strategy-meta">{s.name} · ID-{s.id}</span>
+                  <span className="v3-strategy-meta">{s.name} · {getAssetSymbol(s)} · ID-{s.id}</span>
                 </div>
 
                 <div className="v3-strategy-metrics">
@@ -512,7 +586,7 @@ export default function StrategiesV3() {
                 return (
                   <div className="v3-strategy-expanded">
                     <div className="v3-chart-section">
-                      <h4>Prix & Signaux — {getAssetSymbol(s)}</h4>
+                      <h4>Prix & Signaux — {edits.all_asset_name || getAssetName(s)}</h4>
                       <StrategyVisualizationChart
                         strategy={s}
                         parameters={edits}
@@ -568,6 +642,47 @@ export default function StrategiesV3() {
                         ))}
                         
                         <div className="v3-config-separator" />
+                        
+                        {/* Asset Selection */}
+                        <div className="v3-config-row">
+                          <span className="config-key">Asset</span>
+                          <div className="v3-asset-selector" ref={showAssetDropdown === s.id ? assetDropdownRef : null} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              className="v3-inline-input asset-search"
+                              placeholder={edits.all_asset_name || getAssetName(s)}
+                              value={showAssetDropdown === s.id ? assetSearchQuery : ''}
+                              onChange={(e) => {
+                                setAssetSearchQuery(e.target.value)
+                                searchAssets(e.target.value)
+                              }}
+                              onFocus={() => setShowAssetDropdown(s.id)}
+                            />
+                            {showAssetDropdown === s.id && (
+                              <div className="v3-asset-dropdown">
+                                {assetSearchLoading && (
+                                  <div className="v3-asset-dropdown-item loading">Recherche...</div>
+                                )}
+                                {!assetSearchLoading && assetSearchQuery.length >= 2 && assetSearchResults.length === 0 && (
+                                  <div className="v3-asset-dropdown-item empty">Aucun résultat</div>
+                                )}
+                                {assetSearchResults.map(asset => (
+                                  <div
+                                    key={asset.id}
+                                    className="v3-asset-dropdown-item"
+                                    onClick={() => handleAssetSelect(s.id, asset)}
+                                  >
+                                    <span className="asset-name">{asset.name || asset.symbol}</span>
+                                    <span className="asset-symbol">{asset.symbol}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {edits.all_asset && edits.all_asset !== getAssetId(s) && (
+                              <span className="asset-changed-badge">Modifié</span>
+                            )}
+                          </div>
+                        </div>
                         
                         {/* Broker (read-only) */}
                         <div className="v3-config-row">
