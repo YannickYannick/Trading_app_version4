@@ -5,11 +5,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Search, Filter, RefreshCw, Plus, Eye, Copy, XCircle, Trash2,
-  Save, X, Clock, TrendingUp, CheckCircle
+  Save, X, Clock, TrendingUp, CheckCircle, Sparkles
 } from 'lucide-react'
 import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
 import PlaceOrderModal from '@components/orders/PlaceOrderModal'
-import { orderService, brokerService, positionService } from '@services'
+import { AIDiversifyModal, type OrderPrefillPayload } from '@components/orders'
+import { orderService, brokerService, positionService } from '@services/index'
 import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
 import type { Order, BrokerAccount, Position } from '@types'
@@ -25,6 +26,8 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isPlaceOrderModalOpen, setIsPlaceOrderModalOpen] = useState(false)
+  const [isDiversifyModalOpen, setIsDiversifyModalOpen] = useState(false)
+  const [orderPrefill, setOrderPrefill] = useState<OrderPrefillPayload | null>(null)
 
   // États pour les positions
   const [positions, setPositions] = useState<Position[]>([])
@@ -646,7 +649,7 @@ export default function Orders() {
       width: '80px',
       align: 'center' as const,
       render: (value: string) => (
-        <Badge variant={value === 'BUY' ? 'success' : 'error'}>
+        <Badge variant={value === 'BUY' ? 'success' : 'danger'}>
           {value}
         </Badge>
       ),
@@ -865,10 +868,21 @@ export default function Orders() {
           )}
           <Button
             variant="primary"
-            onClick={() => setIsPlaceOrderModalOpen(true)}
+            onClick={() => {
+              setOrderPrefill(null)
+              setIsPlaceOrderModalOpen(true)
+            }}
           >
             <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Nouvel Ordre
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsDiversifyModalOpen(true)}
+            title="3 suggestions d’actions pour diversifier (IA Gemini)"
+          >
+            <Sparkles style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Suggérer 3 actions (IA)
           </Button>
           <Button
             variant="outline"
@@ -893,7 +907,7 @@ export default function Orders() {
         <div className="error-banner">
           <Badge variant="danger">Erreur</Badge>
           <span>{error}</span>
-          <Button onClick={loadOrders} variant="outline" size="small">Réessayer</Button>
+          <Button onClick={loadOrders} variant="outline" size="sm">Réessayer</Button>
         </div>
       )}
 
@@ -971,7 +985,13 @@ export default function Orders() {
         {orders.length === 0 ? (
           <div className="empty-state">
             <p>Aucun ordre trouvé</p>
-            <Button variant="primary" onClick={() => setIsPlaceOrderModalOpen(true)}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setOrderPrefill(null)
+                setIsPlaceOrderModalOpen(true)
+              }}
+            >
               Passer votre premier ordre
             </Button>
           </div>
@@ -999,12 +1019,14 @@ export default function Orders() {
           <h2 className="positions-title">
             📊 Positions ouvertes
             {positions.length > 0 && (
-              <Badge variant="info" style={{ marginLeft: '8px' }}>{positions.length}</Badge>
+              <span style={{ marginLeft: '8px', display: 'inline-flex' }}>
+                <Badge variant="info">{positions.length}</Badge>
+              </span>
             )}
           </h2>
           <Button
             variant="outline"
-            size="small"
+            size="sm"
             onClick={loadPositions}
             disabled={positionsLoading}
           >
@@ -1020,7 +1042,7 @@ export default function Orders() {
 
         {positionsLoading ? (
           <div className="positions-loading">
-            <Loading size="small" />
+            <Loading size="sm" />
             <span>Chargement des positions...</span>
           </div>
         ) : positions.length === 0 ? (
@@ -1173,12 +1195,29 @@ export default function Orders() {
       </div>
 
       {/* Modal de placement d'ordre */}
+      <AIDiversifyModal
+        isOpen={isDiversifyModalOpen}
+        onClose={() => setIsDiversifyModalOpen(false)}
+        onPickOrder={(payload) => {
+          setIsDiversifyModalOpen(false)
+          setOrderPrefill(payload)
+          setIsPlaceOrderModalOpen(true)
+        }}
+      />
+
       <PlaceOrderModal
         isOpen={isPlaceOrderModalOpen}
-        onClose={() => setIsPlaceOrderModalOpen(false)}
+        initialAllAssetId={orderPrefill?.allAssetId ?? undefined}
+        initialSymbol={orderPrefill?.symbol}
+        initialSide={orderPrefill?.side}
+        onClose={() => {
+          setIsPlaceOrderModalOpen(false)
+          setOrderPrefill(null)
+        }}
         onSuccess={() => {
           loadOrders()
           setIsPlaceOrderModalOpen(false)
+          setOrderPrefill(null)
         }}
       />
     </div>

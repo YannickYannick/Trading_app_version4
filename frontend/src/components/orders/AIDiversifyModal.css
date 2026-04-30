@@ -1,0 +1,125 @@
+.ai-diversify-modal {
+  padding: 0 0 8px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.ai-diversify-disclaimer {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
+
+.ai-diversify-loading {
+  padding: 24px 0;
+}
+
+.ai-diversify-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.ai-diversify-summary,
+.ai-diversify-macro {
+  margin-bottom: 16px;
+}
+
+.ai-diversify-summary h4,
+.ai-diversify-macro h4 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.ai-diversify-summary p,
+.ai-diversify-macro p {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.ai-diversify-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ai-diversify-card {
+  border: 1px solid var(--border-color, #333);
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--card-bg-elevated, rgba(255, 255, 255, 0.03));
+}
+
+.ai-diversify-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ai-diversify-ticker {
+  font-size: 1.1rem;
+}
+
+.ai-diversify-name {
+  font-size: 0.88rem;
+  margin-top: 4px;
+  opacity: 0.95;
+}
+
+.ai-diversify-sector {
+  font-size: 0.8rem;
+  margin-top: 6px;
+  color: var(--text-muted, #999);
+}
+
+.ai-diversify-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.ai-diversify-details {
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+}
+
+.ai-diversify-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.ai-diversify-body {
+  margin: 8px 0 0 12px;
+  line-height: 1.45;
+}
+
+.ai-diversify-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ai-diversify-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+.ai-diversify-empty {
+  font-size: 0.9rem;
+  color: var(--text-muted, #888);
+}
+
+.ai-diversify-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}

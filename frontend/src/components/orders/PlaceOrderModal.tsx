@@ -11,16 +11,27 @@ import { formatCurrency } from '@utils/format'
 import type { BrokerAccount } from '@types'
 import './PlaceOrderModal.css'
 
+type OrderType = 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
+type OrderSide = 'BUY' | 'SELL'
+
 interface PlaceOrderModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Pré-remplissage (ex. suggestion IA diversification) */
+  initialAllAssetId?: number | null
+  initialSymbol?: string
+  initialSide?: OrderSide
 }
 
-type OrderType = 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
-type OrderSide = 'BUY' | 'SELL'
-
-export default function PlaceOrderModal({ isOpen, onClose, onSuccess }: PlaceOrderModalProps) {
+export default function PlaceOrderModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialAllAssetId,
+  initialSymbol,
+  initialSide,
+}: PlaceOrderModalProps) {
   const [loading, setLoading] = useState(false)
   const [brokerAccounts, setBrokerAccounts] = useState<BrokerAccount[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
@@ -41,6 +52,9 @@ export default function PlaceOrderModal({ isOpen, onClose, onSuccess }: PlaceOrd
   const [loadingAutocomplete, setLoadingAutocomplete] = useState(false)
   const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const symbolInputRef = useRef<HTMLInputElement>(null)
+  /** Évite d'effacer symbole/AllAsset quand le 1er compte broker est auto-sélectionné au chargement */
+  const skipNextBrokerClearRef = useRef(false)
+  const prefillKeyRef = useRef<string | null>(null)
   
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -68,6 +82,7 @@ export default function PlaceOrderModal({ isOpen, onClose, onSuccess }: PlaceOrd
       const accounts = response.results || []
       setBrokerAccounts(accounts)
       if (accounts.length > 0 && !brokerAccountId) {
+        skipNextBrokerClearRef.current = true
         setBrokerAccountId(accounts[0].id)
       }
     } catch (err: any) {
@@ -122,8 +137,13 @@ export default function PlaceOrderModal({ isOpen, onClose, onSuccess }: PlaceOrd
     setAutocompleteResults([])
   }
 
-  // Réinitialiser l'autocomplétion quand le broker change
+  // Réinitialiser symbole quand l'utilisateur change de compte broker (pas au 1er auto-select)
   useEffect(() => {
+    if (!brokerAccountId) return
+    if (skipNextBrokerClearRef.current) {
+      skipNextBrokerClearRef.current = false
+      return
+    }
     setSymbol('')
     setAllAssetId(null)
     setAutocompleteResults([])
@@ -131,6 +151,32 @@ export default function PlaceOrderModal({ isOpen, onClose, onSuccess }: PlaceOrd
     setPriceData(null)
     setPriceError(null)
   }, [brokerAccountId])
+
+  // Pré-remplissage (IA / deep link) une fois les comptes chargés
+  useEffect(() => {
+    if (!isOpen) {
+      prefillKeyRef.current = null
+      return
+    }
+    if (loadingAccounts) return
+    const hasPrefill =
+      (initialSymbol != null && String(initialSymbol).trim() !== '') ||
+      (initialAllAssetId != null && initialAllAssetId > 0)
+    if (!hasPrefill) return
+    const key = `${initialAllAssetId ?? ''}|${initialSymbol ?? ''}|${initialSide ?? ''}`
+    if (prefillKeyRef.current === key) return
+    prefillKeyRef.current = key
+    if (initialSymbol != null && String(initialSymbol).trim() !== '') {
+      setSymbol(String(initialSymbol).trim())
+    }
+    if (initialAllAssetId != null && initialAllAssetId > 0) {
+      setAllAssetId(initialAllAssetId)
+    }
+    if (initialSide === 'BUY' || initialSide === 'SELL') {
+      setSide(initialSide)
+    }
+    setQuantity('')
+  }, [isOpen, loadingAccounts, initialSymbol, initialAllAssetId, initialSide])
   
   // Fonction pour récupérer les prix (broker + Yahoo)
   const fetchAssetPrice = async () => {

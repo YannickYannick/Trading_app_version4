@@ -2,6 +2,34 @@
  * Types TypeScript pour l'AI Assistant
  */
 
+/** Suggestion diversification (réponse Gemini + champs serveur) */
+export interface DiversifyFundamentals {
+    per?: number | null;
+    valuation?: string;
+    profitability?: string;
+}
+
+export interface DiversifySuggestion {
+    symbol?: string;
+    yahoo_symbol?: string;
+    name?: string;
+    sector?: string;
+    industry?: string;
+    country?: string;
+    fundamentals?: DiversifyFundamentals;
+    moat?: string;
+    company_strategy?: string;
+    diversification_reason?: string;
+    macro_and_geopolitical?: string;
+    investment_horizon?: string;
+    risks?: string[];
+    confidence?: number;
+    all_asset_id?: number | null;
+    tradable?: boolean;
+    /** Symbole broker (AllAssets.symbol) si résolu dans le catalogue */
+    broker_symbol?: string | null;
+}
+
 export interface AIAnalysis {
     id: number;
     user: number;
@@ -16,7 +44,8 @@ export interface AIAnalysis {
     prompt: string;
     response: string;
     summary: string;
-    recommendations: Recommendation[];
+    /** Stratégie/portefeuille : Recommendation[] ; diversification MARKET : DiversifySuggestion[] */
+    recommendations: Recommendation[] | DiversifySuggestion[];
     insights: Insights;
     risks: Risk[];
     opportunities: Opportunity[];
@@ -81,6 +110,8 @@ export interface Insights {
     risk_assessment?: string;
     technical_analysis?: string;
     strategy_performance?: string;
+    macro_context?: string;
+    diversify_suggestions?: DiversifySuggestion[];
 }
 
 export interface StrategyDetail {
@@ -103,6 +134,16 @@ export interface AnalyzeStrategyRequest {
 export interface AnalyzePortfolioRequest {
     force_new?: boolean;
 }
+
+export interface SuggestDiversificationRequest {
+    force_new?: boolean;
+}
+
+/** Réponse 201 : analyse seule ; 200 cache : { message, analysis } */
+export type SuggestDiversificationResponse = AIAnalysis | {
+    message: string;
+    analysis: AIAnalysis;
+};
 
 export interface AnalyzeStrategyResponse {
     message?: string;

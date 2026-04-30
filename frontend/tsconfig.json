@@ -27,6 +27,9 @@
       "@/*": [
         "./src/*"
       ],
+      "@services": [
+        "./src/services/index.ts"
+      ],
       "@components/*": [
         "./src/components/*"
       ],
@@ -38,6 +41,9 @@
       ],
       "@hooks/*": [
         "./src/hooks/*"
+      ],
+      "@types": [
+        "./src/types/index.ts"
       ],
       "@types/*": [
         "./src/types/*"

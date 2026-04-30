@@ -9,6 +9,8 @@ import {
     AnalyzeStrategyRequest,
     AnalyzePortfolioRequest,
     AnalyzeStrategyResponse,
+    SuggestDiversificationRequest,
+    SuggestDiversificationResponse,
 } from '../types/aiTypes';
 import { config } from '../utils/config';
 
@@ -53,6 +55,20 @@ class AIService {
      */
     async analyzePortfolio(data: AnalyzePortfolioRequest = {}): Promise<AnalyzeStrategyResponse> {
         const response = await api.post<AnalyzeStrategyResponse>('/analyses/analyze-portfolio/', data);
+        return response.data;
+    }
+
+    /**
+     * Propose 3 actions pour diversifier le portefeuille (Gemini).
+     * POST /analyses/suggest-diversification/
+     */
+    async suggestDiversification(
+        data: SuggestDiversificationRequest = { force_new: true }
+    ): Promise<SuggestDiversificationResponse> {
+        const response = await api.post<SuggestDiversificationResponse>(
+            '/analyses/suggest-diversification/',
+            data
+        );
         return response.data;
     }
 

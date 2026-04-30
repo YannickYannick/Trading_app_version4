@@ -12,7 +12,8 @@ from apps.trading.models import Strategy, Position, Trade, AllAssets, StrategyPe
 from apps.ai_assistant.services.prompt_templates import (
     format_strategy_prompt,
     format_portfolio_prompt,
-    format_asset_prompt
+    format_asset_prompt,
+    format_diversify_prompt,
 )
 from apps.ai_assistant.services.gemini_service import GeminiAIService
 from apps.ai_assistant.models import AIAnalysis
@@ -126,6 +127,192 @@ class TradingAnalysisService:
             analysis.mark_as_failed(error_msg)
         
         return analysis
+
+    def suggest_diversification(self, user: User) -> AIAnalysis:
+        """
+        Propose 3 actions pour diversifier le portefeuille (analyse MARKET + Gemini).
+
+        Les suggestions enrichies (all_asset_id) sont stockées dans ``recommendations``.
+        """
+        logger.info(f"Début suggestion diversification IA pour {user.username}")
+
+        analysis = AIAnalysis.objects.create(
+            user=user,
+            analysis_type=AIAnalysis.AnalysisType.MARKET,
+            status=AIAnalysis.AnalysisStatus.PROCESSING,
+            prompt="",
+        )
+
+        try:
+            diversify_data = self._prepare_diversify_data(user)
+            prompt = format_diversify_prompt(diversify_data)
+            analysis.prompt = prompt
+            analysis.save(update_fields=["prompt"])
+
+            result = self.gemini_service.generate_analysis(prompt)
+
+            if result["success"]:
+                self._save_diversification_results(analysis, result)
+                analysis.mark_as_completed()
+                logger.info(f"Suggestion diversification terminée pour {user.username}")
+            else:
+                analysis.mark_as_failed(result["error"])
+                logger.error(f"Échec diversification: {result['error']}")
+
+        except Exception as e:
+            error_msg = f"Erreur lors de la suggestion diversification: {str(e)}"
+            logger.exception(error_msg)
+            analysis.mark_as_failed(error_msg)
+
+        return analysis
+
+    def _prepare_diversify_data(self, user: User) -> Dict:
+        """Prépare le contexte portefeuille pour le prompt de diversification."""
+        positions = (
+            Position.objects.filter(user=user, is_open=True)
+            .select_related("all_asset")
+            .order_by("-quantity")
+        )
+
+        if not positions.exists():
+            positions_detailed = "Aucune position ouverte — l'utilisateur part d'un portefeuille vide ou non synchronisé."
+            sectors_and_industries_held = "Aucune exposition sectorielle connue."
+            total_position_value = "0.00"
+            dominant_currency = "EUR"
+            num_positions = 0
+            return {
+                "num_positions": num_positions,
+                "total_position_value": total_position_value,
+                "dominant_currency": dominant_currency,
+                "positions_detailed": positions_detailed,
+                "sectors_and_industries_held": sectors_and_industries_held,
+            }
+
+        total_value = 0.0
+        currency_counts: Dict[str, float] = {}
+        lines: List[str] = []
+        sectors_seen = set()
+        industries_seen = set()
+
+        for pos in positions:
+            aa = pos.all_asset
+            sym = aa.symbol if aa else "Unknown"
+            name = (aa.name if aa else "") or ""
+            sector = (getattr(aa, "sector", None) or "").strip() if aa else ""
+            industry = (getattr(aa, "industry", None) or "").strip() if aa else ""
+            if sector:
+                sectors_seen.add(sector)
+            if industry:
+                industries_seen.add(industry)
+
+            px = float(pos.current_price or pos.entry_price or 0)
+            qty = float(pos.quantity or 0)
+            line_value = px * qty
+            total_value += line_value
+
+            cur = (aa.currency if aa else None) or "EUR"
+            currency_counts[cur] = currency_counts.get(cur, 0.0) + line_value
+
+        dominant_currency = max(currency_counts, key=currency_counts.get) if currency_counts else "EUR"
+
+        for pos in positions:
+            aa = pos.all_asset
+            sym = aa.symbol if aa else "Unknown"
+            name = (aa.name if aa else "") or ""
+            sector = (getattr(aa, "sector", None) or "").strip() if aa else ""
+            industry = (getattr(aa, "industry", None) or "").strip() if aa else ""
+            px = float(pos.current_price or pos.entry_price or 0)
+            qty = float(pos.quantity or 0)
+            line_value = px * qty
+            pct = (line_value / total_value * 100.0) if total_value > 0 else 0.0
+            yahoo = (aa.symbole_yahoo if aa else "") or ""
+            lines.append(
+                f"- {sym} (Yahoo: {yahoo}) | {name or '—'} | secteur: {sector or '—'} | "
+                f"industrie: {industry or '—'} | valeur ~{line_value:.2f} ({pct:.1f}% du portefeuille)"
+            )
+
+        positions_detailed = "\n".join(lines) if lines else "—"
+
+        si_lines = []
+        if sectors_seen:
+            si_lines.append("Secteurs: " + ", ".join(sorted(sectors_seen)))
+        if industries_seen:
+            si_lines.append("Industries: " + ", ".join(sorted(industries_seen)))
+        sectors_and_industries_held = "\n".join(si_lines) if si_lines else "Non renseigné en base — déduire à partir des noms/symboles."
+
+        return {
+            "num_positions": positions.count(),
+            "total_position_value": f"{total_value:.2f}",
+            "dominant_currency": dominant_currency,
+            "positions_detailed": positions_detailed,
+            "sectors_and_industries_held": sectors_and_industries_held,
+        }
+
+    def _find_all_asset_by_yahoo_symbol(self, yahoo_symbol: str) -> Optional[AllAssets]:
+        """Résout un ticker Yahoo vers un AllAssets du catalogue (hors statuts invalides)."""
+        if not yahoo_symbol or not isinstance(yahoo_symbol, str):
+            return None
+        y = yahoo_symbol.strip()
+        if not y or y in ("Not_searched", "not_found", "manual"):
+            return None
+        invalid = ["Not_searched", "not_found", "manual", ""]
+        qs = AllAssets.objects.exclude(symbole_yahoo__in=invalid).filter(symbole_yahoo__iexact=y)
+        found = qs.first()
+        if found:
+            return found
+        # Parfois l'IA renvoie le symbole broker (BASE:MIC) : tenter le symbole exact
+        return (
+            AllAssets.objects.exclude(symbole_yahoo__in=invalid)
+            .filter(symbol__iexact=y)
+            .first()
+        )
+
+    def _save_diversification_results(self, analysis: AIAnalysis, result: Dict):
+        """Sauvegarde la réponse JSON diversification (suggestions + macro)."""
+        analysis.response = result["response"]
+        analysis.metadata = result.get("metadata") or {}
+
+        parsed = result.get("parsed_data") or {}
+        suggestions = parsed.get("suggestions")
+
+        enriched: List[Dict] = []
+        if isinstance(suggestions, list):
+            for raw in suggestions:
+                if not isinstance(raw, dict):
+                    continue
+                row = dict(raw)
+                yahoo = (row.get("yahoo_symbol") or row.get("symbol") or "").strip()
+                aa = self._find_all_asset_by_yahoo_symbol(yahoo)
+                row["all_asset_id"] = aa.id if aa else None
+                row["tradable"] = bool(aa)
+                row["broker_symbol"] = aa.symbol if aa else None
+                enriched.append(row)
+
+        analysis.summary = parsed.get("summary", "") or ""
+        analysis.recommendations = enriched
+        analysis.insights = {
+            "macro_context": parsed.get("macro_context", ""),
+            "diversify_suggestions": enriched,
+        }
+        analysis.risks = []
+        analysis.opportunities = []
+
+        confs = [
+            float(x["confidence"])
+            for x in enriched
+            if isinstance(x.get("confidence"), (int, float))
+        ]
+        if confs:
+            analysis.confidence_score = sum(confs) / len(confs)
+        elif parsed.get("confidence_score") is not None:
+            try:
+                analysis.confidence_score = float(parsed["confidence_score"])
+            except (TypeError, ValueError):
+                analysis.confidence_score = None
+        else:
+            analysis.confidence_score = None
+
+        analysis.save()
     
     def _prepare_strategy_data(self, strategy: Strategy) -> Dict:
         """Prépare les données d'une stratégie pour le prompt."""

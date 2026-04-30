@@ -9,6 +9,7 @@ Application de trading avec backend Django et frontend React.
 - [Déploiement](docs/deployment/) — guides et rapports d’hébergement
 - [Brokers (migrations / correctifs)](docs/brokers/)
 - [Index doc backend (phases, stack)](docs/backend/INDEX.md)
+- [IA — Suggestions de diversification (Orders)](docs/AI_DIVERSIFY_ORDERS.md)
 
 ## Fonctionnalités
 - Trading multi-brokers (Saxo Bank, Binance)

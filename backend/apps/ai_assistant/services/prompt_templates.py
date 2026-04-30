@@ -146,6 +146,84 @@ Réponds en JSON structuré avec les clés suivantes :
 }}
 """
 
+DIVERSIFY_PROMPT = """
+Tu es un expert en allocation d'actifs, analyse fondamentale et macroéconomie.
+L'utilisateur souhaite **diversifier son portefeuille** en passant d'éventuels nouveaux ordres sur des actions.
+
+**Contexte portefeuille (positions ouvertes) :**
+- Nombre de positions : {num_positions}
+- Valeur totale estimée des positions : {total_position_value} (devise de référence : {dominant_currency})
+- Exposition actuelle par ligne (symbole, nom, secteur, industrie, poids approximatif du portefeuille) :
+{positions_detailed}
+
+**Secteurs et industries déjà présents (à éviter de dupliquer pour les 3 suggestions) :**
+{sectors_and_industries_held}
+
+**Mission :**
+Propose **exactement 3 actions** (titres cotés) qui **complètent** le portefeuille : secteurs/industries **différents** de ceux déjà fortement représentés, géographies ou styles variés si pertinent.
+
+Pour **chaque** suggestion, fournis :
+- Identifiants : symbole court (ex: NVDA), **yahoo_symbol** (format Yahoo Finance, ex: NVDA, MC.PA, VUSA.L)
+- **name** : nom de l'entreprise ou du fonds
+- **sector**, **industry**, **country**
+- **fundamentals** : objet avec au minimum **per** (nombre ou null si inconnu), **valuation** (texte court : valorisation boursière, multiples, etc.), **profitability** (texte court : marges, ROE, cash-flows, etc.)
+- **moat** : avantages compétitifs et barrières à l'entrée (texte structuré)
+- **company_strategy** : stratégie de l'entreprise (produits, R&D, M&A, distribution, etc.)
+- **diversification_reason** : pourquoi cette ligne améliore la diversification **par rapport au portefeuille décrit**
+- **macro_and_geopolitical** : contexte économique et politique pertinent (banques centrales Fed/BCE, politique budgétaire, tensions géopolitiques, guerres commerciales, etc.) **sans** injonction d'achat/vente
+- **investment_horizon** : recommandation d'horizon (court terme < 1 an, moyen terme 1-3 ans, long terme 3+ ans) avec justification en une phrase
+- **risks** : liste de 2 à 4 chaînes (risques spécifiques au titre ou au secteur)
+- **confidence** : score 0-100 (qualité de ton argumentaire, pas une garantie de performance)
+
+**Niveau global :**
+- **macro_context** : synthèse macro (2-4 phrases) : cycle, taux, inflation, géopolitique, facteurs Trump ou équivalents si pertinents
+- **summary** : synthèse en 2-3 phrases de la logique des 3 choix
+
+**Règles :**
+- Réponds **uniquement** en JSON valide UTF-8, sans markdown ni texte hors JSON.
+- Les 3 suggestions doivent être **distinctes** (pas le même yahoo_symbol).
+- Ne pas inventer de chiffres précis : si incertain, mets **null** pour per et explique dans les textes.
+- Rappel légal : formulations de type « à titre informatif », pas de conseil personnalisé réglementé ; l'utilisateur reste responsable de ses décisions.
+
+Schéma JSON exact :
+{{
+  "summary": "...",
+  "macro_context": "...",
+  "suggestions": [
+    {{
+      "symbol": "NVDA",
+      "yahoo_symbol": "NVDA",
+      "name": "NVIDIA Corporation",
+      "sector": "...",
+      "industry": "...",
+      "country": "...",
+      "fundamentals": {{ "per": null, "valuation": "...", "profitability": "..." }},
+      "moat": "...",
+      "company_strategy": "...",
+      "diversification_reason": "...",
+      "macro_and_geopolitical": "...",
+      "investment_horizon": "moyen terme (1-3 ans) — ...",
+      "risks": ["...", "..."],
+      "confidence": 72
+    }}
+  ]
+}}
+"""
+
+
+def format_diversify_prompt(diversify_data):
+    """
+    Formate le prompt pour les suggestions de diversification (3 actions).
+
+    Args:
+        diversify_data: dict avec positions_detailed, sectors_and_industries_held,
+            total_position_value, dominant_currency, num_positions
+
+    Returns:
+        str: Prompt formaté
+    """
+    return DIVERSIFY_PROMPT.format(**diversify_data)
+
 
 def format_strategy_prompt(strategy_data):
     """
