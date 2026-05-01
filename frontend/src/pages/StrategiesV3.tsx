@@ -3,10 +3,10 @@
  * Inspiré de bot-bloom-forge
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { strategyService, assetService } from '@services'
+import { strategyService, assetService, positionService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
 import { useToast } from '@hooks/useToast'
-import type { Strategy, AllAsset } from '@types'
+import type { Strategy, AllAsset, Position } from '@types'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import './StrategiesV3.css'
 
@@ -84,6 +84,11 @@ export default function StrategiesV3() {
   
   // Key to force chart remount after sync
   const [chartKey, setChartKey] = useState(0)
+  
+  // Portfolio positions for "Create from portfolio" feature
+  const [positions, setPositions] = useState<Position[]>([])
+  const [portfolioModalOpen, setPortfolioModalOpen] = useState(false)
+  const [loadingPositions, setLoadingPositions] = useState(false)
   
   // Filters
   const [search, setSearch] = useState('')
@@ -222,6 +227,56 @@ export default function StrategiesV3() {
       setLoading(false)
     }
   }, [])
+
+  const loadPositions = useCallback(async () => {
+    setLoadingPositions(true)
+    try {
+      const openPositions = await positionService.getOpen()
+      setPositions(openPositions)
+    } catch (err) {
+      console.error('Erreur chargement positions:', err)
+    } finally {
+      setLoadingPositions(false)
+    }
+  }, [])
+
+  const openPortfolioModal = () => {
+    loadPositions()
+    setPortfolioModalOpen(true)
+  }
+
+  const createFromPosition = (position: Position) => {
+    setPortfolioModalOpen(false)
+    
+    // Pre-fill wizard with position's asset
+    const assetId = position.all_asset?.id || (typeof position.asset === 'object' ? position.asset.id : position.asset)
+    const assetSymbol = position.all_asset_symbol || position.symbol || ''
+    const assetName = position.all_asset_name || position.all_asset?.name || assetSymbol
+    
+    const defaults: Record<string, number> = {}
+    ALGORITHM_PARAMS['threshold'].forEach(p => { defaults[p.key] = p.default })
+    
+    setEditTarget(null)
+    setWizardData({
+      name: `Stratégie ${assetName}`,
+      description: `Stratégie automatique pour ${assetSymbol}`,
+      asset: assetId?.toString() || '',
+      algorithm_type: 'threshold',
+      parameters: defaults,
+      execution_mode: 'simulation',
+      risk_level: 'MEDIUM',
+      is_automated: false,
+      target_min_quantity: Math.min(position.quantity || 1, 1),
+      target_max_quantity: position.quantity || 10,
+      check_frequency: 60,
+      // Store asset info for wizard
+      all_asset_id: assetId,
+      all_asset_symbol: assetSymbol,
+      all_asset_name: assetName,
+    } as any)
+    setWizardStep(0)
+    setWizardOpen(true)
+  }
 
   useEffect(() => {
     loadData()
@@ -496,6 +551,9 @@ export default function StrategiesV3() {
           <span className="v3-time-badge">
             {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
+          <button className="v3-btn-secondary" onClick={openPortfolioModal}>
+            📂 Depuis portefeuille
+          </button>
           <button className="v3-btn-primary" onClick={() => openWizard()}>
             + Nouvelle Stratégie
           </button>
@@ -1250,6 +1308,78 @@ export default function StrategiesV3() {
                 onClick={() => setExecutionModalOpen(false)}
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio Selection Modal */}
+      {portfolioModalOpen && (
+        <div className="v3-modal-overlay" onClick={() => setPortfolioModalOpen(false)}>
+          <div className="v3-modal portfolio-modal" onClick={e => e.stopPropagation()}>
+            <div className="v3-modal-header">
+              <span className="v3-modal-title">
+                Créer depuis le portefeuille
+              </span>
+              <button 
+                className="v3-modal-close"
+                onClick={() => setPortfolioModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="v3-modal-body">
+              <p className="portfolio-modal-hint">
+                Sélectionnez une position pour créer une stratégie avec cet asset :
+              </p>
+              
+              {loadingPositions ? (
+                <div className="portfolio-loading">Chargement des positions...</div>
+              ) : positions.length === 0 ? (
+                <div className="portfolio-empty">
+                  Aucune position ouverte dans votre portefeuille.
+                </div>
+              ) : (
+                <div className="portfolio-list">
+                  {positions.map(position => {
+                    const assetName = position.all_asset_name || position.all_asset?.name || position.symbol
+                    const assetSymbol = position.all_asset_symbol || position.symbol
+                    const pnlClass = position.pnl >= 0 ? 'positive' : 'negative'
+                    
+                    return (
+                      <div 
+                        key={position.id} 
+                        className="portfolio-item"
+                        onClick={() => createFromPosition(position)}
+                      >
+                        <div className="portfolio-item-info">
+                          <span className="portfolio-item-name">{assetName}</span>
+                          <span className="portfolio-item-symbol">{assetSymbol}</span>
+                        </div>
+                        <div className="portfolio-item-details">
+                          <span className="portfolio-item-qty">{position.quantity} unités</span>
+                          <span className={`portfolio-item-pnl ${pnlClass}`}>
+                            {position.pnl >= 0 ? '+' : ''}{position.pnl?.toFixed(2)} €
+                          </span>
+                        </div>
+                        <div className="portfolio-item-platform">
+                          {position.all_asset_platform || 'N/A'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="v3-modal-footer">
+              <button
+                className="v3-btn-secondary"
+                onClick={() => setPortfolioModalOpen(false)}
+              >
+                Annuler
               </button>
             </div>
           </div>

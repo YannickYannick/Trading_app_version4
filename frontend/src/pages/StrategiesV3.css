@@ -1391,6 +1391,115 @@
   margin-bottom: var(--spacing-xs);
 }
 
+/* ============================================
+   PORTFOLIO SELECTION MODAL
+   ============================================ */
+
+.portfolio-modal {
+  max-width: 550px;
+}
+
+.portfolio-modal-hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.portfolio-loading,
+.portfolio-empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+}
+
+.portfolio-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.portfolio-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--spacing-md);
+  align-items: center;
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.portfolio-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+}
+
+.portfolio-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.portfolio-item-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portfolio-item-symbol {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+}
+
+.portfolio-item-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+}
+
+.portfolio-item-qty {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+}
+
+.portfolio-item-pnl {
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-mono);
+  font-weight: var(--font-weight-semibold);
+}
+
+.portfolio-item-pnl.positive {
+  color: var(--color-success);
+}
+
+.portfolio-item-pnl.negative {
+  color: var(--color-danger);
+}
+
+.portfolio-item-platform {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+  background: var(--bg-tertiary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-bold);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .v3-strategy-metrics {
