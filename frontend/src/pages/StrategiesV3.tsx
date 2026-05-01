@@ -585,13 +585,28 @@ export default function StrategiesV3() {
           parameters: wizardData.parameters,
         })
       } else {
-        await strategyService.create({
-          name: wizardData.name || `${wizardData.asset} ${ALGORITHM_LABELS[wizardData.algorithm_type]}`,
+        // Build create data with all fields including asset
+        const createData: any = {
+          name: wizardData.name || `${(wizardData as any).all_asset_symbol || wizardData.asset} ${ALGORITHM_LABELS[wizardData.algorithm_type]}`,
           description: wizardData.description,
           risk_level: wizardData.risk_level as 'LOW' | 'MEDIUM' | 'HIGH',
           is_active: false,
           is_automated: wizardData.is_automated,
-        })
+          algorithm_type: wizardData.algorithm_type,
+          execution_mode: wizardData.execution_mode,
+          target_min_quantity: wizardData.target_min_quantity,
+          target_max_quantity: wizardData.target_max_quantity,
+          check_frequency: wizardData.check_frequency,
+          parameters: wizardData.parameters,
+        }
+        
+        // Include asset if set (from "Create from portfolio" or manual selection)
+        const assetId = (wizardData as any).all_asset_id
+        if (assetId) {
+          createData.all_asset = assetId
+        }
+        
+        await strategyService.create(createData)
       }
       setWizardOpen(false)
       loadData()
