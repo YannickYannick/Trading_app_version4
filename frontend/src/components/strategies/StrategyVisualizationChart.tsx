@@ -612,10 +612,6 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       {performanceMetrics && (
         <div className="performance-panel">
           <div className="performance-metric">
-            <span className="metric-label">Trades simulés:</span>
-            <span className="metric-value">{performanceMetrics.totalTrades}</span>
-          </div>
-          <div className="performance-metric">
             <span className="metric-label">Taux de réussite:</span>
             <span className={`metric-value ${performanceMetrics.winRate >= 50 ? 'positive' : 'negative'}`}>
               {performanceMetrics.winRate.toFixed(1)}%
