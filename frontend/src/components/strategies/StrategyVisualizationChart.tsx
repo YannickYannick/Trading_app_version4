@@ -44,6 +44,18 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   const [simulatedTrades, setSimulatedTrades] = useState<TradeSimulation[]>([])
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
   const [portfolioQuantity, setPortfolioQuantity] = useState<number>(0)
+  const [periodDays, setPeriodDays] = useState<number>(365)
+
+  // Options de période disponibles
+  const periodOptions = [
+    { label: '1M', value: 30 },
+    { label: '3M', value: 90 },
+    { label: '6M', value: 180 },
+    { label: '1A', value: 365 },
+    { label: '2A', value: 730 },
+    { label: '5A', value: 1825 },
+    { label: '10A', value: 3650 },
+  ]
 
   // Initialiser le graphique
   useEffect(() => {
@@ -134,8 +146,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           ? strategy.all_asset
           : strategy.all_asset.id
 
-        // Charger l'historique des prix
-        const historyResponse = await assetService.getPriceHistory(assetId, 365, 'list')
+        // Charger l'historique des prix selon la période sélectionnée
+        const historyResponse = await assetService.getPriceHistory(assetId, periodDays, 'list')
 
         const priceData: PriceHistoryPoint[] = (historyResponse.results || [])
           .map((point: any) => ({
@@ -156,7 +168,6 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         try {
           const tradesResponse = await tradeService.getAll({} as any)
           const allTrades = tradesResponse.results || tradesResponse || []
-          console.log('[StrategyVisualizationChart] All trades loaded:', allTrades.length, 'for assetId:', assetId)
           // Filtrer les trades par asset (all_asset_id ou asset.id)
           const assetTrades = allTrades.filter((t: any) => {
             const tradeAssetId = t.all_asset_id 
@@ -165,10 +176,6 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
               || (typeof t.asset === 'object' ? t.asset?.id : null)
             return tradeAssetId === assetId
           })
-          console.log('[StrategyVisualizationChart] Filtered trades for asset:', assetTrades.length)
-          if (allTrades.length > 0 && assetTrades.length === 0) {
-            console.log('[StrategyVisualizationChart] Sample trade structure:', JSON.stringify(allTrades[0], null, 2))
-          }
           setTrades(assetTrades)
         } catch (err) {
           console.warn('[StrategyVisualizationChart] Could not load trades:', err)
@@ -178,14 +185,12 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         // Charger les positions pour calculer la quantité en portefeuille
         try {
           const openPositions = await positionService.getOpen()
-          console.log('[StrategyVisualizationChart] Open positions loaded:', openPositions.length)
           const assetPositions = openPositions.filter((p: any) => {
             const posAssetId = p.all_asset_id 
               || (typeof p.all_asset === 'object' ? p.all_asset?.id : null)
               || (typeof p.all_asset === 'number' ? p.all_asset : null)
             return posAssetId === assetId
           })
-          console.log('[StrategyVisualizationChart] Positions for asset:', assetPositions.length)
           const totalQty = assetPositions.reduce((sum: number, p: any) => sum + (Number(p.quantity) || 0), 0)
           setPortfolioQuantity(totalQty)
         } catch (err) {
@@ -201,7 +206,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     }
 
     loadData()
-  }, [strategy])
+  }, [strategy, periodDays])
 
   // Stabiliser les paramètres pour éviter les boucles infinies
   // Utiliser une comparaison profonde avec JSON.stringify pour détecter les vrais changements
@@ -499,8 +504,6 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Fusionner les trades simulés et les trades réels historiques
     const allMarkers = [...entryPointMarkers, ...tradeMarkers]
       .sort((a, b) => (a.time as string).localeCompare(b.time as string))
-    
-    console.log('[StrategyVisualizationChart] Markers - Simulated:', entryPointMarkers.length, 'Real trades:', tradeMarkers.length, 'Total:', allMarkers.length)
 
     // Mettre à jour les marqueurs (uniquement si la série de prix existe)
     if (allMarkers.length > 0 && priceSeriesRef.current) {
@@ -587,6 +590,23 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           <p>{error}</p>
         </div>
       )}
+
+      {/* Sélecteur de période */}
+      <div className="period-selector">
+        <span className="period-label">Période:</span>
+        <div className="period-buttons">
+          {periodOptions.map(option => (
+            <button
+              key={option.value}
+              className={`period-btn ${periodDays === option.value ? 'active' : ''}`}
+              onClick={() => setPeriodDays(option.value)}
+              disabled={loading}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Panneau d'informations sur les performances */}
       {performanceMetrics && (
