@@ -133,6 +133,21 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     }
   }, [])
 
+  // Vérifier si les données Yahoo doivent être rafraîchies (dernier sync > 4h)
+  const shouldRefreshYahoo = useCallback((assetId: number): boolean => {
+    const cacheKey = `yahoo_sync_${assetId}`
+    const lastSync = localStorage.getItem(cacheKey)
+    if (!lastSync) return true
+    const lastSyncDate = new Date(lastSync)
+    const hoursSinceSync = (Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60)
+    return hoursSinceSync > 4 // Rafraîchir si plus de 4 heures
+  }, [])
+
+  const markYahooSynced = useCallback((assetId: number) => {
+    const cacheKey = `yahoo_sync_${assetId}`
+    localStorage.setItem(cacheKey, new Date().toISOString())
+  }, [])
+
   // Charger les données de la stratégie
   useEffect(() => {
     const loadData = async () => {
@@ -145,6 +160,15 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         const assetId = typeof strategy.all_asset === 'number'
           ? strategy.all_asset
           : strategy.all_asset.id
+
+        // Rafraîchir les données Yahoo si nécessaire (en arrière-plan)
+        if (shouldRefreshYahoo(assetId)) {
+          assetService.syncPriceHistory(assetId, periodDays).then(() => {
+            markYahooSynced(assetId)
+          }).catch(err => {
+            console.warn('[StrategyVisualizationChart] Auto Yahoo sync failed:', err)
+          })
+        }
 
         // Charger l'historique des prix selon la période sélectionnée
         const historyResponse = await assetService.getPriceHistory(assetId, periodDays, 'list')
@@ -218,6 +242,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     }, {} as Record<string, any>)
     return JSON.stringify(sorted)
   }, [
+    parameters.algorithm_type, // Type d'algorithme
     parameters.rsi_period,
     parameters.rsi_low,
     parameters.rsi_high,
@@ -244,7 +269,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   useEffect(() => {
     if (!chartRef.current || !priceSeriesRef.current || priceHistory.length === 0 || !strategy) return
 
-    const algorithmType = strategy.algorithm_type
+    // Utiliser l'algo des paramètres en cours d'édition, sinon celui de la stratégie
+    const algorithmType = parameters.algorithm_type || strategy.algorithm_type
     if (!algorithmType) return
 
     // Convertir les paramètres au format StrategyParameters
