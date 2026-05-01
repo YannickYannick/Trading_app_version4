@@ -90,6 +90,14 @@ export default function StrategiesV3() {
   const [portfolioModalOpen, setPortfolioModalOpen] = useState(false)
   const [loadingPositions, setLoadingPositions] = useState(false)
   
+  // Asset association modal (for strategies without asset)
+  const [assetAssociationModal, setAssetAssociationModal] = useState<{ strategyId: number; strategyName: string } | null>(null)
+  const [associationSearchQuery, setAssociationSearchQuery] = useState('')
+  const [associationResults, setAssociationResults] = useState<any[]>([])
+  const [associationLoading, setAssociationLoading] = useState(false)
+  const [associating, setAssociating] = useState(false)
+  const associationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Filters
   const [search, setSearch] = useState('')
   const [filterAlgo, setFilterAlgo] = useState('all')
@@ -170,11 +178,91 @@ export default function StrategiesV3() {
     setAutocompleteResults([])
   }
 
+  // Search for asset association
+  const handleAssociationSearch = useCallback((query: string) => {
+    setAssociationSearchQuery(query)
+    
+    if (associationTimeoutRef.current) {
+      clearTimeout(associationTimeoutRef.current)
+    }
+    
+    if (query.length < 2) {
+      setAssociationResults([])
+      return
+    }
+    
+    setAssociationLoading(true)
+    associationTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await assetService.autocompleteAllAssets(query)
+        setAssociationResults(results.slice(0, 15))
+      } catch (err) {
+        console.error('Erreur recherche assets:', err)
+        setAssociationResults([])
+      } finally {
+        setAssociationLoading(false)
+      }
+    }, 200)
+  }, [])
+
+  // Associate asset to strategy and sync Yahoo
+  const handleAssociateAndSync = async (strategyId: number, asset: any) => {
+    setAssociating(true)
+    try {
+      // Update strategy with asset
+      await strategyService.update(strategyId, {
+        all_asset: asset.id
+      })
+      
+      // Close modal
+      setAssetAssociationModal(null)
+      setAssociationSearchQuery('')
+      setAssociationResults([])
+      
+      // Reload data to get updated strategy
+      await loadData()
+      
+      // Now sync Yahoo data
+      setSyncingYahooId(strategyId)
+      setYahooSyncResult(prev => ({ ...prev, [strategyId]: { success: false, message: 'Association OK, synchronisation...' } }))
+      
+      await assetService.validateYahoo(asset.id)
+      const result = await assetService.syncPriceHistory(asset.id, 365, '1d')
+      
+      if (result.success) {
+        setYahooSyncResult(prev => ({
+          ...prev,
+          [strategyId]: { success: true, message: `${result.records || 0} points chargés` }
+        }))
+        setChartKey(prev => prev + 1)
+      } else {
+        setYahooSyncResult(prev => ({
+          ...prev,
+          [strategyId]: { success: false, message: result.error || 'Erreur sync' }
+        }))
+      }
+    } catch (err: any) {
+      setYahooSyncResult(prev => ({
+        ...prev,
+        [strategyId]: { success: false, message: err?.message || 'Erreur association' }
+      }))
+    } finally {
+      setAssociating(false)
+      setSyncingYahooId(null)
+    }
+  }
+
   // Sync Yahoo price data for a strategy's asset
   const handleSyncYahoo = async (s: Strategy) => {
     const assetId = getAssetId(s)
     if (!assetId) {
-      alert('Pas d\'asset associé à cette stratégie')
+      // Open asset association modal instead of alert
+      setAssetAssociationModal({ strategyId: s.id, strategyName: s.name })
+      // Pre-fill search with strategy name (might help find the asset)
+      const searchHint = s.name.split(' ')[0] || ''
+      if (searchHint.length >= 2) {
+        handleAssociationSearch(searchHint)
+      }
       return
     }
 
@@ -1378,6 +1466,84 @@ export default function StrategiesV3() {
               <button
                 className="v3-btn-secondary"
                 onClick={() => setPortfolioModalOpen(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Asset Association Modal */}
+      {assetAssociationModal && (
+        <div className="v3-modal-overlay" onClick={() => !associating && setAssetAssociationModal(null)}>
+          <div className="v3-modal association-modal" onClick={e => e.stopPropagation()}>
+            <div className="v3-modal-header">
+              <span className="v3-modal-title">
+                Associer un asset
+              </span>
+              <button 
+                className="v3-modal-close"
+                onClick={() => !associating && setAssetAssociationModal(null)}
+                disabled={associating}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="v3-modal-body">
+              <p className="association-hint">
+                La stratégie <strong>"{assetAssociationModal.strategyName}"</strong> n'a pas d'asset associé.
+                <br />Recherchez et sélectionnez un asset pour continuer :
+              </p>
+              
+              <div className="association-search">
+                <input
+                  type="text"
+                  className="v3-form-input"
+                  placeholder="Rechercher un asset (ex: AAPL, Bitcoin, Microsoft...)"
+                  value={associationSearchQuery}
+                  onChange={(e) => handleAssociationSearch(e.target.value)}
+                  disabled={associating}
+                  autoFocus
+                />
+              </div>
+
+              {associating ? (
+                <div className="association-loading">
+                  <span className="loading-spinner">⏳</span>
+                  Association et synchronisation en cours...
+                </div>
+              ) : (
+                <div className="association-results">
+                  {associationLoading && (
+                    <div className="association-item loading">Recherche...</div>
+                  )}
+                  {!associationLoading && associationSearchQuery.length >= 2 && associationResults.length === 0 && (
+                    <div className="association-item empty">Aucun résultat pour "{associationSearchQuery}"</div>
+                  )}
+                  {!associationLoading && associationResults.map(asset => (
+                    <div
+                      key={asset.id}
+                      className="association-item selectable"
+                      onClick={() => handleAssociateAndSync(assetAssociationModal.strategyId, asset)}
+                    >
+                      <div className="association-item-main">
+                        <span className="association-symbol">{asset.symbol}</span>
+                        <span className="association-name">{asset.name}</span>
+                      </div>
+                      <span className="association-platform">{asset.platform}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="v3-modal-footer">
+              <button
+                className="v3-btn-secondary"
+                onClick={() => setAssetAssociationModal(null)}
+                disabled={associating}
               >
                 Annuler
               </button>
