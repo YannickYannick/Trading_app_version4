@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createChart, LineSeries, createSeriesMarkers, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
 import { assetService } from '@services/assets'
-import { tradeService } from '@services'
+import { tradeService, positionService } from '@services'
 import { calculateRSI, calculateMA, calculateBollingerBands, calculateMACD, calculateEMA } from '@utils/technicalIndicators'
 import { calculateStrategySignals, type StrategyParameters, type Signal } from '@utils/strategySignals'
 import { simulateTradesFromSignals, calculatePerformanceMetrics, type TradeSimulation } from '@utils/strategyPerformance'
@@ -43,6 +43,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   const [trades, setTrades] = useState<Trade[]>([])
   const [simulatedTrades, setSimulatedTrades] = useState<TradeSimulation[]>([])
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
+  const [portfolioQuantity, setPortfolioQuantity] = useState<number>(0)
 
   // Initialiser le graphique
   useEffect(() => {
@@ -151,16 +152,38 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
         setPriceHistory(priceData)
 
-        // Charger les trades de cette stratégie (si le service le supporte)
+        // Charger les trades filtrés par asset
         try {
-          // Note: Le filtre 'strategy' peut ne pas être supporté, on essaie quand même
-          const tradesResponse = await tradeService.getAll({} as any) // Filtrer côté frontend si nécessaire
-          const allTrades = tradesResponse.results || []
-          // Filtrer par stratégie si possible (dépend de la structure des trades)
-          setTrades(allTrades)
+          const tradesResponse = await tradeService.getAll({} as any)
+          const allTrades = tradesResponse.results || tradesResponse || []
+          // Filtrer les trades par asset (all_asset_id ou asset.id)
+          const assetTrades = allTrades.filter((t: any) => {
+            const tradeAssetId = t.all_asset_id 
+              || (typeof t.all_asset === 'object' ? t.all_asset?.id : null)
+              || (typeof t.all_asset === 'number' ? t.all_asset : null)
+              || (typeof t.asset === 'object' ? t.asset?.id : null)
+            return tradeAssetId === assetId
+          })
+          setTrades(assetTrades)
         } catch (err) {
           console.warn('[StrategyVisualizationChart] Could not load trades:', err)
           setTrades([])
+        }
+
+        // Charger les positions pour calculer la quantité en portefeuille
+        try {
+          const openPositions = await positionService.getOpen()
+          const assetPositions = openPositions.filter((p: any) => {
+            const posAssetId = p.all_asset_id 
+              || (typeof p.all_asset === 'object' ? p.all_asset?.id : null)
+              || (typeof p.all_asset === 'number' ? p.all_asset : null)
+            return posAssetId === assetId
+          })
+          const totalQty = assetPositions.reduce((sum: number, p: any) => sum + (p.quantity || 0), 0)
+          setPortfolioQuantity(totalQty)
+        } catch (err) {
+          console.warn('[StrategyVisualizationChart] Could not load positions:', err)
+          setPortfolioQuantity(0)
         }
       } catch (err: any) {
         setError(err.response?.data?.error || err.message || 'Erreur lors du chargement des données')
@@ -466,8 +489,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       })
       .filter((m): m is MarkerData => m !== null)
 
-    // N'afficher que les trades simulés (entry points) pour garder le graphique propre
-    const allMarkers = entryPointMarkers
+    // Fusionner les trades simulés et les trades réels historiques
+    const allMarkers = [...entryPointMarkers, ...tradeMarkers]
+      .sort((a, b) => (a.time as string).localeCompare(b.time as string))
 
     // Mettre à jour les marqueurs (uniquement si la série de prix existe)
     if (allMarkers.length > 0 && priceSeriesRef.current) {
@@ -580,6 +604,16 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
               {performanceMetrics.totalPnLPercent >= 0 ? '+' : ''}{performanceMetrics.totalPnLPercent.toFixed(2)}%
             </span>
           </div>
+          <div className="performance-metric">
+            <span className="metric-label">En portefeuille:</span>
+            <span className="metric-value">{portfolioQuantity.toFixed(2)} unités</span>
+          </div>
+          {trades.length > 0 && (
+            <div className="performance-metric">
+              <span className="metric-label">Trades réels:</span>
+              <span className="metric-value">{trades.length}</span>
+            </div>
+          )}
           {performanceMetrics.currentPosition && (
             <div className="performance-metric">
               <span className="metric-label">Position ouverte:</span>

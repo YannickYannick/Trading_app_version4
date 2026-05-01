@@ -1610,6 +1610,78 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* ============================================
+   DISABLED STATES (Strategy already exists for asset)
+   ============================================ */
+
+/* Portfolio item disabled */
+.portfolio-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+}
+
+.portfolio-item.disabled:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.existing-strategy-badge {
+  display: inline-block;
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.15);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+}
+
+/* Autocomplete item disabled */
+.v3-autocomplete-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary);
+}
+
+.v3-autocomplete-item.disabled:hover {
+  background: var(--bg-tertiary);
+}
+
+.autocomplete-used {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.15);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+  margin-left: auto;
+}
+
+/* Association item disabled */
+.association-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary);
+}
+
+.association-item.disabled:hover {
+  background: var(--bg-tertiary);
+}
+
+.association-used-badge {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.15);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+  width: fit-content;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .v3-strategy-metrics {

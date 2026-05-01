@@ -650,6 +650,24 @@ export default function StrategiesV3() {
     return null
   }
 
+  // Helper to detect duplicate strategies by asset
+  const usedAssetIds = useMemo(() => {
+    return new Set(
+      strategies
+        .map(s => getAssetId(s))
+        .filter((id): id is number => id !== null)
+    )
+  }, [strategies])
+
+  const hasStrategyForAsset = useCallback((assetId: number | null | undefined, excludeStrategyId?: number): boolean => {
+    if (!assetId) return false
+    // Check if any strategy (except the one being edited) uses this asset
+    return strategies.some(s => {
+      if (excludeStrategyId && s.id === excludeStrategyId) return false
+      return getAssetId(s) === assetId
+    })
+  }, [strategies])
+
   const formatPnl = (val: number) => {
     return (val >= 0 ? '+' : '') + val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
   }
@@ -944,18 +962,22 @@ export default function StrategiesV3() {
                                 ) : assetSearchQuery.length >= 2 && autocompleteResults.length === 0 ? (
                                   <div className="v3-autocomplete-item empty">Aucun résultat</div>
                                 ) : (
-                                  autocompleteResults.map(asset => (
-                                    <div
-                                      key={asset.id}
-                                      className="v3-autocomplete-item"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => handleAssetSelect(s.id, asset)}
-                                    >
-                                      <span className="autocomplete-symbol">{asset.symbol}</span>
-                                      <span className="autocomplete-name">{asset.name}</span>
-                                      <span className="autocomplete-platform">{asset.platform}</span>
-                                    </div>
-                                  ))
+                                  autocompleteResults.map(asset => {
+                                    const isUsed = hasStrategyForAsset(asset.id, s.id)
+                                    return (
+                                      <div
+                                        key={asset.id}
+                                        className={`v3-autocomplete-item ${isUsed ? 'disabled' : ''}`}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => !isUsed && handleAssetSelect(s.id, asset)}
+                                      >
+                                        <span className="autocomplete-symbol">{asset.symbol}</span>
+                                        <span className="autocomplete-name">{asset.name}</span>
+                                        <span className="autocomplete-platform">{asset.platform}</span>
+                                        {isUsed && <span className="autocomplete-used">Utilisé</span>}
+                                      </div>
+                                    )
+                                  })
                                 )}
                               </div>
                             )}
@@ -1472,15 +1494,24 @@ export default function StrategiesV3() {
                     const assetSymbol = position.all_asset_symbol || position.symbol
                     const pnlClass = position.pnl >= 0 ? 'positive' : 'negative'
                     
+                    // Check if a strategy already exists for this asset
+                    const positionAssetId = position.all_asset_id 
+                      || (typeof position.all_asset === 'object' ? position.all_asset?.id : null)
+                      || (typeof position.all_asset === 'number' ? position.all_asset : null)
+                    const alreadyHasStrategy = hasStrategyForAsset(positionAssetId)
+                    
                     return (
                       <div 
                         key={position.id} 
-                        className="portfolio-item"
-                        onClick={() => createFromPosition(position)}
+                        className={`portfolio-item ${alreadyHasStrategy ? 'disabled' : ''}`}
+                        onClick={() => !alreadyHasStrategy && createFromPosition(position)}
                       >
                         <div className="portfolio-item-info">
                           <span className="portfolio-item-name">{assetName}</span>
                           <span className="portfolio-item-symbol">{assetSymbol}</span>
+                          {alreadyHasStrategy && (
+                            <span className="existing-strategy-badge">Stratégie existante</span>
+                          )}
                         </div>
                         <div className="portfolio-item-details">
                           <span className="portfolio-item-qty">{position.quantity} unités</span>
@@ -1558,19 +1589,23 @@ export default function StrategiesV3() {
                   {!associationLoading && associationSearchQuery.length >= 2 && associationResults.length === 0 && (
                     <div className="association-item empty">Aucun résultat pour "{associationSearchQuery}"</div>
                   )}
-                  {!associationLoading && associationResults.map(asset => (
-                    <div
-                      key={asset.id}
-                      className="association-item selectable"
-                      onClick={() => handleAssociateAndSync(assetAssociationModal.strategyId, asset)}
-                    >
-                      <div className="association-item-main">
-                        <span className="association-symbol">{asset.symbol}</span>
-                        <span className="association-name">{asset.name}</span>
+                  {!associationLoading && associationResults.map(asset => {
+                    const isUsed = hasStrategyForAsset(asset.id, assetAssociationModal.strategyId)
+                    return (
+                      <div
+                        key={asset.id}
+                        className={`association-item ${isUsed ? 'disabled' : 'selectable'}`}
+                        onClick={() => !isUsed && handleAssociateAndSync(assetAssociationModal.strategyId, asset)}
+                      >
+                        <div className="association-item-main">
+                          <span className="association-symbol">{asset.symbol}</span>
+                          <span className="association-name">{asset.name}</span>
+                          {isUsed && <span className="association-used-badge">Stratégie existante</span>}
+                        </div>
+                        <span className="association-platform">{asset.platform}</span>
                       </div>
-                      <span className="association-platform">{asset.platform}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
