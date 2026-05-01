@@ -886,7 +886,25 @@ export default function StrategiesV3() {
                         strategy={s}
                         parameters={edits}
                         initialPeriod={chartPeriods[s.id] || 365}
-                        onPeriodChange={(days) => setChartPeriods(prev => ({ ...prev, [s.id]: days }))}
+                        onPeriodChange={(days) => {
+                          setChartPeriods(prev => ({ ...prev, [s.id]: days }))
+                          // Auto-sync Yahoo data for the new period
+                          const assetId = getAssetId(s)
+                          if (assetId && !syncingYahooId) {
+                            setSyncingYahooId(s.id)
+                            assetService.syncPriceHistory(assetId, days, '1d')
+                              .then(result => {
+                                if (result.success) {
+                                  setYahooSyncResult(prev => ({
+                                    ...prev,
+                                    [s.id]: { success: true, message: `${result.records || 0} points chargés` }
+                                  }))
+                                }
+                              })
+                              .catch(() => {})
+                              .finally(() => setSyncingYahooId(null))
+                          }
+                        }}
                       />
                     </div>
                     <div className="v3-config-section">
