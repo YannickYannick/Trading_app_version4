@@ -178,13 +178,15 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         // Charger les positions pour calculer la quantité en portefeuille
         try {
           const openPositions = await positionService.getOpen()
+          console.log('[StrategyVisualizationChart] Open positions loaded:', openPositions.length)
           const assetPositions = openPositions.filter((p: any) => {
             const posAssetId = p.all_asset_id 
               || (typeof p.all_asset === 'object' ? p.all_asset?.id : null)
               || (typeof p.all_asset === 'number' ? p.all_asset : null)
             return posAssetId === assetId
           })
-          const totalQty = assetPositions.reduce((sum: number, p: any) => sum + (p.quantity || 0), 0)
+          console.log('[StrategyVisualizationChart] Positions for asset:', assetPositions.length)
+          const totalQty = assetPositions.reduce((sum: number, p: any) => sum + (Number(p.quantity) || 0), 0)
           setPortfolioQuantity(totalQty)
         } catch (err) {
           console.warn('[StrategyVisualizationChart] Could not load positions:', err)
@@ -613,7 +615,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           </div>
           <div className="performance-metric">
             <span className="metric-label">En portefeuille:</span>
-            <span className="metric-value">{portfolioQuantity.toFixed(2)} unités</span>
+            <span className="metric-value">{(Number(portfolioQuantity) || 0).toFixed(2)} unités</span>
           </div>
           {trades.length > 0 && (
             <div className="performance-metric">
