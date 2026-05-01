@@ -156,6 +156,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         try {
           const tradesResponse = await tradeService.getAll({} as any)
           const allTrades = tradesResponse.results || tradesResponse || []
+          console.log('[StrategyVisualizationChart] All trades loaded:', allTrades.length, 'for assetId:', assetId)
           // Filtrer les trades par asset (all_asset_id ou asset.id)
           const assetTrades = allTrades.filter((t: any) => {
             const tradeAssetId = t.all_asset_id 
@@ -164,6 +165,10 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
               || (typeof t.asset === 'object' ? t.asset?.id : null)
             return tradeAssetId === assetId
           })
+          console.log('[StrategyVisualizationChart] Filtered trades for asset:', assetTrades.length)
+          if (allTrades.length > 0 && assetTrades.length === 0) {
+            console.log('[StrategyVisualizationChart] Sample trade structure:', JSON.stringify(allTrades[0], null, 2))
+          }
           setTrades(assetTrades)
         } catch (err) {
           console.warn('[StrategyVisualizationChart] Could not load trades:', err)
@@ -492,6 +497,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Fusionner les trades simulés et les trades réels historiques
     const allMarkers = [...entryPointMarkers, ...tradeMarkers]
       .sort((a, b) => (a.time as string).localeCompare(b.time as string))
+    
+    console.log('[StrategyVisualizationChart] Markers - Simulated:', entryPointMarkers.length, 'Real trades:', tradeMarkers.length, 'Total:', allMarkers.length)
 
     // Mettre à jour les marqueurs (uniquement si la série de prix existe)
     if (allMarkers.length > 0 && priceSeriesRef.current) {
