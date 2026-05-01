@@ -61,7 +61,8 @@ export interface AllAsset {
 export interface Position {
   id: number
   asset: Asset
-  all_asset?: AllAsset
+  all_asset?: AllAsset | number
+  all_asset_id?: number // ID direct depuis PositionListSerializer
   all_asset_symbol?: string
   all_asset_name?: string
   all_asset_sector?: string

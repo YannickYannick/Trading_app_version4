@@ -337,9 +337,30 @@ export default function StrategiesV3() {
     setPortfolioModalOpen(false)
     
     // Pre-fill wizard with position's asset
-    const assetId = position.all_asset?.id || (typeof position.asset === 'object' ? position.asset.id : position.asset)
+    // Priority: all_asset_id (flat) > all_asset.id (nested object) > all_asset (if number) > asset.id
+    let assetId: number | undefined
+    
+    if (position.all_asset_id) {
+      assetId = position.all_asset_id
+    } else if (typeof position.all_asset === 'object' && position.all_asset?.id) {
+      assetId = position.all_asset.id
+    } else if (typeof position.all_asset === 'number') {
+      assetId = position.all_asset
+    } else if (typeof position.asset === 'object' && position.asset?.id) {
+      assetId = position.asset.id
+    }
+    
     const assetSymbol = position.all_asset_symbol || position.symbol || ''
-    const assetName = position.all_asset_name || position.all_asset?.name || assetSymbol
+    const assetName = position.all_asset_name 
+      || (typeof position.all_asset === 'object' ? position.all_asset?.name : null) 
+      || assetSymbol
+    
+    console.log('[createFromPosition] Position:', position)
+    console.log('[createFromPosition] Asset ID:', assetId, 'Symbol:', assetSymbol, 'Name:', assetName)
+    
+    if (!assetId) {
+      console.warn('[createFromPosition] No asset ID found in position!')
+    }
     
     const defaults: Record<string, number> = {}
     ALGORITHM_PARAMS['threshold'].forEach(p => { defaults[p.key] = p.default })
