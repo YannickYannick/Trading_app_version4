@@ -193,7 +193,8 @@ class YahooFinanceService:
         try:
             ticker = self._get_ticker(symbol)
             
-            # Calculate period
+            # Calculate period based on yfinance supported values
+            # Valid periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
             if days <= 7:
                 period = '1wk'
             elif days <= 30:
@@ -204,8 +205,14 @@ class YahooFinanceService:
                 period = '6mo'
             elif days <= 365:
                 period = '1y'
-            else:
+            elif days <= 730:
                 period = '2y'
+            elif days <= 1825:
+                period = '5y'
+            elif days <= 3650:
+                period = '10y'
+            else:
+                period = 'max'
             
             hist = ticker.history(period=period, interval=interval)
             
