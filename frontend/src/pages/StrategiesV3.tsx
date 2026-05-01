@@ -82,6 +82,9 @@ export default function StrategiesV3() {
   const [syncingYahooId, setSyncingYahooId] = useState<number | null>(null)
   const [yahooSyncResult, setYahooSyncResult] = useState<Record<number, { success: boolean; message: string }>>({})
   
+  // Chart period state (per strategy)
+  const [chartPeriods, setChartPeriods] = useState<Record<number, number>>({})
+  
   // Key to force chart remount after sync
   const [chartKey, setChartKey] = useState(0)
   
@@ -227,7 +230,8 @@ export default function StrategiesV3() {
       setYahooSyncResult(prev => ({ ...prev, [strategyId]: { success: false, message: 'Association OK, synchronisation...' } }))
       
       await assetService.validateYahoo(asset.id)
-      const result = await assetService.syncPriceHistory(asset.id, 365, '1d')
+      const periodDays = chartPeriods[strategyId] || 365
+      const result = await assetService.syncPriceHistory(asset.id, periodDays, '1d')
       
       if (result.success) {
         setYahooSyncResult(prev => ({
@@ -273,8 +277,9 @@ export default function StrategiesV3() {
       // First validate Yahoo symbol if needed
       await assetService.validateYahoo(assetId)
       
-      // Then sync price history (365 days)
-      const result = await assetService.syncPriceHistory(assetId, 365, '1d')
+      // Then sync price history (use selected period, default 365 days)
+      const periodDays = chartPeriods[s.id] || 365
+      const result = await assetService.syncPriceHistory(assetId, periodDays, '1d')
       
       if (result.success) {
         setYahooSyncResult(prev => ({
@@ -880,6 +885,8 @@ export default function StrategiesV3() {
                         key={`chart-${s.id}-${chartKey}`}
                         strategy={s}
                         parameters={edits}
+                        initialPeriod={chartPeriods[s.id] || 365}
+                        onPeriodChange={(days) => setChartPeriods(prev => ({ ...prev, [s.id]: days }))}
                       />
                     </div>
                     <div className="v3-config-section">

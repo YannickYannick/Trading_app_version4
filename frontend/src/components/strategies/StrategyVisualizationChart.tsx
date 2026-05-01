@@ -15,6 +15,8 @@ interface StrategyVisualizationChartProps {
   strategy: Strategy | null
   parameters: Record<string, any> // Paramètres actuels (peuvent changer en temps réel)
   onParametersChange?: (params: Record<string, any>) => void
+  initialPeriod?: number // Période initiale en jours (défaut: 365)
+  onPeriodChange?: (days: number) => void // Callback quand la période change
 }
 
 interface PriceHistoryPoint {
@@ -28,6 +30,8 @@ interface PriceHistoryPoint {
 const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   strategy,
   parameters,
+  initialPeriod = 365,
+  onPeriodChange,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -44,7 +48,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
   const [simulatedTrades, setSimulatedTrades] = useState<TradeSimulation[]>([])
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
   const [portfolioQuantity, setPortfolioQuantity] = useState<number>(0)
-  const [periodDays, setPeriodDays] = useState<number>(365)
+  const [periodDays, setPeriodDays] = useState<number>(initialPeriod)
 
   // Options de période disponibles
   const periodOptions = [
@@ -56,6 +60,12 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     { label: '5A', value: 1825 },
     { label: '10A', value: 3650 },
   ]
+
+  // Handler pour changer la période
+  const handlePeriodChange = useCallback((days: number) => {
+    setPeriodDays(days)
+    onPeriodChange?.(days)
+  }, [onPeriodChange])
 
   // Initialiser le graphique
   useEffect(() => {
@@ -625,7 +635,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
             <button
               key={option.value}
               className={`period-btn ${periodDays === option.value ? 'active' : ''}`}
-              onClick={() => setPeriodDays(option.value)}
+              onClick={() => handlePeriodChange(option.value)}
               disabled={loading}
             >
               {option.label}
