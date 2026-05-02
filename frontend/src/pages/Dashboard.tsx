@@ -142,7 +142,7 @@ export default function Dashboard() {
               <div className="breakdown-panel">
                 {breakdown.map((broker, idx) => (
                   <div key={idx} className="breakdown-item">
-                    <div className="breakdown-broker-name">{broker.broker || 'Inconnu'}</div>
+                    <div className="breakdown-broker-name">{broker.broker_name || 'Inconnu'}</div>
                     <div className="breakdown-details">
                       <div className="breakdown-row">
                         <span className="breakdown-label">Cash:</span>
