@@ -3,10 +3,10 @@
  * Inspiré de bot-bloom-forge
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { strategyService, assetService, positionService } from '@services'
+import { strategyService, assetService, positionService, orderService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
 import { useToast } from '@hooks/useToast'
-import type { Strategy, AllAsset, Position } from '@types'
+import type { Strategy, AllAsset, Position, Order } from '@types'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import './StrategiesV3.css'
 
@@ -55,6 +55,14 @@ const MODE_LABELS: Record<string, string> = {
   live_trading: 'LIVE',
 }
 
+function orderAllAssetId(o: Order): number | null {
+  const raw = o as Order & { all_asset_id?: number }
+  if (typeof raw.all_asset_id === 'number') return raw.all_asset_id
+  if (typeof o.all_asset === 'object' && o.all_asset?.id) return o.all_asset.id
+  if (typeof o.all_asset === 'number') return o.all_asset
+  return null
+}
+
 export default function StrategiesV3() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [executions, setExecutions] = useState<StrategyExecution[]>([])
@@ -90,6 +98,7 @@ export default function StrategiesV3() {
   
   // Portfolio positions for "Create from portfolio" feature
   const [positions, setPositions] = useState<Position[]>([])
+  const [portfolioOrders, setPortfolioOrders] = useState<Order[]>([])
   const [portfolioModalOpen, setPortfolioModalOpen] = useState(false)
   const [loadingPositions, setLoadingPositions] = useState(false)
   
@@ -324,10 +333,16 @@ export default function StrategiesV3() {
   const loadPositions = useCallback(async () => {
     setLoadingPositions(true)
     try {
-      const openPositions = await positionService.getOpen()
+      const [openPositions, pendingOrders] = await Promise.all([
+        positionService.getOpen(),
+        orderService.getActivePendingList(),
+      ])
       setPositions(openPositions)
+      setPortfolioOrders(pendingOrders)
     } catch (err) {
-      console.error('Erreur chargement positions:', err)
+      console.error('Erreur chargement positions / ordres:', err)
+      setPositions([])
+      setPortfolioOrders([])
     } finally {
       setLoadingPositions(false)
     }
@@ -672,6 +687,15 @@ export default function StrategiesV3() {
       return getAssetId(s) === assetId
     })
   }, [strategies])
+
+  const pendingOrdersCountByAllAssetId = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const o of portfolioOrders) {
+      const id = orderAllAssetId(o)
+      if (id != null) m.set(id, (m.get(id) || 0) + 1)
+    }
+    return m
+  }, [portfolioOrders])
 
   const formatPnl = (val: number) => {
     return (val >= 0 ? '+' : '') + val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
@@ -1503,53 +1527,123 @@ export default function StrategiesV3() {
 
             <div className="v3-modal-body">
               <p className="portfolio-modal-hint">
-                Sélectionnez une position pour créer une stratégie avec cet asset :
+                Sous « Ordres en cours », vous voyez les ordres encore actifs chez les brokers (pris en compte pour votre exposition).
+                Choisissez ensuite une position pour créer une stratégie sur l’actif correspondant :
               </p>
-              
+
               {loadingPositions ? (
-                <div className="portfolio-loading">Chargement des positions...</div>
-              ) : positions.length === 0 ? (
+                <div className="portfolio-loading">Chargement des positions et ordres...</div>
+              ) : positions.length === 0 && portfolioOrders.length === 0 ? (
                 <div className="portfolio-empty">
-                  Aucune position ouverte dans votre portefeuille.
+                  Aucune position ouverte et aucun ordre en cours.
                 </div>
               ) : (
-                <div className="portfolio-list">
-                  {positions.map(position => {
-                    const assetName = position.all_asset_name || position.all_asset?.name || position.symbol
-                    const assetSymbol = position.all_asset_symbol || position.symbol
-                    const pnlClass = position.pnl >= 0 ? 'positive' : 'negative'
-                    
-                    // Check if a strategy already exists for this asset
-                    const positionAssetId = position.all_asset_id 
-                      || (typeof position.all_asset === 'object' ? position.all_asset?.id : null)
-                      || (typeof position.all_asset === 'number' ? position.all_asset : null)
-                    const alreadyHasStrategy = hasStrategyForAsset(positionAssetId)
-                    
-                    return (
-                      <div 
-                        key={position.id} 
-                        className={`portfolio-item ${alreadyHasStrategy ? 'disabled' : ''}`}
-                        onClick={() => !alreadyHasStrategy && createFromPosition(position)}
-                      >
-                        <div className="portfolio-item-info">
-                          <span className="portfolio-item-name">{assetName}</span>
-                          <span className="portfolio-item-symbol">{assetSymbol}</span>
-                          {alreadyHasStrategy && (
-                            <span className="existing-strategy-badge">Stratégie existante</span>
-                          )}
-                        </div>
-                        <div className="portfolio-item-details">
-                          <span className="portfolio-item-qty">{position.quantity} unités</span>
-                          <span className={`portfolio-item-pnl ${pnlClass}`}>
-                            {position.pnl >= 0 ? '+' : ''}{position.pnl?.toFixed(2)} €
-                          </span>
-                        </div>
-                        <div className="portfolio-item-platform">
-                          {position.all_asset_platform || 'N/A'}
-                        </div>
+                <div className="portfolio-modal-scroll">
+                  <section className="portfolio-modal-section" aria-label="Ordres en cours">
+                    <h4 className="portfolio-section-title">Ordres en cours</h4>
+                    <p className="portfolio-section-desc">
+                      Statuts PENDING, OPEN ou partiellement exécutés — même actif que vos stratégies une fois exécutés.
+                    </p>
+                    {portfolioOrders.length === 0 ? (
+                      <div className="portfolio-section-empty">Aucun ordre actif.</div>
+                    ) : (
+                      <div className="portfolio-orders-list">
+                        {portfolioOrders.map((order) => {
+                          const sym =
+                            order.all_asset_symbol ||
+                            (typeof order.asset === 'object' && order.asset?.symbol) ||
+                            '—'
+                          const label =
+                            order.all_asset_name ||
+                            (typeof order.asset === 'object' && order.asset?.name) ||
+                            sym
+                          const broker = order.broker_name || order.broker?.name || '—'
+                          const priceLabel =
+                            order.price != null && order.price !== 0
+                              ? order.price.toLocaleString('fr-FR', { maximumFractionDigits: 6 })
+                              : '—'
+                          return (
+                            <div key={order.id} className="portfolio-order-card">
+                              <div className="portfolio-order-main">
+                                <span className="portfolio-order-name">{label}</span>
+                                <span className="portfolio-order-symbol">{sym}</span>
+                              </div>
+                              <div className={`portfolio-order-side portfolio-order-side-${order.side.toLowerCase()}`}>
+                                {order.side}
+                              </div>
+                              <div className="portfolio-order-meta">
+                                <span>{order.order_type}</span>
+                                <span className="portfolio-order-status">{order.status}</span>
+                              </div>
+                              <div className="portfolio-order-qty">
+                                <span>{order.quantity}</span>
+                                <span className="portfolio-order-lim">@ {priceLabel}</span>
+                              </div>
+                              <div className="portfolio-order-broker">{broker}</div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
+                    )}
+                  </section>
+
+                  <section className="portfolio-modal-section" aria-label="Positions ouvertes">
+                    <h4 className="portfolio-section-title">Positions ouvertes</h4>
+                    {positions.length === 0 ? (
+                      <div className="portfolio-section-empty">Aucune position ouverte.</div>
+                    ) : (
+                      <div className="portfolio-list">
+                        {positions.map((position) => {
+                          const assetName =
+                            position.all_asset_name || position.all_asset?.name || position.symbol
+                          const assetSymbol = position.all_asset_symbol || position.symbol
+                          const pnlClass = position.pnl >= 0 ? 'positive' : 'negative'
+
+                          const positionAssetId =
+                            position.all_asset_id ||
+                            (typeof position.all_asset === 'object' ? position.all_asset?.id : null) ||
+                            (typeof position.all_asset === 'number' ? position.all_asset : null)
+                          const alreadyHasStrategy = hasStrategyForAsset(positionAssetId)
+                          const pendingN = positionAssetId
+                            ? pendingOrdersCountByAllAssetId.get(positionAssetId) || 0
+                            : 0
+
+                          return (
+                            <div
+                              key={position.id}
+                              className={`portfolio-item ${alreadyHasStrategy ? 'disabled' : ''}`}
+                              onClick={() => !alreadyHasStrategy && createFromPosition(position)}
+                            >
+                              <div className="portfolio-item-info">
+                                <span className="portfolio-item-name">{assetName}</span>
+                                <span className="portfolio-item-symbol">{assetSymbol}</span>
+                                <div className="portfolio-item-badges">
+                                  {alreadyHasStrategy && (
+                                    <span className="existing-strategy-badge">Stratégie existante</span>
+                                  )}
+                                  {pendingN > 0 && (
+                                    <span className="pending-orders-badge">
+                                      {pendingN} ordre{pendingN > 1 ? 's' : ''} en cours
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="portfolio-item-details">
+                                <span className="portfolio-item-qty">{position.quantity} unités</span>
+                                <span className={`portfolio-item-pnl ${pnlClass}`}>
+                                  {position.pnl >= 0 ? '+' : ''}
+                                  {position.pnl?.toFixed(2)} €
+                                </span>
+                              </div>
+                              <div className="portfolio-item-platform">
+                                {position.all_asset_platform || 'N/A'}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
             </div>
