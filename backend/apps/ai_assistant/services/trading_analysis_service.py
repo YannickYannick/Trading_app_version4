@@ -14,6 +14,7 @@ from apps.ai_assistant.services.prompt_templates import (
     format_portfolio_prompt,
     format_asset_prompt,
     format_diversify_prompt,
+    format_sell_suggestions_prompt,
 )
 from apps.ai_assistant.services.gemini_service import GeminiAIService
 from apps.ai_assistant.models import AIAnalysis
@@ -293,6 +294,158 @@ class TradingAnalysisService:
         analysis.insights = {
             "macro_context": parsed.get("macro_context", ""),
             "diversify_suggestions": enriched,
+        }
+        analysis.risks = []
+        analysis.opportunities = []
+
+        confs = [
+            float(x["confidence"])
+            for x in enriched
+            if isinstance(x.get("confidence"), (int, float))
+        ]
+        if confs:
+            analysis.confidence_score = sum(confs) / len(confs)
+        elif parsed.get("confidence_score") is not None:
+            try:
+                analysis.confidence_score = float(parsed["confidence_score"])
+            except (TypeError, ValueError):
+                analysis.confidence_score = None
+        else:
+            analysis.confidence_score = None
+
+        analysis.save()
+
+    def suggest_sell(self, user: User) -> AIAnalysis:
+        """
+        Propose des actions à vendre du portefeuille (analyse MARKET + Gemini).
+
+        Les suggestions de vente sont stockées dans ``recommendations``.
+        """
+        logger.info(f"Début suggestion vente IA pour {user.username}")
+
+        analysis = AIAnalysis.objects.create(
+            user=user,
+            analysis_type=AIAnalysis.AnalysisType.MARKET,
+            status=AIAnalysis.AnalysisStatus.PROCESSING,
+            prompt="",
+        )
+
+        try:
+            sell_data = self._prepare_sell_data(user)
+            prompt = format_sell_suggestions_prompt(sell_data)
+            analysis.prompt = prompt
+            analysis.save(update_fields=["prompt"])
+
+            result = self.gemini_service.generate_analysis(prompt)
+
+            if result["success"]:
+                self._save_sell_results(analysis, result)
+                analysis.mark_as_completed()
+                logger.info(f"Suggestion vente terminée pour {user.username}")
+            else:
+                analysis.mark_as_failed(result["error"])
+                logger.error(f"Échec suggestion vente: {result['error']}")
+
+        except Exception as e:
+            error_msg = f"Erreur lors de la suggestion vente: {str(e)}"
+            logger.exception(error_msg)
+            analysis.mark_as_failed(error_msg)
+
+        return analysis
+
+    def _prepare_sell_data(self, user: User) -> Dict:
+        """Prépare le contexte portefeuille pour le prompt de suggestion de vente."""
+        positions = (
+            Position.objects.filter(user=user, is_open=True)
+            .select_related("all_asset")
+            .order_by("-quantity")
+        )
+
+        if not positions.exists():
+            return {
+                "num_positions": 0,
+                "total_position_value": "0.00",
+                "dominant_currency": "EUR",
+                "positions_detailed": "Aucune position ouverte — rien à vendre.",
+            }
+
+        total_value = 0.0
+        currency_counts: Dict[str, float] = {}
+        lines: List[str] = []
+
+        for pos in positions:
+            aa = pos.all_asset
+            px = float(pos.current_price or pos.entry_price or 0)
+            qty = float(pos.quantity or 0)
+            line_value = px * qty
+            total_value += line_value
+
+            cur = (aa.currency if aa else None) or "EUR"
+            currency_counts[cur] = currency_counts.get(cur, 0.0) + line_value
+
+        dominant_currency = max(currency_counts, key=currency_counts.get) if currency_counts else "EUR"
+
+        for pos in positions:
+            aa = pos.all_asset
+            sym = aa.symbol if aa else "Unknown"
+            name = (aa.name if aa else "") or ""
+            sector = (getattr(aa, "sector", None) or "").strip() if aa else ""
+            industry = (getattr(aa, "industry", None) or "").strip() if aa else ""
+            yahoo = (aa.symbole_yahoo if aa else "") or ""
+            
+            entry_px = float(pos.entry_price or 0)
+            current_px = float(pos.current_price or entry_px or 0)
+            qty = float(pos.quantity or 0)
+            line_value = current_px * qty
+            pct = (line_value / total_value * 100.0) if total_value > 0 else 0.0
+            
+            pnl_value = (current_px - entry_px) * qty if entry_px > 0 else 0
+            pnl_pct = ((current_px - entry_px) / entry_px * 100.0) if entry_px > 0 else 0
+            pnl_sign = "+" if pnl_value >= 0 else ""
+            
+            lines.append(
+                f"- {sym} (Yahoo: {yahoo}) | {name or '—'} | secteur: {sector or '—'} | "
+                f"industrie: {industry or '—'} | qté: {qty:.2f} | "
+                f"prix entrée: {entry_px:.2f} | prix actuel: {current_px:.2f} | "
+                f"PnL: {pnl_sign}{pnl_value:.2f} ({pnl_sign}{pnl_pct:.1f}%) | "
+                f"valeur: ~{line_value:.2f} ({pct:.1f}% du portefeuille)"
+            )
+
+        positions_detailed = "\n".join(lines) if lines else "—"
+
+        return {
+            "num_positions": positions.count(),
+            "total_position_value": f"{total_value:.2f}",
+            "dominant_currency": dominant_currency,
+            "positions_detailed": positions_detailed,
+        }
+
+    def _save_sell_results(self, analysis: AIAnalysis, result: Dict):
+        """Sauvegarde la réponse JSON suggestions de vente."""
+        analysis.response = result["response"]
+        analysis.metadata = result.get("metadata") or {}
+
+        parsed = result.get("parsed_data") or {}
+        suggestions = parsed.get("suggestions")
+
+        enriched: List[Dict] = []
+        if isinstance(suggestions, list):
+            for raw in suggestions:
+                if not isinstance(raw, dict):
+                    continue
+                row = dict(raw)
+                yahoo = (row.get("yahoo_symbol") or row.get("symbol") or "").strip()
+                aa = self._find_all_asset_by_yahoo_symbol(yahoo)
+                row["all_asset_id"] = aa.id if aa else None
+                row["tradable"] = bool(aa)
+                row["broker_symbol"] = aa.symbol if aa else None
+                enriched.append(row)
+
+        analysis.summary = parsed.get("summary", "") or ""
+        analysis.recommendations = enriched
+        analysis.insights = {
+            "macro_context": parsed.get("macro_context", ""),
+            "sell_suggestions": enriched,
         }
         analysis.risks = []
         analysis.opportunities = []

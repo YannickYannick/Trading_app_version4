@@ -225,6 +225,93 @@ def format_diversify_prompt(diversify_data):
     return DIVERSIFY_PROMPT.format(**diversify_data)
 
 
+SELL_SUGGESTIONS_PROMPT = """
+Tu es un expert en analyse fondamentale, gestion de portefeuille et macroéconomie.
+L'utilisateur souhaite **identifier les actions de son portefeuille qui ont un faible potentiel** dans les mois à venir et qu'il pourrait envisager de vendre.
+
+**Contexte portefeuille (positions ouvertes) :**
+- Nombre de positions : {num_positions}
+- Valeur totale estimée des positions : {total_position_value} (devise de référence : {dominant_currency})
+- Positions détaillées (symbole, nom, secteur, industrie, PnL, poids approximatif) :
+{positions_detailed}
+
+**Mission :**
+Analyse **chaque** position du portefeuille individuellement et identifie les **3 actions** (maximum) qui présentent le **plus faible potentiel** dans les prochains mois, en priorisant :
+- Les actions avec des fondamentaux dégradés (PER élevé non justifié, marges en baisse, cash-flows négatifs)
+- Les secteurs/industries en difficulté ou en déclin structurel
+- Les entreprises mal positionnées face aux tendances macro/géopolitiques actuelles
+- Les positions avec un PnL fortement négatif et peu de perspectives de rebond
+
+Pour **chaque** suggestion de vente, fournis :
+- Identifiants : **symbol** (symbole broker), **yahoo_symbol** (format Yahoo Finance)
+- **name** : nom de l'entreprise
+- **sector**, **industry**
+- **current_position** : objet avec **quantity**, **entry_price**, **current_price**, **pnl_percent**
+- **fundamentals** : objet avec **per** (nombre ou null), **valuation** (texte court), **profitability** (texte court)
+- **weakness_analysis** : pourquoi cette action a un faible potentiel (2-3 phrases)
+- **sector_outlook** : perspectives du secteur/industrie
+- **macro_and_geopolitical** : facteurs macro/géopolitiques négatifs pour ce titre
+- **sell_rationale** : argumentaire détaillé pour recommander la vente
+- **alternative_use_of_capital** : suggestion d'utilisation alternative du capital libéré
+- **urgency** : "HIGH" (vendre rapidement), "MEDIUM" (vendre sous 1-3 mois), "LOW" (considérer la vente)
+- **confidence** : score 0-100
+
+**Niveau global :**
+- **macro_context** : synthèse macro (2-4 phrases) : cycle économique, taux, inflation, géopolitique
+- **summary** : synthèse en 2-3 phrases de la logique des suggestions de vente
+
+**Règles :**
+- Réponds **uniquement** en JSON valide UTF-8, sans markdown ni texte hors JSON.
+- Si le portefeuille est sain et qu'aucune position ne mérite d'être vendue, renvoie un tableau `suggestions` vide avec un `summary` expliquant pourquoi.
+- Les suggestions doivent être **distinctes** (pas le même yahoo_symbol).
+- Ne pas inventer de chiffres précis : si incertain, mets **null** pour per et explique dans les textes.
+- Rappel légal : formulations de type « à titre informatif », pas de conseil personnalisé réglementé ; l'utilisateur reste responsable de ses décisions.
+
+Schéma JSON exact :
+{{
+  "summary": "...",
+  "macro_context": "...",
+  "suggestions": [
+    {{
+      "symbol": "TTE.PA",
+      "yahoo_symbol": "TTE.PA",
+      "name": "TotalEnergies SE",
+      "sector": "...",
+      "industry": "...",
+      "current_position": {{
+        "quantity": 10,
+        "entry_price": 55.0,
+        "current_price": 48.5,
+        "pnl_percent": -11.8
+      }},
+      "fundamentals": {{ "per": 8.5, "valuation": "...", "profitability": "..." }},
+      "weakness_analysis": "...",
+      "sector_outlook": "...",
+      "macro_and_geopolitical": "...",
+      "sell_rationale": "...",
+      "alternative_use_of_capital": "...",
+      "urgency": "MEDIUM",
+      "confidence": 68
+    }}
+  ]
+}}
+"""
+
+
+def format_sell_suggestions_prompt(sell_data):
+    """
+    Formate le prompt pour les suggestions de vente.
+
+    Args:
+        sell_data: dict avec positions_detailed, total_position_value,
+            dominant_currency, num_positions
+
+    Returns:
+        str: Prompt formaté
+    """
+    return SELL_SUGGESTIONS_PROMPT.format(**sell_data)
+
+
 def format_strategy_prompt(strategy_data):
     """
     Formate le prompt pour l'analyse de stratégie.

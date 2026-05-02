@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
 import PlaceOrderModal from '@components/orders/PlaceOrderModal'
-import { AIDiversifyModal, type OrderPrefillPayload } from '@components/orders'
+import { AIDiversifyModal, AISellModal, type OrderPrefillPayload, type SellOrderPayload } from '@components/orders'
 import { orderService, brokerService, positionService } from '@services/index'
 import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
@@ -27,7 +27,8 @@ export default function Orders() {
   const [isSaving, setIsSaving] = useState(false)
   const [isPlaceOrderModalOpen, setIsPlaceOrderModalOpen] = useState(false)
   const [isDiversifyModalOpen, setIsDiversifyModalOpen] = useState(false)
-  const [orderPrefill, setOrderPrefill] = useState<OrderPrefillPayload | null>(null)
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false)
+  const [orderPrefill, setOrderPrefill] = useState<OrderPrefillPayload | SellOrderPayload | null>(null)
 
   // États pour les positions
   const [positions, setPositions] = useState<Position[]>([])
@@ -882,7 +883,15 @@ export default function Orders() {
             title="3 suggestions d’actions pour diversifier (IA Gemini)"
           >
             <Sparkles style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-            Suggérer 3 actions (IA)
+            Suggérer achats (IA)
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsSellModalOpen(true)}
+            title="Suggestions d'actions à vendre (IA Gemini)"
+          >
+            <Sparkles style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Suggérer ventes (IA)
           </Button>
           <Button
             variant="outline"
@@ -1081,7 +1090,8 @@ export default function Orders() {
 
                   // Déterminer le symbole à afficher
                   const displaySymbol = position.symbol || position.all_asset_symbol || position.asset?.symbol || 'N/A'
-                  const yahooSymbol = position.all_asset_yahoo_symbol || position.all_asset?.symbole_yahoo || '-'
+                  const allAssetObj = typeof position.all_asset === 'object' ? position.all_asset : null
+                  const yahooSymbol = position.all_asset_yahoo_symbol || allAssetObj?.symbole_yahoo || '-'
                   const displayName = position.all_asset_name || position.asset?.name || '-'
 
                   // Prix actuel (préférence pour Yahoo si dispo, sinon broker)
@@ -1194,12 +1204,23 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Modal de placement d'ordre */}
+      {/* Modal IA suggestions d'achat */}
       <AIDiversifyModal
         isOpen={isDiversifyModalOpen}
         onClose={() => setIsDiversifyModalOpen(false)}
         onPickOrder={(payload) => {
           setIsDiversifyModalOpen(false)
+          setOrderPrefill(payload)
+          setIsPlaceOrderModalOpen(true)
+        }}
+      />
+
+      {/* Modal IA suggestions de vente */}
+      <AISellModal
+        isOpen={isSellModalOpen}
+        onClose={() => setIsSellModalOpen(false)}
+        onPickOrder={(payload) => {
+          setIsSellModalOpen(false)
           setOrderPrefill(payload)
           setIsPlaceOrderModalOpen(true)
         }}

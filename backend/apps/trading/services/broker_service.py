@@ -718,19 +718,38 @@ class BrokerService:
                     if side not in [choice[0] for choice in Order.OrderSide.choices]:
                         side = Order.OrderSide.BUY if 'BUY' in side.upper() else Order.OrderSide.SELL
                     
+                    # Find or create AllAsset for this order
+                    all_asset = None
+                    try:
+                        all_asset = AllAssets.objects.filter(
+                            symbol__iexact=broker_order.symbol,
+                            platform=broker.broker_type
+                        ).first()
+                        if not all_asset:
+                            # Try without platform filter
+                            all_asset = AllAssets.objects.filter(
+                                symbol__iexact=broker_order.symbol
+                            ).first()
+                    except Exception as e:
+                        logger.warning(f"Could not find AllAsset for {broker_order.symbol}: {e}")
+                    
                     if order:
                         # Update existing order
                         order.status = internal_status
                         order.filled_quantity = broker_order.filled_quantity
                         order.price = broker_order.price
                         order.quantity = broker_order.quantity
+                        # Update all_asset if missing
+                        if not order.all_asset and all_asset:
+                            order.all_asset = all_asset
                         order.save()
                         updated += 1
                     else:
-                        # Create new order
+                        # Create new order with all_asset
                         Order.objects.create(
                             user=self.user,
                             asset=asset,
+                            all_asset=all_asset,  # Now includes AllAsset reference
                             broker=broker,
                             order_type=order_type,
                             side=side,

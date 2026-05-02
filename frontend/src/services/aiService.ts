@@ -73,6 +73,20 @@ class AIService {
     }
 
     /**
+     * Propose des actions à vendre du portefeuille (Gemini).
+     * POST /analyses/suggest-sell/
+     */
+    async suggestSell(
+        data: SuggestDiversificationRequest = { force_new: true }
+    ): Promise<SuggestDiversificationResponse> {
+        const response = await api.post<SuggestDiversificationResponse>(
+            '/analyses/suggest-sell/',
+            data
+        );
+        return response.data;
+    }
+
+    /**
      * Récupère l'historique des analyses
      */
     async getAnalyses(params?: {

@@ -227,6 +227,56 @@ class AIAnalysisViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=['post'], url_path='suggest-sell')
+    def suggest_sell(self, request):
+        """
+        Propose des actions à vendre du portefeuille (Gemini).
+
+        POST /api/ai/analyses/suggest-sell/
+        Body: {"force_new": false}
+
+        Réponse: objet AIAnalysis (recommendations = suggestions de vente enrichies).
+        """
+        serializer = AIAnalysisCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        force_new = serializer.validated_data.get('force_new', False)
+
+        if not force_new:
+            one_hour_ago = timezone.now() - timedelta(hours=1)
+            recent_analysis = AIAnalysis.objects.filter(
+                user=request.user,
+                analysis_type=AIAnalysis.AnalysisType.MARKET,
+                status=AIAnalysis.AnalysisStatus.COMPLETED,
+                created_at__gte=one_hour_ago,
+                insights__has_key='sell_suggestions',
+            ).first()
+
+            if recent_analysis:
+                return Response(
+                    {
+                        'message': 'Une analyse récente existe déjà',
+                        'analysis': AIAnalysisSerializer(recent_analysis).data,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        try:
+            analysis_service = TradingAnalysisService()
+            analysis = analysis_service.suggest_sell(request.user)
+
+            return Response(
+                AIAnalysisSerializer(analysis).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            logger.error(f"Erreur suggest-sell: {e}")
+            return Response(
+                {'error': f'Erreur lors de la suggestion de vente: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=['get'], url_path='latest')
     def latest(self, request):
         """
