@@ -130,6 +130,8 @@ export default function StrategiesV3() {
     is_automated: false,
     target_min_quantity: 0.001,
     target_max_quantity: 1,
+    portfolio_min_quantity: 0,
+    portfolio_max_quantity: '' as string | number,
     check_frequency: 5,
   })
 
@@ -406,6 +408,8 @@ export default function StrategiesV3() {
       is_automated: false,
       target_min_quantity: Math.min(position.quantity || 1, 1),
       target_max_quantity: position.quantity || 10,
+      portfolio_min_quantity: 0,
+      portfolio_max_quantity: '',
       check_frequency: 60,
       // Store asset info for wizard
       all_asset_id: assetId,
@@ -456,6 +460,8 @@ export default function StrategiesV3() {
       is_automated: false,
       target_min_quantity: Math.min(qty, 1),
       target_max_quantity: Math.max(qty, 10),
+      portfolio_min_quantity: 0,
+      portfolio_max_quantity: '',
       check_frequency: 60,
       all_asset_id: assetId,
       all_asset_symbol: assetSymbol,
@@ -480,6 +486,11 @@ export default function StrategiesV3() {
           risk_level: s.risk_level || 'MEDIUM',
           target_min_quantity: s.target_min_quantity ?? 1,
           target_max_quantity: s.target_max_quantity ?? 10,
+          portfolio_min_quantity: s.portfolio_min_quantity ?? 0,
+          portfolio_max_quantity:
+            s.portfolio_max_quantity != null && s.portfolio_max_quantity !== ''
+              ? s.portfolio_max_quantity
+              : '',
           check_frequency: s.check_frequency ?? 45,
           is_automated: s.is_automated ?? false,
           all_asset: getAssetId(s),
@@ -521,6 +532,18 @@ export default function StrategiesV3() {
         risk_level: edits.risk_level,
         target_min_quantity: parseFloat(edits.target_min_quantity) || 0,
         target_max_quantity: parseFloat(edits.target_max_quantity) || 0,
+        portfolio_min_quantity: parseFloat(String(edits.portfolio_min_quantity ?? 0)) || 0,
+        portfolio_max_quantity: (() => {
+          if (
+            edits.portfolio_max_quantity === '' ||
+            edits.portfolio_max_quantity === undefined ||
+            edits.portfolio_max_quantity === null
+          ) {
+            return null
+          }
+          const v = parseFloat(String(edits.portfolio_max_quantity))
+          return Number.isFinite(v) ? v : null
+        })(),
         check_frequency: parseInt(edits.check_frequency) || 45,
         is_automated: edits.is_automated,
         parameters,
@@ -638,6 +661,9 @@ export default function StrategiesV3() {
         is_automated: strategy.is_automated || false,
         target_min_quantity: strategy.target_min_quantity || 0.001,
         target_max_quantity: strategy.target_max_quantity || 1,
+        portfolio_min_quantity: strategy.portfolio_min_quantity ?? 0,
+        portfolio_max_quantity:
+          strategy.portfolio_max_quantity != null ? strategy.portfolio_max_quantity : '',
         check_frequency: strategy.check_frequency || 5,
       })
     } else {
@@ -655,6 +681,8 @@ export default function StrategiesV3() {
         is_automated: false,
         target_min_quantity: 0.001,
         target_max_quantity: 1,
+        portfolio_min_quantity: 0,
+        portfolio_max_quantity: '',
         check_frequency: 5,
       })
     }
@@ -680,6 +708,18 @@ export default function StrategiesV3() {
           is_automated: wizardData.is_automated,
           target_min_quantity: wizardData.target_min_quantity,
           target_max_quantity: wizardData.target_max_quantity,
+          portfolio_min_quantity: parseFloat(String(wizardData.portfolio_min_quantity ?? 0)) || 0,
+          portfolio_max_quantity: (() => {
+            if (
+              wizardData.portfolio_max_quantity === '' ||
+              wizardData.portfolio_max_quantity === undefined ||
+              wizardData.portfolio_max_quantity === null
+            ) {
+              return null
+            }
+            const v = parseFloat(String(wizardData.portfolio_max_quantity))
+            return Number.isFinite(v) ? v : null
+          })(),
           check_frequency: wizardData.check_frequency,
           parameters: wizardData.parameters,
         })
@@ -695,6 +735,18 @@ export default function StrategiesV3() {
           execution_mode: wizardData.execution_mode,
           target_min_quantity: wizardData.target_min_quantity,
           target_max_quantity: wizardData.target_max_quantity,
+          portfolio_min_quantity: parseFloat(String(wizardData.portfolio_min_quantity ?? 0)) || 0,
+          portfolio_max_quantity: (() => {
+            if (
+              wizardData.portfolio_max_quantity === '' ||
+              wizardData.portfolio_max_quantity === undefined ||
+              wizardData.portfolio_max_quantity === null
+            ) {
+              return null
+            }
+            const v = parseFloat(String(wizardData.portfolio_max_quantity))
+            return Number.isFinite(v) ? v : null
+          })(),
           check_frequency: wizardData.check_frequency,
           parameters: wizardData.parameters,
         }
@@ -1116,9 +1168,11 @@ export default function StrategiesV3() {
                           </div>
                         </div>
                         
-                        {/* Quantity Range */}
+                        {/* Quantité par trade */}
                         <div className="v3-config-row">
-                          <span className="config-key">Quantité</span>
+                          <span className="config-key" title="Taille min/max d’un ordre ou d’un trade simulé">
+                            Qté par trade
+                          </span>
                           <div className="v3-inline-range" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
@@ -1134,6 +1188,44 @@ export default function StrategiesV3() {
                               value={edits.target_max_quantity ?? s.target_max_quantity ?? 10}
                               onChange={(e) => updateInlineEdit(s.id, 'target_max_quantity', e.target.value)}
                               step="any"
+                            />
+                          </div>
+                        </div>
+                        {/* Bornes position totale en portefeuille */}
+                        <div className="v3-config-row">
+                          <span className="config-key" title="Quantité minimale et maximale d’actions détenues (tous ordres confondus)">
+                            Portefeuille (actions)
+                          </span>
+                          <div className="v3-inline-range" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              className="v3-inline-input small"
+                              value={
+                                edits.portfolio_min_quantity !== undefined
+                                  ? edits.portfolio_min_quantity
+                                  : (s.portfolio_min_quantity ?? 0)
+                              }
+                              onChange={(e) =>
+                                updateInlineEdit(s.id, 'portfolio_min_quantity', e.target.value)
+                              }
+                              step="any"
+                              min={0}
+                            />
+                            <span className="range-separator">–</span>
+                            <input
+                              type="number"
+                              className="v3-inline-input small"
+                              placeholder="∞"
+                              value={
+                                edits.portfolio_max_quantity !== undefined
+                                  ? edits.portfolio_max_quantity
+                                  : (s.portfolio_max_quantity ?? '')
+                              }
+                              onChange={(e) =>
+                                updateInlineEdit(s.id, 'portfolio_max_quantity', e.target.value)
+                              }
+                              step="any"
+                              min={0}
                             />
                           </div>
                         </div>
@@ -1340,9 +1432,12 @@ export default function StrategiesV3() {
                       ))}
                     </div>
                   </div>
+                  <p style={{ fontSize: '9px', fontFamily: 'IBM Plex Mono', color: 'hsl(240, 4%, 46%)', margin: '0 0 0.5rem' }}>
+                    Qté par trade : taille min/max d’un ordre (live/paper) et du backtest graphique.
+                  </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div className="v3-form-group">
-                      <label className="v3-form-label">Quantité min</label>
+                      <label className="v3-form-label">Min (par trade)</label>
                       <input
                         type="number"
                         className="v3-form-input"
@@ -1352,13 +1447,52 @@ export default function StrategiesV3() {
                       />
                     </div>
                     <div className="v3-form-group">
-                      <label className="v3-form-label">Quantité max</label>
+                      <label className="v3-form-label">Max (par trade)</label>
                       <input
                         type="number"
                         className="v3-form-input"
                         value={wizardData.target_max_quantity}
                         onChange={e => setWizardData(prev => ({ ...prev, target_max_quantity: parseFloat(e.target.value) || 0 }))}
                         step="any"
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '9px', fontFamily: 'IBM Plex Mono', color: 'hsl(240, 4%, 46%)', margin: '0.75rem 0 0.5rem' }}>
+                    Portefeuille : min et max d’actions détenues (position totale). Max vide = pas de plafond.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div className="v3-form-group">
+                      <label className="v3-form-label">Min actions portefeuille</label>
+                      <input
+                        type="number"
+                        className="v3-form-input"
+                        value={wizardData.portfolio_min_quantity}
+                        onChange={e =>
+                          setWizardData(prev => ({
+                            ...prev,
+                            portfolio_min_quantity: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        step="any"
+                        min={0}
+                      />
+                    </div>
+                    <div className="v3-form-group">
+                      <label className="v3-form-label">Max actions portefeuille</label>
+                      <input
+                        type="number"
+                        className="v3-form-input"
+                        placeholder="Illimité"
+                        value={wizardData.portfolio_max_quantity === '' ? '' : wizardData.portfolio_max_quantity}
+                        onChange={e =>
+                          setWizardData(prev => ({
+                            ...prev,
+                            portfolio_max_quantity:
+                              e.target.value === '' ? '' : parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        step="any"
+                        min={0}
                       />
                     </div>
                   </div>

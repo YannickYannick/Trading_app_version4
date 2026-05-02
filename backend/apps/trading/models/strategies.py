@@ -177,14 +177,14 @@ class Strategy(TimeStampedModel):
         max_length=10, choices=RiskLevel.choices, default=RiskLevel.MEDIUM
     )
     
-    # Quantité et budget
+    # Quantité par ordre (backtest / taille d'ordre par défaut) et budget
     min_quantity = models.DecimalField(
         max_digits=20, decimal_places=10, default=0, null=False, blank=False,
-        help_text="Quantité minimale d'achat"
+        help_text="Quantité minimale par trade (taille d'ordre plancher pour simulation / trade_size par défaut)"
     )
     max_quantity = models.DecimalField(
         max_digits=20, decimal_places=10, default=1, null=False, blank=False,
-        help_text="Quantité maximale d'achat"
+        help_text="Quantité maximale par trade (taille d'ordre plafond pour simulation)"
     )
     budget = models.DecimalField(
         max_digits=20, decimal_places=2, default=1000, null=False, blank=False,
@@ -205,7 +205,22 @@ class Strategy(TimeStampedModel):
         default=0,
         help_text="Quantité actuellement détenue en portefeuille"
     )
-    
+    portfolio_min_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        default=0,
+        null=False,
+        blank=False,
+        help_text="Nombre minimum d'actions (titres) à conserver en portefeuille (exécution threshold : min_qty)",
+    )
+    portfolio_max_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        null=True,
+        blank=True,
+        help_text="Nombre maximum d'actions (titres) en portefeuille. None = pas de plafond (exécution threshold : max_qty)",
+    )
+
     # Statut
     is_active = models.BooleanField(
         default=True,
@@ -242,6 +257,27 @@ class Strategy(TimeStampedModel):
         
         # Fallback vers l'ancien système (JSONField)
         return self.parameters or {}
+
+    def get_execution_parameters(self):
+        """
+        Paramètres effectifs pour AlgorithmFactory : JSON + champs stratégie
+        (ex. threshold : min_qty / max_qty portefeuille, trade_size depuis min/max par trade).
+        """
+        merged = dict(self.get_parameters_dict())
+        if self.algorithm_type == self.AlgorithmType.THRESHOLD:
+            if 'min_qty' not in merged:
+                merged['min_qty'] = float(self.portfolio_min_quantity or 0)
+            if 'max_qty' not in merged:
+                merged['max_qty'] = (
+                    float(self.portfolio_max_quantity)
+                    if self.portfolio_max_quantity is not None
+                    else float('inf')
+                )
+            if 'trade_size' not in merged:
+                t_hi = float(self.max_quantity or 0)
+                t_lo = float(self.min_quantity or 0)
+                merged['trade_size'] = t_hi if t_hi > 0 else (t_lo if t_lo > 0 else 1.0)
+        return merged
     
     def set_parameter(self, key, value, param_type, description=''):
         """Crée ou met à jour un paramètre."""
@@ -342,7 +378,7 @@ class Strategy(TimeStampedModel):
         
         try:
             from apps.trading.algorithms import AlgorithmFactory
-            parameters = self.get_parameters_dict()
+            parameters = self.get_execution_parameters()
             return AlgorithmFactory.create_algorithm(self.algorithm_type, parameters, self)
         except ImportError:
             return None

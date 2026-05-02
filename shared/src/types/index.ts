@@ -169,6 +169,8 @@ export interface Strategy {
   portfolio_quantity?: number
   target_min_quantity?: number
   target_max_quantity?: number
+  portfolio_min_quantity?: number
+  portfolio_max_quantity?: number | null
   min_quantity?: number
   max_quantity?: number
   budget?: number

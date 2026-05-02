@@ -286,6 +286,7 @@ class StrategySerializer(serializers.ModelSerializer):
             'min_quantity', 'max_quantity',
             'target_min_quantity', 'target_max_quantity',
             'budget', 'portfolio_quantity',
+            'portfolio_min_quantity', 'portfolio_max_quantity',
             # Fréquence
             'check_frequency',
             # Paramètres

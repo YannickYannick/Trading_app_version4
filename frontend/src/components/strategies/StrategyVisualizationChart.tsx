@@ -275,6 +275,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     parameters.budget,
     parameters.order_size,
     parameters.stop_loss,
+    parameters.portfolio_min_quantity,
+    parameters.portfolio_max_quantity,
   ])
 
   // Calculer et afficher les indicateurs et signaux
@@ -475,7 +477,25 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const maxQuantityRaw = maxQ === undefined || maxQ === null || maxQ === '' ? NaN : Number(maxQ)
     const maxQuantity = Number.isFinite(maxQuantityRaw) ? maxQuantityRaw : undefined
     const budget = strategyParams.budget
-    const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity, maxQuantity, budget)
+    const pMinSrc = parameters.portfolio_min_quantity ?? strategy.portfolio_min_quantity
+    const pMaxSrc = parameters.portfolio_max_quantity ?? strategy.portfolio_max_quantity
+    const portfolioMinHeld =
+      pMinSrc === undefined || pMinSrc === null || pMinSrc === '' ? 0 : Number(pMinSrc) || 0
+    const pMaxNum =
+      pMaxSrc === undefined || pMaxSrc === null || pMaxSrc === '' ? NaN : Number(pMaxSrc)
+    const portfolioMaxHeld = Number.isFinite(pMaxNum) ? pMaxNum : undefined
+    const simulated = simulateTradesFromSignals(
+      signals,
+      prices,
+      dates,
+      orderSize,
+      stopLoss,
+      minQuantity,
+      maxQuantity,
+      budget,
+      portfolioMinHeld,
+      portfolioMaxHeld
+    )
     setSimulatedTrades(simulated)
 
     // Calculer les métriques de performance
