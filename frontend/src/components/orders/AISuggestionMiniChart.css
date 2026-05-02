@@ -1,0 +1,77 @@
+.ai-mini-chart {
+  position: relative;
+  margin: 12px 0 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.ai-mini-chart-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ai-mini-chart-period-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+}
+
+.ai-mini-chart-period-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-mini-period-btn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #444);
+  background: var(--bg-tertiary, transparent);
+  color: var(--text-primary, #eee);
+  cursor: pointer;
+}
+
+.ai-mini-period-btn:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.ai-mini-period-btn.active {
+  border-color: var(--accent-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.ai-mini-period-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-mini-chart-canvas {
+  width: 100%;
+  min-height: 220px;
+}
+
+.ai-mini-chart-error {
+  font-size: 0.85rem;
+  color: var(--danger-color, #f87171);
+  margin: 0 0 8px;
+}
+
+.ai-mini-chart-loading {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+}
+
+.ai-mini-chart-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin: 8px 0 0;
+}

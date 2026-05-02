@@ -1,0 +1,126 @@
+/* Liste verticale partagée : suggestions IA (achat / vente) */
+.ai-suggest-vertical-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ai-suggest-row {
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  background: var(--bg-card, var(--card-bg-elevated, rgba(255, 255, 255, 0.03)));
+  overflow: hidden;
+}
+
+.ai-suggest-row.expanded {
+  border-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.ai-suggest-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ai-suggest-row-head:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.ai-suggest-row-chevron {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.75;
+}
+
+.ai-suggest-row-title {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-suggest-ticker {
+  font-size: 1.05rem;
+}
+
+.ai-suggest-sub {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.ai-suggest-sector {
+  font-size: 0.78rem;
+  color: var(--text-muted, #999);
+}
+
+.ai-suggest-row-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  font-size: 0.85rem;
+}
+
+.ai-suggest-live strong {
+  font-weight: 600;
+}
+
+.ai-suggest-live.muted {
+  color: var(--text-muted, #888);
+}
+
+.ai-suggest-pnl.pos {
+  color: var(--success-color, #22c55e);
+}
+
+.ai-suggest-pnl.neg {
+  color: var(--danger-color, #ef4444);
+}
+
+.ai-suggest-qty {
+  color: var(--text-muted, #888);
+}
+
+.ai-suggest-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.ai-suggest-row-body {
+  padding: 0 14px 14px 44px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+}
+
+.ai-suggest-no-chart {
+  font-size: 0.9rem;
+  color: var(--text-muted, #888);
+  margin: 8px 0;
+}
+
+@media (max-width: 640px) {
+  .ai-suggest-row-badges {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .ai-suggest-row-body {
+    padding-left: 14px;
+  }
+}
