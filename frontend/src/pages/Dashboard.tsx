@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any[]>([])
   const [breakdown, setBreakdown] = useState<any[]>([])
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+  const [showBreakdown, setShowBreakdown] = useState(false)
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -118,7 +119,7 @@ export default function Dashboard() {
 
       {/* Statistiques principales - Source API Analytics */}
       <div className="dashboard-stats-grid">
-        <Card className="stat-card stat-card-primary">
+        <Card className="stat-card stat-card-primary stat-card-expandable">
           <div className="stat-card-content">
             <h3 className="stat-card-label">Valeur Totale</h3>
             <p className="stat-card-value">{formatCurrency(kpi?.total_value || 0)}</p>
@@ -127,6 +128,39 @@ export default function Dashboard() {
               <span>|</span>
               <span>Investi: {formatCurrency(kpi?.total_invested || 0)}</span>
             </div>
+            
+            {/* Bouton pour voir le détail */}
+            <button 
+              className="breakdown-toggle"
+              onClick={() => setShowBreakdown(!showBreakdown)}
+            >
+              {showBreakdown ? '▲ Masquer détails' : '▼ Voir détails par compte'}
+            </button>
+            
+            {/* Panneau déroulant avec détails par broker */}
+            {showBreakdown && breakdown.length > 0 && (
+              <div className="breakdown-panel">
+                {breakdown.map((broker, idx) => (
+                  <div key={idx} className="breakdown-item">
+                    <div className="breakdown-broker-name">{broker.broker || 'Inconnu'}</div>
+                    <div className="breakdown-details">
+                      <div className="breakdown-row">
+                        <span className="breakdown-label">Cash:</span>
+                        <span className="breakdown-value">{formatCurrency(broker.cash || 0)}</span>
+                      </div>
+                      <div className="breakdown-row">
+                        <span className="breakdown-label">Investi:</span>
+                        <span className="breakdown-value">{formatCurrency(broker.invested || 0)}</span>
+                      </div>
+                      <div className="breakdown-row breakdown-total">
+                        <span className="breakdown-label">Total:</span>
+                        <span className="breakdown-value">{formatCurrency((broker.cash || 0) + (broker.invested || 0))}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Card>
 
