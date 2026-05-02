@@ -172,6 +172,7 @@ export default function AISellModal({ isOpen, onClose, onPickOrder }: AISellModa
     }
   }, [isOpen, suggestions])
 
+  const macroContext =
     (analysis?.insights as { macro_context?: string } | undefined)?.macro_context || ''
 
   const handlePickOrder = (s: SellSuggestion) => {

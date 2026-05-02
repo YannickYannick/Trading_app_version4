@@ -24,7 +24,7 @@ from apps.trading.models import (
     Strategy, StrategyPerformance, Broker, BrokerAccount, BrokerSyncLog,
     ScheduledTask, TaskExecutionLog, PortfolioSnapshot, StrategyExecution
 )
-from apps.trading.services.broker_service import BrokerService
+from apps.trading.services.broker_service import BrokerService, resolve_all_asset_from_asset
 from .serializers import (
     AllAssetsSerializer, AssetSerializer, AssetNestedSerializer, AssetPriceSerializer,
     AllAssetPriceHistorySerializer, PositionSerializer, TradeSerializer, OrderSerializer,
@@ -1380,7 +1380,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.filter(user=self.request.user)
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        order = serializer.save(user=self.request.user)
+        if order.asset_id and not order.all_asset_id:
+            try:
+                asset = Asset.objects.select_related('all_asset').get(pk=order.asset_id)
+            except Asset.DoesNotExist:
+                return
+            broker_type = getattr(order.broker, 'broker_type', None) if order.broker_id else None
+            aa = resolve_all_asset_from_asset(asset, broker_type)
+            if aa:
+                if not asset.all_asset_id:
+                    asset.all_asset = aa
+                    asset.save(update_fields=['all_asset'])
+                order.all_asset = aa
+                order.save(update_fields=['all_asset'])
     
     @action(detail=False, methods=['get'])
     def pending(self, request):
@@ -1392,6 +1405,34 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
         serializer = self.get_serializer(orders, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='backfill-all-asset')
+    def backfill_all_asset(self, request):
+        """
+        POST /api/orders/backfill-all-asset/
+        Renseigne Order.all_asset via Asset.all_asset ou résolution catalogue (symbole normalisé).
+        """
+        qs = (
+            self.get_queryset()
+            .filter(all_asset__isnull=True)
+            .exclude(asset__isnull=True)
+            .select_related('asset', 'asset__all_asset', 'broker')
+        )
+        updated = 0
+        for order in qs:
+            if not order.asset_id or not order.asset:
+                continue
+            asset = order.asset
+            broker_type = getattr(order.broker, 'broker_type', None) if order.broker_id else None
+            aa = resolve_all_asset_from_asset(asset, broker_type)
+            if aa and not asset.all_asset_id:
+                asset.all_asset = aa
+                asset.save(update_fields=['all_asset'])
+            if aa:
+                order.all_asset = aa
+                order.save(update_fields=['all_asset'])
+                updated += 1
+        return Response({'updated': updated, 'message': f'{updated} ordre(s) mis à jour.'})
     
     @action(detail=False, methods=['get'])
     def filled(self, request):
@@ -1642,6 +1683,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'price': price_decimal,
                 'stop_price': stop_price_decimal,
                 'status': 'OPEN' if result.success else 'REJECTED',
+                'all_asset': all_asset,
             }
         )
         
@@ -1704,6 +1746,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         # Update order with broker response
         order.broker_order_id = result.order_id or order.broker_order_id
         order.status = 'OPEN'
+        if order.asset_id and not order.all_asset_id:
+            try:
+                a = Asset.objects.select_related('all_asset').get(pk=order.asset_id)
+                if a.all_asset_id:
+                    order.all_asset = a.all_asset
+            except Asset.DoesNotExist:
+                pass
         order.save()
         
         return Response({

@@ -270,6 +270,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     parameters.grid_levels,
     parameters.min_quantity,
     parameters.max_quantity,
+    parameters.target_min_quantity,
+    parameters.target_max_quantity,
     parameters.budget,
     parameters.order_size,
     parameters.stop_loss,
@@ -284,6 +286,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     if (!algorithmType) return
 
     // Convertir les paramètres au format StrategyParameters
+    const minQ = parameters.min_quantity ?? parameters.target_min_quantity
+    const maxQ = parameters.max_quantity ?? parameters.target_max_quantity
+
     const strategyParams: StrategyParameters = {
       rsi_period: parameters.rsi_period,
       rsi_low: parameters.rsi_low,
@@ -300,9 +305,11 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
       grid_min: parameters.grid_min,
       grid_max: parameters.grid_max,
       grid_levels: parameters.grid_levels,
-      min_quantity: parameters.min_quantity,
-      max_quantity: parameters.max_quantity,
+      min_quantity: minQ,
+      max_quantity: maxQ,
       budget: parameters.budget,
+      order_size: parameters.order_size,
+      stop_loss: parameters.stop_loss,
     }
 
     const prices = priceHistory.map(p => p.value)
@@ -461,8 +468,12 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Simuler les trades basés sur les signaux
     const orderSize = strategyParams.order_size || 1.0
     const stopLoss = strategyParams.stop_loss
-    const minQuantity = strategyParams.min_quantity || 0
-    const maxQuantity = strategyParams.max_quantity
+    const minQuantity =
+      minQ === undefined || minQ === null || minQ === ''
+        ? 0
+        : Number(minQ) || 0
+    const maxQuantityRaw = maxQ === undefined || maxQ === null || maxQ === '' ? NaN : Number(maxQ)
+    const maxQuantity = Number.isFinite(maxQuantityRaw) ? maxQuantityRaw : undefined
     const budget = strategyParams.budget
     const simulated = simulateTradesFromSignals(signals, prices, dates, orderSize, stopLoss, minQuantity, maxQuantity, budget)
     setSimulatedTrades(simulated)

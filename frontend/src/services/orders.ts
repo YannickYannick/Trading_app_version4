@@ -88,6 +88,16 @@ export const orderService = {
   },
 
   /**
+   * Répare Order.all_asset (et Asset.all_asset si vide) pour les ordres déjà en base.
+   */
+  async backfillAllAssetLinks(): Promise<{ updated: number; message?: string }> {
+    const response = await apiClient.post<{ updated: number; message?: string }>(
+      '/orders/backfill-all-asset/'
+    )
+    return response.data
+  },
+
+  /**
    * Récupérer les ordres en attente
    */
   async getPending(filters?: Omit<OrderFilters, 'status'>): Promise<Order[]> {

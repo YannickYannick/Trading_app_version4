@@ -333,10 +333,19 @@ export default function StrategiesV3() {
   const loadPositions = useCallback(async () => {
     setLoadingPositions(true)
     try {
-      const [openPositions, pendingOrders] = await Promise.all([
+      const [openPositions, initialPending] = await Promise.all([
         positionService.getOpen(),
         orderService.getActivePendingList(),
       ])
+      let pendingOrders = initialPending
+      try {
+        const r = await orderService.backfillAllAssetLinks()
+        if (r.updated > 0) {
+          pendingOrders = await orderService.getActivePendingList()
+        }
+      } catch (backfillErr) {
+        console.warn('backfill AllAsset ordres:', backfillErr)
+      }
       setPositions(openPositions)
       setPortfolioOrders(pendingOrders)
     } catch (err) {

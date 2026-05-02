@@ -35,6 +35,38 @@ from ..models import (
 logger = logging.getLogger('trading.services.broker')
 
 
+def _normalize_broker_symbol(symbol: Optional[str]) -> str:
+    """Aligne les symboles broker (ex: V:xnys, AAPL_xnas) sur la clé catalogue AllAssets."""
+    if not symbol:
+        return ''
+    s = str(symbol).split(':')[0].split('_')[0].strip().upper()
+    return s
+
+
+def resolve_all_asset_from_asset(asset: Optional[Asset], broker_type: Optional[str] = None) -> Optional[AllAssets]:
+    """
+    AllAssets pour un Asset : FK déjà présente, sinon recherche catalogue par symbole (normalisé ou brut).
+    Même logique que la sync ordres broker pour éviter les ordres sans catalogue.
+    """
+    if asset is None:
+        return None
+    if getattr(asset, 'all_asset_id', None):
+        return asset.all_asset
+    sym_raw = (asset.symbol or '').strip()
+    sym = _normalize_broker_symbol(sym_raw)
+    bt = (broker_type or '').strip()
+    all_asset = None
+    if bt:
+        all_asset = AllAssets.objects.filter(symbol__iexact=sym, platform=bt).first()
+        if not all_asset and sym_raw:
+            all_asset = AllAssets.objects.filter(symbol__iexact=sym_raw, platform=bt).first()
+    if not all_asset:
+        all_asset = AllAssets.objects.filter(symbol__iexact=sym).first()
+    if not all_asset and sym_raw:
+        all_asset = AllAssets.objects.filter(symbol__iexact=sym_raw).first()
+    return all_asset
+
+
 class BrokerServiceError(Exception):
     """Base exception for broker service errors."""
     pass
@@ -651,35 +683,45 @@ class BrokerService:
             # Process each broker order
             for broker_order in broker_orders:
                 try:
-                    # Find asset by symbol
+                    sym_raw = (broker_order.symbol or '').strip()
+                    sym = _normalize_broker_symbol(sym_raw)
+
+                    # Find asset by symbol (normalized first — Saxo often sends V:xnys)
                     asset = None
                     try:
-                        # Try to find asset by symbol
-                        asset = Asset.objects.filter(
-                            symbol__iexact=broker_order.symbol
-                        ).first()
-                        
-                        # If not found, try to find via AllAssets
+                        asset = Asset.objects.filter(symbol__iexact=sym).first()
+                        if not asset and sym_raw:
+                            asset = Asset.objects.filter(symbol__iexact=sym_raw).first()
+
                         if not asset:
-                            all_asset = AllAssets.objects.filter(
-                                symbol__iexact=broker_order.symbol,
+                            all_asset_lookup = AllAssets.objects.filter(
+                                symbol__iexact=sym,
                                 platform=broker.broker_type
                             ).first()
-                            if all_asset:
+                            if not all_asset_lookup and sym_raw:
+                                all_asset_lookup = AllAssets.objects.filter(
+                                    symbol__iexact=sym_raw,
+                                    platform=broker.broker_type
+                                ).first()
+                            if not all_asset_lookup:
+                                all_asset_lookup = AllAssets.objects.filter(symbol__iexact=sym).first()
+                            if not all_asset_lookup and sym_raw:
+                                all_asset_lookup = AllAssets.objects.filter(symbol__iexact=sym_raw).first()
+                            if all_asset_lookup:
                                 asset, _ = Asset.objects.get_or_create(
-                                    all_asset=all_asset,
+                                    all_asset=all_asset_lookup,
                                     defaults={
-                                        'symbol': all_asset.symbol,
-                                        'name': all_asset.name,
-                                        'asset_type': all_asset.asset_type,
-                                        'currency': all_asset.currency,
+                                        'symbol': all_asset_lookup.symbol,
+                                        'name': all_asset_lookup.name,
+                                        'asset_type': all_asset_lookup.asset_type,
+                                        'currency': all_asset_lookup.currency,
                                     }
                                 )
                     except Exception as e:
                         logger.warning(f"Could not find asset for symbol {broker_order.symbol}: {e}")
                         errors.append(f"Asset not found for {broker_order.symbol}")
                         continue
-                    
+
                     if not asset:
                         errors.append(f"Asset not found for {broker_order.symbol}")
                         continue
@@ -718,30 +760,43 @@ class BrokerService:
                     if side not in [choice[0] for choice in Order.OrderSide.choices]:
                         side = Order.OrderSide.BUY if 'BUY' in side.upper() else Order.OrderSide.SELL
                     
-                    # Find or create AllAsset for this order
+                    # AllAssets pour Order.all_asset (serializer + stratégies)
                     all_asset = None
                     try:
                         all_asset = AllAssets.objects.filter(
-                            symbol__iexact=broker_order.symbol,
+                            symbol__iexact=sym,
                             platform=broker.broker_type
                         ).first()
-                        if not all_asset:
-                            # Try without platform filter
+                        if not all_asset and sym_raw:
                             all_asset = AllAssets.objects.filter(
-                                symbol__iexact=broker_order.symbol
+                                symbol__iexact=sym_raw,
+                                platform=broker.broker_type
                             ).first()
+                        if not all_asset:
+                            all_asset = AllAssets.objects.filter(symbol__iexact=sym).first()
+                        if not all_asset and sym_raw:
+                            all_asset = AllAssets.objects.filter(symbol__iexact=sym_raw).first()
+                        if not all_asset and getattr(asset, 'all_asset_id', None):
+                            all_asset = asset.all_asset
                     except Exception as e:
-                        logger.warning(f"Could not find AllAsset for {broker_order.symbol}: {e}")
-                    
+                        logger.warning(f"Could not resolve AllAsset for {broker_order.symbol}: {e}")
+
                     if order:
                         # Update existing order
                         order.status = internal_status
                         order.filled_quantity = broker_order.filled_quantity
                         order.price = broker_order.price
                         order.quantity = broker_order.quantity
-                        # Update all_asset if missing
-                        if not order.all_asset and all_asset:
-                            order.all_asset = all_asset
+                        if not order.all_asset_id:
+                            if all_asset:
+                                order.all_asset = all_asset
+                            elif order.asset_id:
+                                try:
+                                    oa = Asset.objects.select_related('all_asset').get(pk=order.asset_id)
+                                    if oa.all_asset_id:
+                                        order.all_asset = oa.all_asset
+                                except Asset.DoesNotExist:
+                                    pass
                         order.save()
                         updated += 1
                     else:
