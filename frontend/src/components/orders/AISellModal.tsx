@@ -301,7 +301,7 @@ export default function AISellModal({ isOpen, onClose, onPickOrder }: AISellModa
                       disabled={!s.tradable || !(s.broker_symbol || s.yahoo_symbol || s.symbol)}
                       title={
                         !s.tradable
-                          ? 'Cet actif n'est pas dans votre catalogue AllAssets'
+                          ? "Cet actif n'est pas dans votre catalogue AllAssets"
                           : undefined
                       }
                       onClick={() => handlePickOrder(s)}
