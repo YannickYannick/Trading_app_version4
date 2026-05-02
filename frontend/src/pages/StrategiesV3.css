@@ -1395,8 +1395,25 @@
    PORTFOLIO SELECTION MODAL
    ============================================ */
 
-.portfolio-modal {
+.v3-modal.portfolio-modal {
   max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 720px);
+  overflow: hidden;
+}
+
+.v3-modal.portfolio-modal .v3-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.v3-modal.portfolio-modal .v3-modal-header,
+.v3-modal.portfolio-modal .v3-modal-footer {
+  flex-shrink: 0;
 }
 
 .portfolio-modal-hint {
@@ -1409,9 +1426,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  max-height: min(70vh, 520px);
-  overflow-y: auto;
-  padding-right: var(--spacing-xs);
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .portfolio-modal-section {
@@ -1539,6 +1556,35 @@
   color: var(--color-text-muted);
 }
 
+.portfolio-order-card.clickable {
+  cursor: pointer;
+}
+
+.portfolio-order-card.clickable:hover {
+  border-color: var(--color-primary);
+  background: var(--bg-hover);
+}
+
+.portfolio-order-card.disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.portfolio-order-action-hint {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.portfolio-order-warn {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: 11px;
+  color: var(--color-warning, #eab308);
+}
+
 .portfolio-order-broker {
   grid-column: 1 / -1;
   font-size: var(--font-size-xs);
@@ -1579,8 +1625,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  max-height: 400px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .portfolio-item {

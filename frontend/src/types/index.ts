@@ -122,8 +122,10 @@ export interface Trade {
 
 export interface Order {
   id: number
-  asset: Asset
+  asset?: Asset | null
   all_asset?: AllAsset
+  /** ID catalogue AllAssets (direct ou via Asset), renvoyé par l’API pour le front */
+  catalog_all_asset_id?: number | null
   all_asset_symbol?: string
   all_asset_name?: string
   all_asset_platform?: string

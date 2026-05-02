@@ -756,13 +756,15 @@ class OrderSerializer(serializers.ModelSerializer):
     # Champs calculés
     fill_percentage = serializers.SerializerMethodField()
     total_value = serializers.SerializerMethodField()
-    
+    catalog_all_asset_id = serializers.SerializerMethodField()
+
     class Meta:
         model = Order
         fields = [
             'id',
             'all_asset', 'all_asset_id', 'all_asset_symbol', 'all_asset_name', 
             'all_asset_platform', 'all_asset_yahoo_symbol',
+            'catalog_all_asset_id',
             'asset', 'asset_id',
             'broker_name', 'broker_id',
             'order_type', 'side', 'status',
@@ -774,6 +776,15 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'filled_quantity', 'created_at', 'updated_at', 'total_value', 
                            'all_asset_symbol', 'all_asset_name', 'all_asset_platform', 'all_asset_yahoo_symbol']
     
+    def get_catalog_all_asset_id(self, obj):
+        """ID catalogue AllAssets (direct ou via Asset lié) pour le front (stratégies, etc.)."""
+        if obj.all_asset_id:
+            return obj.all_asset_id
+        asset = getattr(obj, 'asset', None)
+        if asset is not None and getattr(asset, 'all_asset_id', None):
+            return asset.all_asset_id
+        return None
+
     def get_fill_percentage(self, obj):
         """Calcule le % de remplissage de l'ordre."""
         if obj.quantity and obj.quantity > 0:

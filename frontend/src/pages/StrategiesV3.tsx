@@ -5,7 +5,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { strategyService, assetService, positionService, orderService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
-import { useToast } from '@hooks/useToast'
 import type { Strategy, AllAsset, Position, Order } from '@types'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import './StrategiesV3.css'
@@ -55,7 +54,8 @@ const MODE_LABELS: Record<string, string> = {
   live_trading: 'LIVE',
 }
 
-function orderAllAssetId(o: Order): number | null {
+function orderCatalogAllAssetId(o: Order): number | null {
+  if (typeof o.catalog_all_asset_id === 'number') return o.catalog_all_asset_id
   const raw = o as Order & { all_asset_id?: number }
   if (typeof raw.all_asset_id === 'number') return raw.all_asset_id
   if (typeof o.all_asset === 'object' && o.all_asset?.id) return o.all_asset.id
@@ -407,6 +407,55 @@ export default function StrategiesV3() {
     setWizardOpen(true)
   }
 
+  const createFromOrder = (order: Order) => {
+    const assetId = orderCatalogAllAssetId(order)
+    const qty = Number(order.quantity) || 1
+
+    const assetSymbol =
+      order.all_asset_symbol ||
+      (typeof order.asset === 'object' && order.asset?.symbol ? order.asset.symbol : '') ||
+      ''
+    const assetName =
+      order.all_asset_name ||
+      (typeof order.asset === 'object' && order.asset?.name ? order.asset.name : null) ||
+      assetSymbol ||
+      'Actif'
+
+    if (!assetId) {
+      window.alert(
+        "Cet ordre n'est pas relié au catalogue AllAssets. Synchronisez ou corrigez l'ordre depuis la page Ordres, puis réessayez."
+      )
+      return
+    }
+
+    setPortfolioModalOpen(false)
+
+    const defaults: Record<string, number> = {}
+    ALGORITHM_PARAMS['threshold'].forEach(p => {
+      defaults[p.key] = p.default
+    })
+
+    setEditTarget(null)
+    setWizardData({
+      name: `Stratégie ${assetName}`,
+      description: `Stratégie automatique pour ${assetSymbol} (depuis ordre ${order.side})`,
+      asset: assetId.toString(),
+      algorithm_type: 'threshold',
+      parameters: defaults,
+      execution_mode: 'simulation',
+      risk_level: 'MEDIUM',
+      is_automated: false,
+      target_min_quantity: Math.min(qty, 1),
+      target_max_quantity: Math.max(qty, 10),
+      check_frequency: 60,
+      all_asset_id: assetId,
+      all_asset_symbol: assetSymbol,
+      all_asset_name: assetName,
+    } as any)
+    setWizardStep(0)
+    setWizardOpen(true)
+  }
+
   useEffect(() => {
     loadData()
   }, [loadData])
@@ -691,7 +740,7 @@ export default function StrategiesV3() {
   const pendingOrdersCountByAllAssetId = useMemo(() => {
     const m = new Map<number, number>()
     for (const o of portfolioOrders) {
-      const id = orderAllAssetId(o)
+      const id = orderCatalogAllAssetId(o)
       if (id != null) m.set(id, (m.get(id) || 0) + 1)
     }
     return m
@@ -1527,8 +1576,8 @@ export default function StrategiesV3() {
 
             <div className="v3-modal-body">
               <p className="portfolio-modal-hint">
-                Sous « Ordres en cours », vous voyez les ordres encore actifs chez les brokers (pris en compte pour votre exposition).
-                Choisissez ensuite une position pour créer une stratégie sur l’actif correspondant :
+                Cliquez sur un <strong>ordre en cours</strong> ou une <strong>position ouverte</strong> pour ouvrir l’assistant
+                avec l’actif pré-rempli (exposition ordres + positions).
               </p>
 
               {loadingPositions ? (
@@ -1549,24 +1598,49 @@ export default function StrategiesV3() {
                     ) : (
                       <div className="portfolio-orders-list">
                         {portfolioOrders.map((order) => {
+                          const catalogId = orderCatalogAllAssetId(order)
                           const sym =
                             order.all_asset_symbol ||
-                            (typeof order.asset === 'object' && order.asset?.symbol) ||
+                            (typeof order.asset === 'object' && order.asset?.symbol ? order.asset.symbol : '') ||
                             '—'
                           const label =
                             order.all_asset_name ||
-                            (typeof order.asset === 'object' && order.asset?.name) ||
-                            sym
+                            (typeof order.asset === 'object' && order.asset?.name ? order.asset.name : null) ||
+                            (sym !== '—' ? sym : 'Actif inconnu')
                           const broker = order.broker_name || order.broker?.name || '—'
                           const priceLabel =
                             order.price != null && order.price !== 0
-                              ? order.price.toLocaleString('fr-FR', { maximumFractionDigits: 6 })
+                              ? Number(order.price).toLocaleString('fr-FR', { maximumFractionDigits: 6 })
                               : '—'
+                          const orderBlocked = catalogId != null && hasStrategyForAsset(catalogId)
+                          const orderClickable = catalogId != null && !orderBlocked
+
                           return (
-                            <div key={order.id} className="portfolio-order-card">
+                            <div
+                              key={order.id}
+                              role="button"
+                              tabIndex={0}
+                              className={`portfolio-order-card ${orderClickable ? 'clickable' : 'disabled'}`}
+                              onClick={() => orderClickable && createFromOrder(order)}
+                              onKeyDown={(e) => {
+                                if ((e.key === 'Enter' || e.key === ' ') && orderClickable) {
+                                  e.preventDefault()
+                                  createFromOrder(order)
+                                }
+                              }}
+                            >
                               <div className="portfolio-order-main">
                                 <span className="portfolio-order-name">{label}</span>
                                 <span className="portfolio-order-symbol">{sym}</span>
+                                {orderClickable && (
+                                  <span className="portfolio-order-action-hint">Cliquer → créer une stratégie</span>
+                                )}
+                                {catalogId == null && (
+                                  <span className="portfolio-order-warn">Catalogue AllAssets indisponible</span>
+                                )}
+                                {orderBlocked && (
+                                  <span className="existing-strategy-badge">Stratégie existante</span>
+                                )}
                               </div>
                               <div className={`portfolio-order-side portfolio-order-side-${order.side.toLowerCase()}`}>
                                 {order.side}

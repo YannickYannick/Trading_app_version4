@@ -1386,7 +1386,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def pending(self, request):
         """GET /api/orders/pending/ → Ordres en attente."""
         orders = self.filter_queryset(
-            self.get_queryset().filter(status__in=['PENDING', 'OPEN', 'PARTIALLY_FILLED'])
+            self.get_queryset()
+            .filter(status__in=['PENDING', 'OPEN', 'PARTIALLY_FILLED'])
+            .select_related('all_asset', 'broker', 'asset', 'asset__all_asset')
         )
         serializer = self.get_serializer(orders, many=True)
         return Response(serializer.data)
