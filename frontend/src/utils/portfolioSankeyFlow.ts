@@ -13,8 +13,18 @@ export interface BrokerBreakdownRow {
   total?: number
 }
 
+export type SankeyNodeRole = 'broker' | 'liquid' | 'sector'
+
+export interface SankeyNodeInput {
+  name: string
+  value: number
+  role: SankeyNodeRole
+  /** Index du courtier pour palette (0..n-1) */
+  brokerPaletteIndex?: number
+}
+
 export interface SankeyChartData {
-  nodes: { name: string; value: number }[]
+  nodes: SankeyNodeInput[]
   links: { source: number; target: number; value: number }[]
 }
 
@@ -100,18 +110,27 @@ export function buildPortfolioBrokerSectorSankey(
 
   if (brokerAggs.length === 0) return null
 
-  const nodes: { name: string; value: number }[] = []
+  const nodes: SankeyNodeInput[] = []
   const brokerNodeIndex = new Map<number, number>()
 
-  for (const b of brokerAggs) {
+  brokerAggs.forEach((b, paletteIdx) => {
     brokerNodeIndex.set(b.bid, nodes.length)
-    nodes.push({ name: b.label, value: b.cash + b.invested })
-  }
+    nodes.push({
+      name: b.label,
+      value: b.cash + b.invested,
+      role: 'broker',
+      brokerPaletteIndex: paletteIdx,
+    })
+  })
 
   const sectorNodeIndex = new Map<string, number>()
   for (const sec of targetOrder) {
     sectorNodeIndex.set(sec, nodes.length)
-    nodes.push({ name: sec, value: 0 })
+    nodes.push({
+      name: sec,
+      value: 0,
+      role: sec === LIQUIDITES ? 'liquid' : 'sector',
+    })
   }
 
   const links: { source: number; target: number; value: number }[] = []
