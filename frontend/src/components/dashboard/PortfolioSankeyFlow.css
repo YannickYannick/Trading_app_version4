@@ -5,45 +5,35 @@
 .portfolio-sankey-note {
   font-size: 0.8125rem;
   line-height: 1.45;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted, #64748b);
   margin: 0 0 1rem;
   max-width: 72ch;
 }
 
 .portfolio-sankey-note a {
-  color: #5eead4;
+  color: var(--color-primary, #6366f1);
   text-decoration: underline;
 }
 
 .portfolio-sankey-empty {
   margin: 0;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted, #64748b);
   font-size: 0.9rem;
 }
 
 .portfolio-sankey-chart-wrap {
-  min-height: 420px;
+  min-height: 460px;
   width: 100%;
-  background: radial-gradient(ellipse 120% 80% at 50% 20%, #1e293b 0%, #0f172a 55%, #020617 100%);
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
-.portfolio-sankey-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.portfolio-sankey-label-name {
-  fill: #e2e8f0;
+.portfolio-sankey-recharts-label-name {
+  fill: var(--color-text, #1e293b);
   font-size: 11px;
   font-weight: 600;
-  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
-.portfolio-sankey-label-value {
-  fill: #f8fafc;
+.portfolio-sankey-recharts-label-value {
+  fill: var(--color-text, #0f172a);
   font-size: 12px;
   font-weight: 700;
   font-family: ui-monospace, 'Cascadia Code', monospace;
@@ -54,13 +44,18 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.65rem;
-  font-size: 0.65rem;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #94a3b8);
 }
 
-.portfolio-sankey-link {
-  mix-blend-mode: screen;
+@media (prefers-color-scheme: dark) {
+  .portfolio-sankey-recharts-label-name {
+    fill: #e2e8f0;
+  }
+  .portfolio-sankey-recharts-label-value {
+    fill: #f8fafc;
+  }
 }
