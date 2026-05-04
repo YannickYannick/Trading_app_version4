@@ -1,65 +1,95 @@
 /**
- * Sankey Recharts (forme d’origine) + couleurs, montants visibles, surbrillance au survol.
- * @see https://github.com/YannickYannick/sankey-flow-studio pour une variante d3 plus « studio ».
+ * Sankey portefeuille : SVG custom (rubans cubiques + dégradés), style proche du prototype
+ * « Apple revenue » fourni (Test sankey.zip).
  */
-import { useCallback, useMemo, useState } from 'react'
-import { ResponsiveContainer, Sankey, Tooltip } from 'recharts'
-import type { LinkProps, NodeProps } from 'recharts/types/chart/Sankey'
+import { useCallback, useId, useMemo, useState } from 'react'
 import { Card } from '@components/common'
 import type { Position } from '@types'
 import {
   buildPortfolioBrokerSectorSankey,
   type BrokerBreakdownRow,
+  type SankeyChartData,
   type SankeyNodeInput,
 } from '@utils/portfolioSankeyFlow'
+import { computePortfolioModernLayout } from '@utils/portfolioSankeyModernLayout'
 import { formatCurrency } from '@utils/format'
 import './PortfolioSankeyFlow.css'
 
 const STUDIO_URL = 'https://github.com/YannickYannick/sankey-flow-studio'
 
 type Hover =
-  | { kind: 'node'; node: SankeyNodeInput & { depth?: number } }
-  | { kind: 'link'; payload: LinkProps['payload'] }
+  | { kind: 'node'; index: number }
+  | { kind: 'link'; index: number }
   | null
 
-function brokerColor(paletteIndex: number | undefined): string {
+function brokerStrokeFill(paletteIndex: number | undefined): { stroke: string; fill: string } {
   const i = paletteIndex ?? 0
   const h = (198 + i * 53) % 360
-  return `hsl(${h} 76% 58%)`
+  return { stroke: `hsl(${h} 76% 58%)`, fill: `hsl(${h} 76% 34%)` }
 }
 
-function sectorColor(name: string): string {
-  if (name.startsWith('Liquidités')) return 'hsl(46 100% 62%)'
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return `hsl(${h % 360} 68% 56%)`
+function sectorStrokeFill(n: SankeyNodeInput): { stroke: string; fill: string } {
+  if (n.role === 'liquid' || n.name.startsWith('Liquidités')) {
+    return { stroke: 'hsl(46 100% 62%)', fill: 'hsl(46 88% 40%)' }
+  }
+  let hue = 0
+  for (let i = 0; i < n.name.length; i++) hue = (hue * 31 + n.name.charCodeAt(i)) >>> 0
+  const h = hue % 360
+  return { stroke: `hsl(${h} 68% 56%)`, fill: `hsl(${h} 68% 36%)` }
 }
 
-function nodeFill(n: SankeyNodeInput): string {
-  if (n.role === 'broker') return brokerColor(n.brokerPaletteIndex)
-  if (n.role === 'liquid') return sectorColor(n.name)
-  return sectorColor(n.name)
+function nodeStrokeFill(n: SankeyNodeInput): { stroke: string; fill: string } {
+  if (n.role === 'broker') return brokerStrokeFill(n.brokerPaletteIndex)
+  return sectorStrokeFill(n)
 }
 
-/** Mélange courtier → cible pour des flux moins « boueux » que la cible seule. */
-function linkStroke(payload: LinkProps['payload']): string {
-  const s = payload.source as SankeyNodeInput
-  const t = payload.target as SankeyNodeInput
-  const from = nodeFill(s)
-  const to = nodeFill(t)
-  return `color-mix(in srgb, ${from} 38%, ${to} 62%)`
+function relatedFromNode(data: SankeyChartData, hoverIndex: number): { nodes: Set<number>; links: Set<number> } {
+  const LINKS = data.links
+  const visited = new Set<number>([hoverIndex])
+  const linkIds = new Set<number>()
+
+  const queueUp = [hoverIndex]
+  while (queueUp.length) {
+    const cur = queueUp.shift()!
+    LINKS.forEach((l, i) => {
+      if (l.target === cur) {
+        linkIds.add(i)
+        if (!visited.has(l.source)) {
+          visited.add(l.source)
+          queueUp.push(l.source)
+        }
+      }
+    })
+  }
+
+  const queueDown = [hoverIndex]
+  while (queueDown.length) {
+    const cur = queueDown.shift()!
+    LINKS.forEach((l, i) => {
+      if (l.source === cur) {
+        linkIds.add(i)
+        if (!visited.has(l.target)) {
+          visited.add(l.target)
+          queueDown.push(l.target)
+        }
+      }
+    })
+  }
+
+  return { nodes: visited, links: linkIds }
 }
 
-function linkPathD(p: LinkProps): string {
-  const {
-    sourceX,
-    sourceY,
-    sourceControlX,
-    targetX,
-    targetY,
-    targetControlX,
-  } = p
-  return `M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}`
+function buildHoverRelated(data: SankeyChartData, hover: Hover): { nodes: Set<number>; links: Set<number> } | null {
+  if (!hover) return null
+  if (hover.kind === 'link') {
+    const l = data.links[hover.index]
+    const a = relatedFromNode(data, l.source)
+    const b = relatedFromNode(data, l.target)
+    const nodes = new Set<number>([...a.nodes, ...b.nodes])
+    const links = new Set<number>([...a.links, ...b.links])
+    return { nodes, links }
+  }
+  return relatedFromNode(data, hover.index)
 }
 
 export function PortfolioSankeyFlow({
@@ -76,97 +106,17 @@ export function PortfolioSankeyFlow({
     [breakdown, positions]
   )
 
+  const layout = useMemo(() => (data ? computePortfolioModernLayout(data) : null), [data])
+  const uid = useId().replace(/:/g, '')
   const [hover, setHover] = useState<Hover>(null)
 
-  const linkActive = useCallback(
-    (payload: LinkProps['payload']) => {
-      if (!hover) return true
-      if (hover.kind === 'link') return hover.payload === payload
-      return payload.source === hover.node || payload.target === hover.node
-    },
-    [hover]
-  )
+  const related = useMemo(() => (data && hover ? buildHoverRelated(data, hover) : null), [data, hover])
 
-  const nodeActive = useCallback(
-    (node: SankeyNodeInput & { depth?: number }) => {
-      if (!hover) return true
-      if (hover.kind === 'node') return hover.node === node
-      return hover.payload.source === node || hover.payload.target === node
-    },
-    [hover]
-  )
+  const { width: vbW, height: vbH } = layout?.opts ?? { width: 1600, height: 720 }
 
-  const renderLink = useCallback(
-    (props: LinkProps) => {
-      const { payload, linkWidth, index } = props
-      const active = linkActive(payload)
-      const dim = hover !== null && !active
-      const w = Math.max(2, Math.min(linkWidth * 0.82, 22))
-      return (
-        <path
-          className="portfolio-sankey-recharts-link"
-          d={linkPathD(props)}
-          fill="none"
-          stroke={linkStroke(payload)}
-          strokeWidth={w}
-          strokeOpacity={dim ? 0.08 : 0.55}
-          strokeLinecap="butt"
-          strokeLinejoin="miter"
-          style={{ transition: 'stroke-opacity 140ms ease' }}
-          data-link-index={index}
-        />
-      )
-    },
-    [hover, linkActive]
-  )
+  const onLeave = useCallback(() => setHover(null), [])
 
-  const renderNode = useCallback(
-    (props: NodeProps) => {
-      const { x, y, width, height, payload } = props
-      const p = payload as SankeyNodeInput & { depth?: number }
-      const active = nodeActive(p)
-      const dim = hover !== null && !active
-      const isLeft = p.depth === 0
-      const lx = isLeft ? x + width + 8 : x - 8
-      const anchor = isLeft ? 'start' : 'end'
-      const cy = y + height / 2
-      const val = Number(p.value ?? 0)
-
-      return (
-        <g className="portfolio-sankey-recharts-node" opacity={dim ? 0.22 : 1}>
-          <rect
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            rx={1}
-            fill={nodeFill(p)}
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth={1}
-          />
-          <text
-            x={lx}
-            y={cy - 5}
-            textAnchor={anchor}
-            className="portfolio-sankey-recharts-label-name"
-          >
-            {p.name.length > 24 ? `${p.name.slice(0, 22)}…` : p.name}
-          </text>
-          <text
-            x={lx}
-            y={cy + 11}
-            textAnchor={anchor}
-            className="portfolio-sankey-recharts-label-value"
-          >
-            {formatCurrency(val)}
-          </text>
-        </g>
-      )
-    },
-    [hover, nodeActive]
-  )
-
-  if (!data || data.nodes.length < 2) {
+  if (!data || data.nodes.length < 2 || !layout) {
     return (
       <Card title={title} className="portfolio-sankey-card">
         <p className="portfolio-sankey-empty">
@@ -177,52 +127,129 @@ export function PortfolioSankeyFlow({
     )
   }
 
+  const { layoutByIndex, links: linkGeoms, opts } = layout
+  const { nodeW } = opts
+
   return (
     <Card title={title} className="portfolio-sankey-card">
       <p className="portfolio-sankey-note">
-        Forme du graphe : <strong>Recharts</strong> (comme la première version). Couleurs, montants
-        et surbrillance au survol sont conservés. Variante plus « rubans » :{' '}
+        Diagramme type <strong>rubans</strong> (dégradés, fusion douce), calqué sur le prototype
+        « revenue waterfall ». Variante Recharts / studio :{' '}
         <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer">
           sankey-flow-studio
         </a>
         .
       </p>
-      <div className="portfolio-sankey-chart-wrap">
-        <ResponsiveContainer width="100%" height={460}>
-          <Sankey
-            className="portfolio-sankey-recharts-root"
-            data={data}
-            nodePadding={22}
-            nodeWidth={10}
-            linkCurvature={0.5}
-            iterations={48}
-            margin={{ top: 20, right: 128, bottom: 20, left: 32 }}
-            sort
-            node={renderNode}
-            link={renderLink}
-            onMouseEnter={(item, type) => {
-              if (type === 'node') {
-                const np = item as NodeProps
-                setHover({ kind: 'node', node: np.payload as SankeyNodeInput & { depth?: number } })
-              } else {
-                const lp = item as LinkProps
-                setHover({ kind: 'link', payload: lp.payload })
-              }
-            }}
-            onMouseLeave={() => setHover(null)}
-          >
-            <Tooltip
-              formatter={(value: number | string) => formatCurrency(Number(value))}
-              contentStyle={{
-                background: 'rgba(15, 23, 42, 0.95)',
-                border: '1px solid rgba(148,163,184,0.25)',
-                borderRadius: 8,
-                fontSize: 12,
-                color: '#f1f5f9',
-              }}
-            />
-          </Sankey>
-        </ResponsiveContainer>
+      <div className="portfolio-sankey-chart-wrap portfolio-sankey-modern-wrap">
+        <svg
+          className="portfolio-sankey-modern-svg"
+          viewBox={`0 0 ${vbW} ${vbH}`}
+          width="100%"
+          height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label={title}
+          onMouseLeave={onLeave}
+        >
+          <defs>
+            {linkGeoms.map(l => {
+              const s = data.nodes[l.source]
+              const t = data.nodes[l.target]
+              const c0 = nodeStrokeFill(s).fill
+              const c1 = nodeStrokeFill(t).fill
+              const sx = layoutByIndex[l.source].x + nodeW
+              const tx = layoutByIndex[l.target].x
+              return (
+                <linearGradient
+                  key={l.index}
+                  id={`${uid}-grad-${l.index}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={sx}
+                  x2={tx}
+                  y1={0}
+                  y2={0}
+                >
+                  <stop offset="0%" stopColor={c0} stopOpacity={0.88} />
+                  <stop offset="100%" stopColor={c1} stopOpacity={0.88} />
+                </linearGradient>
+              )
+            })}
+          </defs>
+
+          <g className="portfolio-sankey-ribbons">
+            {linkGeoms.map(l => {
+              const dim = related && !related.links.has(l.index)
+              return (
+                <path
+                  key={l.index}
+                  d={l.path}
+                  fill={`url(#${uid}-grad-${l.index})`}
+                  className="portfolio-sankey-ribbon-path"
+                  opacity={dim ? 0.12 : 0.78}
+                  data-active={!dim ? '1' : '0'}
+                  onMouseEnter={() => setHover({ kind: 'link', index: l.index })}
+                >
+                  <title>
+                    {data.nodes[l.source].name} → {data.nodes[l.target].name} :{' '}
+                    {formatCurrency(l.value)}
+                  </title>
+                </path>
+              )
+            })}
+          </g>
+
+          <g className="portfolio-sankey-nodes">
+            {data.nodes.map((n, i) => {
+              const geom = layoutByIndex[i]
+              if (!geom) return null
+              const c = nodeStrokeFill(n)
+              const dim = related && !related.nodes.has(i)
+              const val = Number(n.value ?? 0)
+              const labelX = geom.x + nodeW + 12
+              const midY = (geom.y0 + geom.y1) / 2
+              const labelTopY = Math.min(geom.y0 + 22, midY)
+              const nameShort = n.name.length > 26 ? `${n.name.slice(0, 24)}…` : n.name
+
+              return (
+                <g
+                  key={i}
+                  className="portfolio-sankey-node-g"
+                  opacity={dim ? 0.35 : 1}
+                  data-active={!dim ? '1' : '0'}
+                  onMouseEnter={() => setHover({ kind: 'node', index: i })}
+                >
+                  <rect
+                    x={geom.x}
+                    y={geom.y0}
+                    width={nodeW}
+                    height={Math.max(2, geom.h)}
+                    fill={c.stroke}
+                    rx={2}
+                  />
+                  <text
+                    x={labelX}
+                    y={labelTopY}
+                    className="portfolio-sankey-modern-label-name"
+                    textAnchor="start"
+                  >
+                    {nameShort}
+                  </text>
+                  <text
+                    x={labelX}
+                    y={labelTopY + 18}
+                    className="portfolio-sankey-modern-label-value"
+                    textAnchor="start"
+                  >
+                    {formatCurrency(val)}
+                  </text>
+                  <title>
+                    {n.name} — {formatCurrency(val)}
+                  </title>
+                </g>
+              )
+            })}
+          </g>
+        </svg>
       </div>
       <div className="portfolio-sankey-legend">
         <span className="portfolio-sankey-legend-left">Entrées : comptes / courtiers</span>
