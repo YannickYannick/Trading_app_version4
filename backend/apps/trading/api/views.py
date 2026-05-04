@@ -4139,6 +4139,8 @@ class AnalyticsViewSet(viewsets.ViewSet):
             
             breakdown.append({
                 'broker_name': account.name or account.broker.name,
+                'broker_id': account.broker_id,
+                'broker_account_id': account.id,
                 'total': account_cash + account_invested,
                 'cash': account_cash,
                 'invested': account_invested

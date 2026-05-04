@@ -1,0 +1,75 @@
+.portfolio-sankey-card .card-body {
+  overflow-x: auto;
+}
+
+.portfolio-sankey-note {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0 0 1rem;
+  max-width: 72ch;
+}
+
+.portfolio-sankey-note a {
+  color: var(--color-primary, #6366f1);
+  text-decoration: underline;
+}
+
+.portfolio-sankey-empty {
+  margin: 0;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.9rem;
+}
+
+.portfolio-sankey-chart-wrap {
+  min-height: 460px;
+  width: 100%;
+}
+
+.portfolio-sankey-tooltip {
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  max-width: 280px;
+}
+
+.portfolio-sankey-tooltip strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.portfolio-sankey-legend {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.portfolio-sankey-chart-wrap .recharts-sankey-link {
+  stroke: rgba(99, 102, 241, 0.28);
+}
+
+.portfolio-sankey-chart-wrap .recharts-sankey-node rect {
+  fill: #6366f1;
+  stroke: rgba(255, 255, 255, 0.12);
+  rx: 2;
+}
+
+.portfolio-sankey-chart-wrap .recharts-layer.recharts-sankey-nodes text {
+  fill: var(--color-text, #1e293b);
+  font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .portfolio-sankey-chart-wrap .recharts-layer.recharts-sankey-nodes text {
+    fill: #e2e8f0;
+  }
+}

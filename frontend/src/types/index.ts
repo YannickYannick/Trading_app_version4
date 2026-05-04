@@ -71,6 +71,8 @@ export interface Position {
   all_asset_asset_type?: string
   all_asset_currency?: string
   all_asset_yahoo_symbol?: string
+  broker_id?: number
+  broker_name?: string
   size: number
   quantity: number // Champ réel du backend
   symbol: string // Champ calculé du backend

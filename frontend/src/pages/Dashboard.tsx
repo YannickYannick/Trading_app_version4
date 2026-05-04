@@ -11,6 +11,8 @@ import type { Position } from '@types'
 import AIInsightWidget from '@components/AIInsightWidget'
 import { AnalyticsCharts } from '@components/dashboard/AnalyticsCharts'
 import { PortfolioCategoryChart } from '@components/dashboard/PortfolioCategoryChart'
+import { PortfolioSankeyFlow } from '@components/dashboard/PortfolioSankeyFlow'
+import type { BrokerBreakdownRow } from '@utils/portfolioSankeyFlow'
 import api from '@services/api'
 import './Dashboard.css'
 
@@ -201,6 +203,14 @@ export default function Dashboard() {
       {/* Allocation portefeuille (catégories) */}
       <div style={{ marginBottom: '24px' }}>
         <PortfolioCategoryChart positions={positions} totalCash={kpi?.total_cash || 0} />
+      </div>
+
+      {/* Flux type Sankey Flow Studio : comptes → secteurs */}
+      <div style={{ marginBottom: '24px' }}>
+        <PortfolioSankeyFlow
+          breakdown={(breakdown || []) as BrokerBreakdownRow[]}
+          positions={positions}
+        />
       </div>
 
       <div className="dashboard-sections-grid">
