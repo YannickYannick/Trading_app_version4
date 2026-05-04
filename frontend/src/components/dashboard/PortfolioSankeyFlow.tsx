@@ -25,14 +25,14 @@ type Hover =
 function brokerColor(paletteIndex: number | undefined): string {
   const i = paletteIndex ?? 0
   const h = (198 + i * 53) % 360
-  return `hsl(${h} 72% 52%)`
+  return `hsl(${h} 76% 58%)`
 }
 
 function sectorColor(name: string): string {
-  if (name.startsWith('Liquidités')) return 'hsl(43 96% 55%)'
+  if (name.startsWith('Liquidités')) return 'hsl(46 100% 62%)'
   let h = 0
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return `hsl(${h % 360} 62% 50%)`
+  return `hsl(${h % 360} 68% 56%)`
 }
 
 function nodeFill(n: SankeyNodeInput): string {
@@ -41,10 +41,13 @@ function nodeFill(n: SankeyNodeInput): string {
   return sectorColor(n.name)
 }
 
+/** Mélange courtier → cible pour des flux moins « boueux » que la cible seule. */
 function linkStroke(payload: LinkProps['payload']): string {
-  const t = payload.target as SankeyNodeInput & { depth?: number }
-  if (t.role === 'liquid') return 'hsl(43 90% 50%)'
-  return sectorColor(t.name)
+  const s = payload.source as SankeyNodeInput
+  const t = payload.target as SankeyNodeInput
+  const from = nodeFill(s)
+  const to = nodeFill(t)
+  return `color-mix(in srgb, ${from} 38%, ${to} 62%)`
 }
 
 function linkPathD(p: LinkProps): string {
@@ -98,15 +101,17 @@ export function PortfolioSankeyFlow({
       const { payload, linkWidth, index } = props
       const active = linkActive(payload)
       const dim = hover !== null && !active
+      const w = Math.max(2, Math.min(linkWidth * 0.82, 22))
       return (
         <path
           className="portfolio-sankey-recharts-link"
           d={linkPathD(props)}
           fill="none"
           stroke={linkStroke(payload)}
-          strokeWidth={Math.max(2, linkWidth)}
-          strokeOpacity={dim ? 0.09 : 0.48}
-          strokeLinecap="round"
+          strokeWidth={w}
+          strokeOpacity={dim ? 0.08 : 0.55}
+          strokeLinecap="butt"
+          strokeLinejoin="miter"
           style={{ transition: 'stroke-opacity 140ms ease' }}
           data-link-index={index}
         />
@@ -134,9 +139,9 @@ export function PortfolioSankeyFlow({
             y={y}
             width={width}
             height={height}
-            rx={2}
+            rx={1}
             fill={nodeFill(p)}
-            stroke="rgba(255,255,255,0.18)"
+            stroke="rgba(255,255,255,0.1)"
             strokeWidth={1}
           />
           <text
@@ -185,12 +190,13 @@ export function PortfolioSankeyFlow({
       <div className="portfolio-sankey-chart-wrap">
         <ResponsiveContainer width="100%" height={460}>
           <Sankey
+            className="portfolio-sankey-recharts-root"
             data={data}
-            nodePadding={18}
-            nodeWidth={12}
-            linkCurvature={0.55}
-            iterations={40}
-            margin={{ top: 16, right: 120, bottom: 16, left: 28 }}
+            nodePadding={22}
+            nodeWidth={10}
+            linkCurvature={0.5}
+            iterations={48}
+            margin={{ top: 20, right: 128, bottom: 20, left: 32 }}
             sort
             node={renderNode}
             link={renderLink}

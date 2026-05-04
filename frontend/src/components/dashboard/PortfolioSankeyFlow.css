@@ -24,19 +24,37 @@
 .portfolio-sankey-chart-wrap {
   min-height: 460px;
   width: 100%;
+  border-radius: 12px;
+  background: radial-gradient(120% 100% at 50% 0%, #1e293b 0%, #0f172a 42%, #020617 100%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.portfolio-sankey-chart-wrap .portfolio-sankey-recharts-root,
+.portfolio-sankey-chart-wrap .recharts-surface {
+  overflow: visible;
+}
+
+.portfolio-sankey-chart-wrap .recharts-surface {
+  border-radius: 12px;
 }
 
 .portfolio-sankey-recharts-label-name {
-  fill: var(--color-text, #1e293b);
+  fill: #e2e8f0;
   font-size: 11px;
   font-weight: 600;
+  paint-order: stroke fill;
+  stroke: rgba(15, 23, 42, 0.55);
+  stroke-width: 3px;
 }
 
 .portfolio-sankey-recharts-label-value {
-  fill: var(--color-text, #0f172a);
+  fill: #f8fafc;
   font-size: 12px;
   font-weight: 700;
   font-family: ui-monospace, 'Cascadia Code', monospace;
+  paint-order: stroke fill;
+  stroke: rgba(15, 23, 42, 0.55);
+  stroke-width: 3px;
 }
 
 .portfolio-sankey-legend {
@@ -51,11 +69,17 @@
   color: var(--color-text-muted, #94a3b8);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
+  .portfolio-sankey-chart-wrap {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-color: rgba(15, 23, 42, 0.08);
+  }
   .portfolio-sankey-recharts-label-name {
-    fill: #e2e8f0;
+    fill: #0f172a;
+    stroke: rgba(248, 250, 252, 0.9);
   }
   .portfolio-sankey-recharts-label-value {
-    fill: #f8fafc;
+    fill: #020617;
+    stroke: rgba(248, 250, 252, 0.9);
   }
 }
