@@ -32,7 +32,9 @@ export interface StrategyPerformanceMetrics {
 }
 
 /**
- * Simule les trades basés sur les signaux
+ * Simule les trades basés sur les signaux.
+ * Les signaux BUY successifs sur un long ouvert augmentent la position (prix de revient moyen),
+ * jusqu'au plafond portfolioMaxHeld si défini.
  */
 export function simulateTradesFromSignals(
     signals: Signal[],
@@ -42,16 +44,15 @@ export function simulateTradesFromSignals(
     stopLoss?: number,
     minQuantity: number = 0,
     maxQuantity?: number,
-    budget?: number
+    budget?: number,
+    portfolioMinHeld: number = 0,
+    portfolioMaxHeld?: number
 ): TradeSimulation[] {
     const trades: TradeSimulation[] = []
     let currentPosition: TradeSimulation | null = null
-    // Track if we've ever had a position - used to determine if short selling is allowed
-    // Short selling (starting with SELL) is only allowed if minQuantity < 0
     let hasHadPosition = false
     const allowShortSelling = minQuantity < 0
 
-    // Créer un map pour accéder rapidement aux prix par date
     const priceMap = new Map<string, number>()
     dates.forEach((date, i) => {
         priceMap.set(date, prices[i])
@@ -61,7 +62,6 @@ export function simulateTradesFromSignals(
         const signal = signals[i]
         const price = priceMap.get(signal.time) || signal.price
 
-        // Si on a une position ouverte, vérifier le stop-loss
         if (currentPosition && currentPosition.status === 'OPEN') {
             if (stopLoss && stopLoss > 0) {
                 const pnlPercent = currentPosition.side === 'BUY'
@@ -69,7 +69,6 @@ export function simulateTradesFromSignals(
                     : ((currentPosition.entryPrice - price) / currentPosition.entryPrice) * 100
 
                 if (pnlPercent <= -stopLoss * 100) {
-                    // Stop-loss déclenché
                     currentPosition.exitTime = signal.time
                     currentPosition.exitPrice = price
                     currentPosition.status = 'CLOSED'
@@ -83,10 +82,8 @@ export function simulateTradesFromSignals(
             }
         }
 
-        // Gérer les nouveaux signaux
-        if (signal.signal === 'BUY' && (!currentPosition || currentPosition.side === 'SELL')) {
-            // Fermer la position SELL si elle existe
-            if (currentPosition && currentPosition.status === 'OPEN') {
+        if (signal.signal === 'BUY') {
+            if (currentPosition && currentPosition.status === 'OPEN' && currentPosition.side === 'SELL') {
                 currentPosition.exitTime = signal.time
                 currentPosition.exitPrice = price
                 currentPosition.status = 'CLOSED'
@@ -96,54 +93,97 @@ export function simulateTradesFromSignals(
                 currentPosition = null
             }
 
-            // Ouvrir une position BUY (avec quantité minimale/maximale et budget)
+            const longHeld =
+                currentPosition?.side === 'BUY' && currentPosition.status === 'OPEN'
+                    ? currentPosition.quantity
+                    : 0
+
             let buyQuantity = Math.max(orderSize, minQuantity)
             if (maxQuantity && buyQuantity > maxQuantity) {
                 buyQuantity = maxQuantity
             }
-            // Si budget défini, ajuster la quantité selon le budget disponible
+            if (portfolioMaxHeld != null && Number.isFinite(portfolioMaxHeld)) {
+                const room = portfolioMaxHeld - longHeld
+                buyQuantity = Math.min(buyQuantity, Math.max(0, room))
+            }
             if (budget && budget > 0) {
                 const maxQuantityFromBudget = budget / price
                 if (maxQuantityFromBudget < buyQuantity) {
                     buyQuantity = Math.max(minQuantity, maxQuantityFromBudget)
                 }
             }
-            currentPosition = {
-                entryTime: signal.time,
-                entryPrice: price,
-                exitTime: null,
-                exitPrice: null,
-                side: 'BUY',
-                quantity: buyQuantity,
-                pnl: null,
-                pnlPercent: null,
-                status: 'OPEN',
+            if (buyQuantity <= 0) {
+                continue
             }
-            hasHadPosition = true // Mark that we've had a position
+
+            if (longHeld > 0 && currentPosition && currentPosition.side === 'BUY') {
+                const oldQ = currentPosition.quantity
+                const oldP = currentPosition.entryPrice
+                const addQ = buyQuantity
+                const newQ = oldQ + addQ
+                currentPosition.quantity = newQ
+                currentPosition.entryPrice = (oldP * oldQ + price * addQ) / newQ
+                hasHadPosition = true
+            } else {
+                currentPosition = {
+                    entryTime: signal.time,
+                    entryPrice: price,
+                    exitTime: null,
+                    exitPrice: null,
+                    side: 'BUY',
+                    quantity: buyQuantity,
+                    pnl: null,
+                    pnlPercent: null,
+                    status: 'OPEN',
+                }
+                hasHadPosition = true
+            }
         } else if (signal.signal === 'SELL' && (!currentPosition || currentPosition.side === 'BUY')) {
-            // Check if we're allowed to open a SELL position
-            // SELL is only allowed if short selling is enabled (minQuantity < 0)
-            const canOpenShort = allowShortSelling
+            const canOpenShort = hasHadPosition || allowShortSelling
 
-            // Fermer la position BUY si elle existe
-            if (currentPosition && currentPosition.status === 'OPEN') {
-                currentPosition.exitTime = signal.time
-                currentPosition.exitPrice = price
-                currentPosition.status = 'CLOSED'
-                currentPosition.pnl = (price - currentPosition.entryPrice) * currentPosition.quantity
-                currentPosition.pnlPercent = ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100
-                trades.push({ ...currentPosition })
-                currentPosition = null
-                hasHadPosition = true // We've had a position now
+            if (currentPosition && currentPosition.status === 'OPEN' && currentPosition.side === 'BUY') {
+                const Q = currentPosition.quantity
+                const minH = Math.max(0, portfolioMinHeld || 0)
+                let sellQty = Math.max(orderSize, Math.abs(minQuantity))
+                if (maxQuantity && sellQty > maxQuantity) {
+                    sellQty = maxQuantity
+                }
+                const maxSellable = Math.max(0, Q - minH)
+                sellQty = Math.min(sellQty, maxSellable)
+                if (sellQty <= 0) {
+                    continue
+                }
+                if (sellQty >= Q) {
+                    currentPosition.exitTime = signal.time
+                    currentPosition.exitPrice = price
+                    currentPosition.status = 'CLOSED'
+                    currentPosition.pnl = (price - currentPosition.entryPrice) * currentPosition.quantity
+                    currentPosition.pnlPercent = ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100
+                    trades.push({ ...currentPosition })
+                    currentPosition = null
+                } else {
+                    const closed: TradeSimulation = {
+                        entryTime: currentPosition.entryTime,
+                        entryPrice: currentPosition.entryPrice,
+                        exitTime: signal.time,
+                        exitPrice: price,
+                        side: 'BUY',
+                        quantity: sellQty,
+                        pnl: (price - currentPosition.entryPrice) * sellQty,
+                        pnlPercent: ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100,
+                        status: 'CLOSED',
+                    }
+                    trades.push(closed)
+                    currentPosition.quantity = Q - sellQty
+                }
+                hasHadPosition = true
             }
 
-            // Ouvrir une position SELL (short) seulement si autorisé
-            if (canOpenShort) {
+            if (canOpenShort && !currentPosition) {
                 let sellQuantity = Math.max(orderSize, Math.abs(minQuantity))
                 if (maxQuantity && sellQuantity > maxQuantity) {
                     sellQuantity = maxQuantity
                 }
-                // Si budget défini, ajuster la quantité selon le budget disponible
                 if (budget && budget > 0) {
                     const maxQuantityFromBudget = budget / price
                     if (maxQuantityFromBudget < sellQuantity) {
@@ -165,7 +205,6 @@ export function simulateTradesFromSignals(
         }
     }
 
-    // Ajouter la position ouverte finale si elle existe
     if (currentPosition && currentPosition.status === 'OPEN') {
         const lastPrice = prices[prices.length - 1]
         const lastDate = dates[dates.length - 1]
