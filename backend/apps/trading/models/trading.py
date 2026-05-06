@@ -193,7 +193,7 @@ class Order(TimeStampedModel):
         'AllAssets',
         on_delete=models.CASCADE,
         related_name='orders',
-        null=True,  # Temporairement nullable pour migration
+        null=False,
         blank=False,  # Obligatoire dans le formulaire
         help_text="Asset depuis le catalogue universel AllAssets (nom exact du broker)"
     )

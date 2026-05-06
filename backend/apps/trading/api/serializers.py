@@ -744,7 +744,7 @@ class OrderSerializer(serializers.ModelSerializer):
     """
     # Champs depuis AllAssets (source de vérité)
     all_asset = AllAssetsSerializer(read_only=True)
-    all_asset_id = serializers.IntegerField(write_only=True, required=False)
+    all_asset_id = serializers.IntegerField(write_only=True, required=True)
     all_asset_symbol = serializers.CharField(source='all_asset.symbol', read_only=True)
     all_asset_name = serializers.CharField(source='all_asset.name', read_only=True)
     all_asset_platform = serializers.CharField(source='all_asset.platform', read_only=True)
@@ -813,6 +813,13 @@ class OrderSerializer(serializers.ModelSerializer):
         order_type = data.get('order_type')
         price = data.get('price')
         stop_price = data.get('stop_price')
+
+        # all_asset_id devient obligatoire : on refuse tout ordre sans lien AllAssets.
+        # NB: all_asset_id est write_only (champ brut), on check la présence dans la payload.
+        if self.instance is None and not self.initial_data.get('all_asset_id'):
+            raise serializers.ValidationError({
+                'all_asset_id': "Champ obligatoire : fournissez l'ID AllAssets de l'ordre."
+            })
         
         # Limit orders nécessitent un prix
         if order_type == 'LIMIT' and not price:
