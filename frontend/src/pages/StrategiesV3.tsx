@@ -1284,8 +1284,15 @@ export default function StrategiesV3() {
                 <span className={`v3-log-status ${ex.status}`}>{ex.status}</span>
                 <span className={`v3-log-signal ${ex.signal}`}>{ex.signal}</span>
                 <span className="v3-log-strategy">{strat?.name || `ID-${ex.strategy_id}`}</span>
-                {ex.signal_price && ex.signal_price > 0 && (
-                  <span className="v3-log-price">@ {Number(ex.signal_price).toLocaleString()} €</span>
+                {((ex.signal_quantity && ex.signal_quantity > 0) || (ex.signal_price && ex.signal_price > 0)) && (
+                  <span className="v3-log-meta">
+                    {ex.signal_quantity && ex.signal_quantity > 0 && (
+                      <span className="v3-log-qty">Qté {Number(ex.signal_quantity).toLocaleString()}</span>
+                    )}
+                    {ex.signal_price && ex.signal_price > 0 && (
+                      <span className="v3-log-price">@ {Number(ex.signal_price).toLocaleString()} €</span>
+                    )}
+                  </span>
                 )}
                 {ex.error && <span className="v3-log-error">{ex.error}</span>}
               </div>

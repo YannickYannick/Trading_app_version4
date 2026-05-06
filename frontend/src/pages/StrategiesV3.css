@@ -921,9 +921,21 @@
   text-overflow: ellipsis;
 }
 
+.v3-log-meta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.v3-log-qty {
+  color: var(--color-text-muted);
+}
+
 .v3-log-price {
   color: var(--color-text-muted);
-  margin-left: auto;
+  margin-left: 0;
   flex-shrink: 0;
 }
 
