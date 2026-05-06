@@ -9,7 +9,14 @@ import {
 } from 'lucide-react'
 import { Card, Button, Table, Badge, Loading, ColumnSelector, type ColumnOption, YahooActions } from '@components/common'
 import PlaceOrderModal from '@components/orders/PlaceOrderModal'
-import { AIDiversifyModal, AISellModal, type OrderPrefillPayload, type SellOrderPayload } from '@components/orders'
+import {
+  AIBothModal,
+  AIDiversifyModal,
+  AISellModal,
+  type BothOrderPayload,
+  type OrderPrefillPayload,
+  type SellOrderPayload,
+} from '@components/orders'
 import { orderService, brokerService, positionService } from '@services/index'
 import { assetService } from '@services/assets'
 import { formatCurrency, formatDate } from '@utils/format'
@@ -28,6 +35,7 @@ export default function Orders() {
   const [isPlaceOrderModalOpen, setIsPlaceOrderModalOpen] = useState(false)
   const [isDiversifyModalOpen, setIsDiversifyModalOpen] = useState(false)
   const [isSellModalOpen, setIsSellModalOpen] = useState(false)
+  const [isBothModalOpen, setIsBothModalOpen] = useState(false)
   const [orderPrefill, setOrderPrefill] = useState<OrderPrefillPayload | SellOrderPayload | null>(null)
 
   // États pour les positions
@@ -895,6 +903,14 @@ export default function Orders() {
           </Button>
           <Button
             variant="outline"
+            onClick={() => setIsBothModalOpen(true)}
+            title="Suggestions achats + ventes (IA Gemini)"
+          >
+            <Sparkles style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Suggérer les 2 (IA)
+          </Button>
+          <Button
+            variant="outline"
             onClick={handleSyncOrders}
             disabled={loading}
           >
@@ -1221,6 +1237,17 @@ export default function Orders() {
         onClose={() => setIsSellModalOpen(false)}
         onPickOrder={(payload) => {
           setIsSellModalOpen(false)
+          setOrderPrefill(payload)
+          setIsPlaceOrderModalOpen(true)
+        }}
+      />
+
+      {/* Modal IA suggestions achats + ventes */}
+      <AIBothModal
+        isOpen={isBothModalOpen}
+        onClose={() => setIsBothModalOpen(false)}
+        onPickOrder={(payload: BothOrderPayload) => {
+          setIsBothModalOpen(false)
           setOrderPrefill(payload)
           setIsPlaceOrderModalOpen(true)
         }}
