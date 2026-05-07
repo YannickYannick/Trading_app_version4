@@ -557,6 +557,9 @@ class PositionListSerializer(serializers.ModelSerializer):
 
     pnl = serializers.SerializerMethodField()
     pnl_percent = serializers.SerializerMethodField()
+    """Prix E et C réellement utilisés pour `pnl` / `pnl_percent` (debug / transparence)."""
+    pnl_basis_price = serializers.SerializerMethodField()
+    pnl_mark_price = serializers.SerializerMethodField()
     reconstructed_entry_price = serializers.SerializerMethodField()
     yahoo_current_price = serializers.SerializerMethodField()
 
@@ -580,6 +583,7 @@ class PositionListSerializer(serializers.ModelSerializer):
             'opened_at', 'closed_at',
             'status',
             'pnl', 'pnl_percent',
+            'pnl_basis_price', 'pnl_mark_price',
             'reconstructed_entry_price',
         ]
 
@@ -611,13 +615,82 @@ class PositionListSerializer(serializers.ModelSerializer):
             cache[pk] = val
         return val
 
+    def _fifo_open_lots_average(self, obj):
+        """
+        PRU moyen pondéré des lots LONG encore ouverts après application FIFO des SELL.
+
+        Retourne (prix_moyen, qty_restante_fifo) ou (None, None) si non calculable.
+        """
+        try:
+            user = getattr(obj, 'user', None)
+            all_asset_id = getattr(obj, 'all_asset_id', None)
+            broker_id = getattr(obj, 'broker_id', None)
+            if not user or not all_asset_id or not broker_id:
+                return None, None
+            if str(getattr(obj, 'side', '')).upper() == 'SHORT':
+                return None, None
+
+            qty_open = float(obj.quantity or 0)
+            if qty_open <= 0:
+                return None, None
+
+            trades = (
+                Trade.objects
+                .filter(user=user, all_asset_id=all_asset_id, broker_id=broker_id)
+                .only('trade_type', 'quantity', 'price', 'executed_at')
+                .order_by('executed_at')[:2000]
+            )
+
+            lots = []
+            for t in trades:
+                t_side = str(t.trade_type).upper()
+                t_qty = float(t.quantity or 0)
+                t_price = float(t.price or 0)
+                if t_qty <= 0 or t_price <= 0:
+                    continue
+                if t_side == 'BUY':
+                    lots.append([t_qty, t_price])
+                elif t_side == 'SELL':
+                    remaining = t_qty
+                    while remaining > 0 and lots:
+                        lot_qty, lot_price = lots[0]
+                        take = min(lot_qty, remaining)
+                        lot_qty -= take
+                        remaining -= take
+                        if lot_qty <= 1e-12:
+                            lots.pop(0)
+                        else:
+                            lots[0][0] = lot_qty
+
+            remaining_qty = sum(q for q, _ in lots)
+            if remaining_qty <= 0:
+                return None, None
+
+            cost = sum(q * p for q, p in lots)
+            avg = cost / remaining_qty if remaining_qty else None
+            if avg is None:
+                return None, None
+            return float(avg), float(remaining_qty)
+        except Exception:
+            return None, None
+
     def _list_entry_price(self, obj):
+        """
+        Base du PnL : priorité au PRU issu des trades (FIFO) si cohérent avec la qty
+        position — aligne Saxo / tooltip avec les exécutions réellement importées.
+        Sinon `entry_price` broker (ex. AverageOpenPrice Saxo), puis PRU FIFO « lâche ».
+        """
+        avg, fifo_qty = self._fifo_open_lots_average(obj)
+        qty_open = float(obj.quantity or 0)
+        if avg is not None and fifo_qty is not None and qty_open > 0:
+            tol = max(1e-9, 1e-6 * qty_open)
+            if abs(fifo_qty - qty_open) <= tol:
+                return float(avg)
         if obj.entry_price:
             e = float(obj.entry_price)
             if e > 0:
                 return e
-        rec = self.get_reconstructed_entry_price(obj)
-        return float(rec) if rec else None
+        return float(avg) if avg is not None else None
 
     def _list_live_price(self, obj):
         if self.context.get('include_yahoo_price'):
@@ -627,6 +700,12 @@ class PositionListSerializer(serializers.ModelSerializer):
         if obj.current_price is not None:
             return float(obj.current_price)
         return None
+
+    def get_pnl_basis_price(self, obj):
+        return self._list_entry_price(obj)
+
+    def get_pnl_mark_price(self, obj):
+        return self._list_live_price(obj)
 
     def get_pnl(self, obj):
         entry_price = self._list_entry_price(obj)
@@ -649,68 +728,13 @@ class PositionListSerializer(serializers.ModelSerializer):
 
     def get_reconstructed_entry_price(self, obj):
         """
-        Reconstitue un PRU (prix de revient unitaire) à partir des trades BUY/SELL en base.
-        Objectif: Binance Spot et cas où la position a un entry_price peu fiable.
-
-        Méthode: FIFO sur les quantités (LONG uniquement). Retourne None si pas calculable.
+        PRU FIFO sur les lots ouverts (LONG), même si la qty ne colle pas à la position
+        (ex. historique de trades incomplet). Pour le PnL liste, voir `_list_entry_price`.
         """
-        try:
-            # Garder léger: pas de Yahoo ici, juste DB.
-            user = getattr(obj, 'user', None)
-            all_asset_id = getattr(obj, 'all_asset_id', None)
-            broker_id = getattr(obj, 'broker_id', None)
-            if not user or not all_asset_id or not broker_id:
-                return None
-            if str(getattr(obj, 'side', '')).upper() == 'SHORT':
-                return None
+        avg, _ = self._fifo_open_lots_average(obj)
+        return avg
 
-            qty_open = float(obj.quantity or 0)
-            if qty_open <= 0:
-                return None
 
-            # Charger les trades pour cet asset+broker
-            trades = (
-                Trade.objects
-                .filter(user=user, all_asset_id=all_asset_id, broker_id=broker_id)
-                .only('trade_type', 'quantity', 'price', 'executed_at')
-                .order_by('executed_at')[:2000]
-            )
-
-            lots = []  # list of [qty_remaining, price]
-            for t in trades:
-                t_side = str(t.trade_type).upper()
-                t_qty = float(t.quantity or 0)
-                t_price = float(t.price or 0)
-                if t_qty <= 0 or t_price <= 0:
-                    continue
-                if t_side == 'BUY':
-                    lots.append([t_qty, t_price])
-                elif t_side == 'SELL':
-                    remaining = t_qty
-                    # Dépile FIFO
-                    while remaining > 0 and lots:
-                        lot_qty, lot_price = lots[0]
-                        take = min(lot_qty, remaining)
-                        lot_qty -= take
-                        remaining -= take
-                        if lot_qty <= 1e-12:
-                            lots.pop(0)
-                        else:
-                            lots[0][0] = lot_qty
-
-            remaining_qty = sum(q for q, _ in lots)
-            if remaining_qty <= 0:
-                return None
-
-            # Si la qty restante est très différente de la position ouverte,
-            # on calcule quand même un PRU sur le restant (c'est le meilleur signal disponible).
-            cost = sum(q * p for q, p in lots)
-            avg = cost / remaining_qty if remaining_qty else None
-            if avg is None:
-                return None
-            return float(avg)
-        except Exception:
-            return None
 class TradeSerializer(serializers.ModelSerializer):
     """
     Serializer pour Trade.
