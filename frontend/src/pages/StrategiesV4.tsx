@@ -86,6 +86,54 @@ function formatUnixMsLabel(ms: number): string {
   return `${dd}/${mm}`
 }
 
+/** Logs console — filtre: `[StrategiesV4][chart]`. Désactiver: localStorage `sv4ChartDebug=0` */
+function logHoverChartDebug(opts: {
+  symbol: string
+  broker: string
+  allAssetId: number
+  source: 'fetch' | 'cache-hit' | 'cache-refresh'
+  prices: Array<{ date: string; close: number }>
+}) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage?.getItem('sv4ChartDebug') === '0') return
+  } catch {
+    /* ignore */
+  }
+  const raw = opts.prices || []
+  const firstRaw = raw[0]
+  const lastRaw = raw[raw.length - 1]
+  const plotted = raw
+    .map((p) => {
+      const date = String((p as any).date ?? '')
+      const close = Number((p as any).close)
+      const t = toUnixMsFromIsoDate(date)
+      return { date, close, t }
+    })
+    .filter((p) => Number.isFinite(p.close) && typeof p.t === 'number')
+    .sort((a, b) => (a.t as number) - (b.t as number))
+  const firstChrono = plotted[0]
+  const lastChrono = plotted[plotted.length - 1]
+  console.log(
+    `[StrategiesV4][chart] ${opts.symbol} (${opts.broker}) · id=${opts.allAssetId} · ${opts.source}`,
+    {
+      pointsBruts: raw.length,
+      pointsTrace: plotted.length,
+      premiereValeur_tableauBrut: firstRaw
+        ? { date: String((firstRaw as any).date), close: Number((firstRaw as any).close) }
+        : null,
+      derniereValeur_tableauBrut: lastRaw
+        ? { date: String((lastRaw as any).date), close: Number((lastRaw as any).close) }
+        : null,
+      premiereValeur_chronologique: firstChrono
+        ? { date: firstChrono.date, close: firstChrono.close, label: formatUnixMsLabel(firstChrono.t as number) }
+        : null,
+      derniereValeur_chronologique: lastChrono
+        ? { date: lastChrono.date, close: lastChrono.close, label: formatUnixMsLabel(lastChrono.t as number) }
+        : null,
+    }
+  )
+}
+
 function safeNumber(v: unknown): number {
   const n = typeof v === 'string' ? Number(v) : (v as number)
   return Number.isFinite(n) ? n : 0
@@ -410,7 +458,10 @@ export default function StrategiesV4() {
     [strategies]
   )
 
-  const ensureHoverPayload = async (allAssetId: number) => {
+  const ensureHoverPayload = async (
+    allAssetId: number,
+    label: { symbol: string; broker: string }
+  ) => {
     const cached = chartCacheRef.current.get(allAssetId)
     const cachedAt = chartCacheTimeRef.current.get(allAssetId) || 0
     const isFresh = Date.now() - cachedAt < 30_000 // 30s TTL pour avoir un "now" crédible
@@ -432,12 +483,24 @@ export default function StrategiesV4() {
           }
           chartCacheRef.current.set(allAssetId, next)
           chartCacheTimeRef.current.set(allAssetId, Date.now())
+          logHoverChartDebug({
+            ...label,
+            allAssetId,
+            source: 'cache-refresh',
+            prices: next.prices || [],
+          })
           setHoverPayload(next)
           return
         }
       } catch {
         // ignore
       }
+      logHoverChartDebug({
+        ...label,
+        allAssetId,
+        source: 'cache-hit',
+        prices: cached.prices || [],
+      })
       setHoverPayload(cached)
       return
     }
@@ -467,6 +530,12 @@ export default function StrategiesV4() {
       chartCacheRef.current.set(allAssetId, data)
       chartCacheTimeRef.current.set(allAssetId, Date.now())
       if (reqId === hoverReqIdRef.current) {
+        logHoverChartDebug({
+          ...label,
+          allAssetId,
+          source: 'fetch',
+          prices: data.prices || [],
+        })
         setHoverPayload(data)
       }
     } catch {
@@ -480,7 +549,7 @@ export default function StrategiesV4() {
     if (!allAssetId) return
     setHover({ visible: true, x: e.clientX, y: e.clientY, allAssetId, symbol, broker })
     setHoverPayload(null)
-    void ensureHoverPayload(allAssetId)
+    void ensureHoverPayload(allAssetId, { symbol, broker })
   }
 
   const handleAssetMove = (e: React.MouseEvent) => {
