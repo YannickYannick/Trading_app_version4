@@ -2,10 +2,14 @@
  * Composant de graphique interactif pour visualiser les trades et l'historique des prix
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { createChart, LineSeries, createSeriesMarkers, IChartApi, ISeriesApi, Time, LineData, MarkerData } from 'lightweight-charts'
+import { createChart, LineSeries, createSeriesMarkers, IChartApi, ISeriesApi, Time, LineData, SeriesMarker } from 'lightweight-charts'
 import { assetService } from '@services/assets'
 import type { Trade, AllAsset } from '@types'
 import './TradesChart.css'
+
+// Cache 1h au hover pour éviter de re-fetch en boucle
+const HOVER_CACHE_TTL = 60 * 60_000
+const hoverPriceCache = new Map<number, { price: number; timestamp: number }>()
 
 export interface TradesChartProps {
   trades: Trade[]
@@ -34,6 +38,43 @@ const TradesChart: React.FC<TradesChartProps> = ({
   const markersRefs = useRef<Map<number, ReturnType<typeof createSeriesMarkers>>>(new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const handleChartMouseEnter = useCallback(() => {
+    const todayISO = new Date().toISOString().slice(0, 10) as Time
+
+    // Fire-and-forget: pas de await bloquant
+    selectedAssets.forEach((assetId) => {
+      const series = priceSeriesRefs.current.get(assetId)
+      if (!series) return
+
+      const cached = hoverPriceCache.get(assetId)
+      if (cached && Date.now() - cached.timestamp < HOVER_CACHE_TTL) {
+        try {
+          series.update({ time: todayISO, value: cached.price })
+        } catch {
+          // la série peut avoir été détruite
+        }
+        return
+      }
+
+      void assetService
+        .getYahooCurrentPrice(assetId)
+        .then((price) => {
+          if (price == null || !Number.isFinite(price)) return
+          hoverPriceCache.set(assetId, { price, timestamp: Date.now() })
+          const s = priceSeriesRefs.current.get(assetId)
+          if (!s) return
+          try {
+            s.update({ time: todayISO, value: price })
+          } catch {
+            // la série peut avoir été détruite
+          }
+        })
+        .catch(() => {
+          // ignore
+        })
+    })
+  }, [selectedAssets])
 
   // Couleurs pour différentes séries de prix
   const priceColors = [
@@ -430,8 +471,8 @@ const TradesChart: React.FC<TradesChartProps> = ({
       })
 
       // Convertir les trades en marqueurs
-      const markers: MarkerData[] = assetTrades
-        .map((trade) => {
+      const markers: SeriesMarker<Time>[] = assetTrades
+        .map<SeriesMarker<Time> | null>((trade) => {
           const tradeDate = trade.executed_at || trade.timestamp
           if (!tradeDate) {
             console.warn(`[TradesChart] Trade ${trade.id} has no date (executed_at: ${trade.executed_at}, timestamp: ${trade.timestamp})`)
@@ -462,8 +503,8 @@ const TradesChart: React.FC<TradesChartProps> = ({
             if (dateStr.includes('Z')) {
               dateStr = dateStr.split('Z')[0].split('T')[0]
             }
-          } else if (tradeDate instanceof Date) {
-            dateStr = tradeDate.toISOString().split('T')[0]
+          } else if ((tradeDate as any) instanceof Date) {
+            dateStr = (tradeDate as any).toISOString().split('T')[0]
           } else {
             console.warn(`[TradesChart] Trade ${trade.id} has invalid date format:`, tradeDate)
             return null
@@ -477,9 +518,9 @@ const TradesChart: React.FC<TradesChartProps> = ({
             color: isBuy ? '#3b82f6' : '#ef4444', // BUY = bleu, SELL = rouge
             shape: isBuy ? ('arrowUp' as const) : ('arrowDown' as const),
             text: `${tradeSide} ${quantity.toFixed(2)} @ ${price.toFixed(2)}`,
-          }
+          } as SeriesMarker<Time>
         })
-        .filter((marker): marker is MarkerData => marker !== null) // Filtrer les marqueurs null
+        .filter((marker): marker is SeriesMarker<Time> => marker !== null) // Filtrer les marqueurs null
 
       // Dans lightweight-charts v5+, utiliser createSeriesMarkers pour gérer les marqueurs
       let markersPrimitive = markersRefs.current.get(assetId)
@@ -627,6 +668,7 @@ const TradesChart: React.FC<TradesChartProps> = ({
       <div 
         ref={chartContainerRef} 
         className="trades-chart"
+        onMouseEnter={handleChartMouseEnter}
         style={{ 
           visibility: (loading || error || selectedAssets.length === 0) ? 'hidden' : 'visible',
           height: '500px', // Hauteur fixe pour que le conteneur ait toujours une taille
