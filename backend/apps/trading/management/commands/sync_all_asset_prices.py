@@ -78,7 +78,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"\n{'='*60}\n"
-                        f"✅ SYNC COMPLETED\n"
+                        f"SYNC COMPLETED\n"
                         f"{'='*60}\n"
                         f"AllAssets synced: {synced}\n"
                         f"AllAssets failed: {failed}\n"
@@ -89,7 +89,7 @@ class Command(BaseCommand):
                 if failed_assets:
                     self.stdout.write(
                         self.style.WARNING(
-                            f"\n⚠️  Failed AllAssets:\n"
+                            f"\nFailed AllAssets:\n"
                         )
                     )
                     for failed_asset in failed_assets:
@@ -100,7 +100,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(
                     self.style.ERROR(
-                        f"\n❌ SYNC FAILED\n"
+                        f"\nSYNC FAILED\n"
                         f"Error: {result.get('message', 'Unknown error')}\n"
                     )
                 )
@@ -109,7 +109,7 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(
-                    f"\n❌ ERROR\n"
+                    f"\nERROR\n"
                     f"{str(e)}\n"
                 )
             )
