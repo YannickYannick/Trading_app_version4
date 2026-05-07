@@ -12,6 +12,8 @@ export interface PositionFilters {
   page?: number
   page_size?: number
   ordering?: string
+  /** GET .../positions/?include_yahoo_price=1 — enrichit yahoo_current_price, pnl, pnl_percent */
+  include_yahoo_price?: 0 | 1 | boolean
 }
 
 export interface PositionCreateData {
@@ -48,7 +50,7 @@ export const positionService = {
    */
   async getOpen(filters?: Omit<PositionFilters, 'status'>): Promise<Position[]> {
     const response = await apiClient.get<ApiResponse<Position>>('/positions/', {
-      params: { ...filters, status: 'OPEN' },
+      params: { include_yahoo_price: 1, ...filters, status: 'OPEN' },
     })
     return response.data.results
   },

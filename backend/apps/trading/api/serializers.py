@@ -558,6 +558,7 @@ class PositionListSerializer(serializers.ModelSerializer):
     pnl = serializers.SerializerMethodField()
     pnl_percent = serializers.SerializerMethodField()
     reconstructed_entry_price = serializers.SerializerMethodField()
+    yahoo_current_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Position
@@ -575,6 +576,7 @@ class PositionListSerializer(serializers.ModelSerializer):
             'broker_id',
             'broker_name',
             'side', 'quantity', 'size', 'entry_price', 'current_price',
+            'yahoo_current_price',
             'opened_at', 'closed_at',
             'status',
             'pnl', 'pnl_percent',
@@ -584,24 +586,63 @@ class PositionListSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         return 'OPEN' if getattr(obj, 'is_open', False) else 'CLOSED'
 
-    def get_pnl(self, obj):
-        # Utilise le prix DB (pas Yahoo) pour rester rapide.
-        if obj.current_price is None or not obj.entry_price:
+    def get_yahoo_current_price(self, obj):
+        """Opt-in: ?include_yahoo_price=1 — même logique que PositionSerializer."""
+        if not self.context.get('include_yahoo_price'):
             return None
-        current_price = float(obj.current_price)
-        entry_price = float(obj.entry_price)
+        cache = self.context.setdefault('_yahoo_position_price_cache', {})
+        pk = getattr(obj, 'pk', None)
+        if pk is not None and pk in cache:
+            return cache[pk]
+
+        val = None
+        if obj.all_asset and obj.all_asset.symbole_yahoo:
+            sym = obj.all_asset.symbole_yahoo
+            if sym not in ('Not_searched', 'not_found', 'manual'):
+                try:
+                    from ..services.data_providers.yahoo_finance import YahooFinanceService
+                    yahoo_service = YahooFinanceService()
+                    price = yahoo_service.get_current_price(sym)
+                    if price is not None:
+                        val = float(price)
+                except Exception:
+                    val = None
+        if pk is not None:
+            cache[pk] = val
+        return val
+
+    def _list_entry_price(self, obj):
+        if obj.entry_price:
+            e = float(obj.entry_price)
+            if e > 0:
+                return e
+        rec = self.get_reconstructed_entry_price(obj)
+        return float(rec) if rec else None
+
+    def _list_live_price(self, obj):
+        if self.context.get('include_yahoo_price'):
+            y = self.get_yahoo_current_price(obj)
+            if y is not None:
+                return float(y)
+        if obj.current_price is not None:
+            return float(obj.current_price)
+        return None
+
+    def get_pnl(self, obj):
+        entry_price = self._list_entry_price(obj)
+        current_price = self._list_live_price(obj)
+        if current_price is None or entry_price is None:
+            return None
         quantity = float(obj.quantity)
         if obj.side == 'LONG':
             return (current_price - entry_price) * quantity
         return (entry_price - current_price) * quantity
 
     def get_pnl_percent(self, obj):
-        if obj.current_price is None or not obj.entry_price:
+        entry_price = self._list_entry_price(obj)
+        current_price = self._list_live_price(obj)
+        if current_price is None or entry_price is None or entry_price == 0:
             return None
-        entry_price = float(obj.entry_price)
-        if entry_price == 0:
-            return 0.0
-        current_price = float(obj.current_price)
         if obj.side == 'LONG':
             return ((current_price - entry_price) / entry_price) * 100
         return ((entry_price - current_price) / entry_price) * 100

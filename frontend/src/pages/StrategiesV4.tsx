@@ -13,6 +13,7 @@ import {
   Layers,
   Maximize2,
   PieChart,
+  RefreshCw,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -170,38 +171,52 @@ function posQuantity(p: Position): number {
   return safeNumber((p as any).quantity ?? (p as any).size)
 }
 
+/** Prix unitaire “marché” : Yahoo puis courtier ; pas d’entrée PRU ici (évite un mélange €/USD ou PRU/live). */
+function posLiveUnitPrice(p: Position): number | null {
+  for (const key of ['yahoo_current_price', 'current_price'] as const) {
+    const raw = (p as any)[key]
+    if (raw == null || raw === '') continue
+    const n = typeof raw === 'string' ? Number(raw) : Number(raw)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return null
+}
+
 function posMarketValueEUR(p: Position): number {
   const qty = posQuantity(p)
-  const px = safeNumber((p as any).yahoo_current_price ?? (p as any).current_price ?? (p as any).entry_price)
-  return Math.max(0, qty * px)
+  const live = posLiveUnitPrice(p)
+  if (live != null) return Math.max(0, qty * live)
+  const entryRaw = (p as any).entry_price
+  if (entryRaw != null && entryRaw !== '') {
+    const e = typeof entryRaw === 'string' ? Number(entryRaw) : Number(entryRaw)
+    if (Number.isFinite(e) && e > 0) return Math.max(0, qty * e)
+  }
+  return 0
 }
 
 /**
- * % de perf par rapport au prix d’entrée.
- * - Formule LONG : (prix_actuel − entrée) / entrée × 100
- * - Formule SHORT : (entrée − prix_actuel) / entrée × 100
- * Prix actuel : Yahoo si dispo (souvent enrichi ailleurs), sinon `current_price` broker en base.
- * L’API liste (`PositionListSerializer`) ne met pas Yahoo dans `pnl_percent` : si `current_price`
- * est vide en BDD, le backend renvoie `pnl_percent: null` → le front affichait 0 % à tort.
+ * % de perf : d’abord `pnl_percent` de l’API (calculé avec Yahoo si include_yahoo_price=1),
+ * sinon recalcul local avec cours live + entrée ou PRU reconstitué.
  */
 function posPnlPercent(p: Position): number {
+  const rawApi = (p as any).pnl_percent
+  if (rawApi != null && rawApi !== '') {
+    const n = typeof rawApi === 'string' ? Number(rawApi) : Number(rawApi)
+    if (Number.isFinite(n)) return n
+  }
+
   const entryRaw = safeNumber((p as any).entry_price)
   const entryReconstructed = safeNumber((p as any).reconstructed_entry_price)
   const entry = entryRaw > 0 ? entryRaw : (entryReconstructed > 0 ? entryReconstructed : 0)
-  const live = safeNumber((p as any).yahoo_current_price ?? (p as any).current_price)
+  const live = posLiveUnitPrice(p)
   const side = String((p as any).side || '').toUpperCase()
   const isShort = side === 'SHORT' || side === 'SELL'
 
-  if (entry > 0 && Number.isFinite(live)) {
+  if (entry > 0 && live != null) {
     if (isShort) return ((entry - live) / entry) * 100
     return ((live - entry) / entry) * 100
   }
 
-  const raw = (p as any).pnl_percent
-  if (raw != null && raw !== '') {
-    const n = typeof raw === 'string' ? Number(raw) : Number(raw)
-    if (Number.isFinite(n)) return n
-  }
   return 0
 }
 
@@ -237,6 +252,7 @@ export default function StrategiesV4() {
   const [centerMode, setCenterMode] = useState<'heatmap' | 'cards'>('heatmap')
 
   const [loading, setLoading] = useState(true)
+  const [syncingPortfolioHistory, setSyncingPortfolioHistory] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const chartCacheRef = useRef<Map<number, ChartTooltipPayload>>(new Map())
@@ -270,6 +286,32 @@ export default function StrategiesV4() {
       setError(e?.response?.data?.error || e?.message || 'Erreur de chargement')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const syncPortfolioPriceHistory = async () => {
+    const ids = [
+      ...new Set(
+        positions
+          .map((p) => (p as any).all_asset_id as unknown)
+          .filter((id): id is number => typeof id === 'number' && id > 0)
+      ),
+    ]
+    if (!ids.length) return
+    setSyncingPortfolioHistory(true)
+    chartCacheRef.current.clear()
+    chartCacheTimeRef.current.clear()
+    try {
+      for (const id of ids) {
+        try {
+          await assetService.syncPriceHistory(id, 365, '1d')
+        } catch {
+          /* continuer les autres actifs */
+        }
+      }
+      await loadData()
+    } finally {
+      setSyncingPortfolioHistory(false)
     }
   }
 
@@ -616,6 +658,18 @@ export default function StrategiesV4() {
                   Cartes
                 </button>
               </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="sv4-sync-history-btn"
+                disabled={loading || syncingPortfolioHistory || positions.length === 0}
+                title="Resynchroniser l’historique Yahoo (365 j) pour chaque actif en position, puis recharger les cours"
+                onClick={() => void syncPortfolioPriceHistory()}
+              >
+                <RefreshCw size={14} className={syncingPortfolioHistory ? 'sv4-spin' : ''} aria-hidden />
+                <span>{syncingPortfolioHistory ? 'Sync…' : 'Sync historiques'}</span>
+              </Button>
             </div>
           </div>
 
