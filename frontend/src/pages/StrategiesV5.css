@@ -1,0 +1,576 @@
+.strategies-v5 {
+  min-height: calc(100vh - 40px);
+  padding: 16px;
+  background: #000;
+  color: #e2e8f0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.sv5-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sv5-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.sv5-title-icon {
+  width: 18px;
+  height: 18px;
+  color: #3b82f6;
+}
+
+.sv5-subtitle {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.sv5-header-cards {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.sv5-stat-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 170px;
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.sv5-stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+.sv5-stat-icon.blue { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.sv5-stat-icon.green { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.sv5-stat-icon-svg { width: 18px; height: 18px; }
+
+.sv5-stat-k {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 800;
+}
+.sv5-stat-v {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.sv5-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 1100px) {
+  .sv5-grid {
+    grid-template-columns: 3fr 7fr 2fr;
+    align-items: start;
+  }
+}
+
+.sv5-col { min-width: 0; }
+.sv5-stack { display: grid; gap: 12px; }
+.sv5-mt { margin-top: 12px; }
+
+.sv5-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  margin-bottom: 10px;
+}
+.sv5-section-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 800;
+}
+.sv5-section-title.purple { color: #c084fc; display: flex; align-items: center; gap: 8px; }
+.sv5-section-muted { color: #64748b; }
+.sv5-section-icon { width: 16px; height: 16px; color: #64748b; }
+.sv5-section-icon.purple { color: #a855f7; }
+
+.sv5-center-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sv5-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.sv5-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sv5-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.sv5-legend-dot.neg { background: hsl(350 80% 40%); }
+.sv5-legend-dot.zero { background: hsl(215 26% 16%); border: 1px solid rgba(148, 163, 184, 0.22); }
+.sv5-legend-dot.pos { background: hsl(152 70% 38%); }
+
+.sv5-mode-toggle {
+  display: inline-flex;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.55);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.sv5-mode-toggle button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.sv5-mode-toggle button.active {
+  background: rgba(59, 130, 246, 0.14);
+  color: #e2e8f0;
+}
+
+.sv5-sync-history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sv5-sync-history-btn .sv5-spin {
+  animation: sv5-spin 0.85s linear infinite;
+}
+
+@keyframes sv5-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sv5-order-card,
+.sv5-exec-card,
+.sv5-pos-card,
+.sv5-status-card,
+.sv5-empty,
+.sv5-error {
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.sv5-order-card { position: relative; overflow: hidden; }
+.sv5-order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sv5-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+.sv5-chip.buy { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+.sv5-chip.sell { background: rgba(244, 63, 94, 0.18); color: #fb7185; }
+.sv5-order-symbol { margin-top: 6px; font-weight: 900; color: #fff; font-size: 14px; }
+.sv5-order-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; font-size: 11px; color: #94a3b8; }
+.sv5-order-broker { font-style: italic; color: #64748b; }
+
+.sv5-progress { position: relative; height: 6px; margin-top: 8px; border-radius: 999px; overflow: hidden; }
+.sv5-progress-rail { position: absolute; inset: 0; background: rgba(30, 41, 59, 0.8); }
+.sv5-progress-bar { position: absolute; inset: 0; width: 0; border-radius: 999px; transition: width 900ms ease; }
+.sv5-progress-bar.buy { background: #10b981; }
+.sv5-progress-bar.sell { background: #f43f5e; }
+
+.sv5-exec-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sv5-exec-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sv5-exec-name { font-weight: 900; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv5-exec-time { font-size: 11px; color: #64748b; }
+.sv5-exec-bottom { margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 11px; color: #94a3b8; }
+.sv5-exec-signal { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+.sv5-exec-signal.BUY { color: #34d399; }
+.sv5-exec-signal.SELL { color: #fb7185; }
+.sv5-exec-price { color: #94a3b8; }
+
+.sv5-positions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 900px) {
+  .sv5-positions-grid { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+}
+@media (min-width: 1300px) {
+  .sv5-positions-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+}
+
+.sv5-pos-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sv5-pos-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sv5-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.9);
+  display: grid;
+  place-items: center;
+  color: #60a5fa;
+  font-weight: 900;
+}
+.sv5-pos-symbol { font-weight: 900; color: #fff; line-height: 1; }
+.sv5-pos-name { margin-top: 2px; font-size: 10px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.sv5-pos-right { text-align: right; display: grid; gap: 4px; }
+.sv5-pos-broker { font-size: 11px; color: #64748b; }
+.sv5-pos-pnl { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-weight: 900; }
+.sv5-pos-pnl.pos { color: #10b981; }
+.sv5-pos-pnl.neg { color: #f43f5e; }
+
+.sv5-pos-bottom { margin-top: 8px; display: flex; justify-content: space-between; align-items: end; }
+.sv5-pos-value { font-size: 14px; font-weight: 900; color: #fff; }
+.sv5-pos-qty { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+.sv5-heatmap-card {
+  padding: 6px;
+  background: #020617;
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.sv5-heatmap {
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sv5-sector {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.sv5-sector-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.sv5-sector-name {
+  font-size: 10px;
+  font-weight: 900;
+  color: #94a3b8;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sv5-sector-alloc {
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.72);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.sv5-sector-assets {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: #000;
+}
+
+.sv5-heat-asset {
+  position: relative;
+  min-width: 72px;
+  min-height: 72px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  overflow: hidden;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.sv5-heat-asset:hover {
+  filter: brightness(1.22);
+  transform: translateZ(0);
+}
+
+.sv5-heat-overlay {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background 140ms ease;
+  pointer-events: none;
+}
+
+.sv5-heat-asset:hover .sv5-heat-overlay {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sv5-heat-center {
+  text-align: center;
+  padding: 8px;
+}
+
+.sv5-heat-symbol {
+  font-weight: 950;
+  color: #fff;
+  letter-spacing: -0.02em;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sv5-heat-pnl {
+  margin-top: 6px;
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.sv5-heat-pnl.pos { color: rgba(167, 243, 208, 0.92); }
+.sv5-heat-pnl.neg { color: rgba(254, 205, 211, 0.92); }
+
+.sv5-heat-value {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.sv5-heat-asset:hover .sv5-heat-value {
+  opacity: 1;
+}
+
+.sv5-heat-empty {
+  color: #64748b;
+  font-size: 12px;
+  padding: 18px;
+}
+
+/* Tooltip graphique au survol (heatmap/cartes) */
+.sv5-hover-tooltip {
+  position: fixed;
+  z-index: 50;
+  width: 500px;
+  border-radius: 14px;
+  padding: 10px 10px 8px;
+  background: rgba(8, 12, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.sv5-hover-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px 6px;
+}
+
+.sv5-hover-title {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.sv5-hover-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.sv5-hover-loading {
+  padding: 10px 6px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.sv5-hover-chart {
+  padding: 0 2px 2px;
+}
+
+.sv5-hover-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 2px 6px 8px;
+}
+.sv5-hover-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.sv5-hover-meta-k {
+  color: rgba(255, 255, 255, 0.55);
+}
+.sv5-hover-meta-v {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.sv5-hover-trades {
+  padding: 6px 6px 0;
+  display: grid;
+  gap: 6px;
+}
+.sv5-hover-trade {
+  display: grid;
+  grid-template-columns: 64px 1fr 56px;
+  gap: 10px;
+  font-size: 13px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.65);
+}
+.sv5-hover-trade--buy {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.16), rgba(15, 23, 42, 0.4));
+  box-shadow: inset 3px 0 0 #22c55e;
+}
+.sv5-hover-trade--sell {
+  border-color: rgba(251, 113, 133, 0.4);
+  background: linear-gradient(90deg, rgba(251, 113, 133, 0.12), rgba(15, 23, 42, 0.4));
+  box-shadow: inset 3px 0 0 #fb7185;
+}
+.sv5-hover-trade-side {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+.sv5-hover-trade-side.buy { color: #4ade80; text-shadow: 0 0 12px rgba(74, 222, 128, 0.35); }
+.sv5-hover-trade-side.sell { color: #fb7185; }
+.sv5-hover-trade-mid {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv5-hover-trade-date {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  text-align: right;
+}
+.sv5-hover-trade-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sv5-hover-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 6px 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sv5-status-card.blue { border-color: rgba(59, 130, 246, 0.22); background: rgba(59, 130, 246, 0.08); }
+.sv5-status-card.amber { border-color: rgba(245, 158, 11, 0.22); background: rgba(245, 158, 11, 0.06); }
+.sv5-status-title { margin: 0 0 8px; font-size: 12px; font-weight: 900; color: #cbd5e1; display: flex; align-items: center; gap: 8px; }
+.sv5-status-text { margin: 0; font-size: 12px; color: #cbd5e1; line-height: 1.45; }
+
+.sv5-empty p { margin: 0; color: #64748b; font-size: 12px; }
+.sv5-error { border-color: rgba(244, 63, 94, 0.26); background: rgba(244, 63, 94, 0.06); }
+.sv5-error-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; }
+
+.sv5-auto-card {
+  background: rgba(168, 85, 247, 0.06);
+  border-color: rgba(168, 85, 247, 0.22);
+}
+
+.sv5-auto-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sv5-auto-name {
+  font-weight: 900;
+  color: #fff;
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv5-auto-meta {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.sv5-auto-algo {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(192, 132, 252, 0.9);
+  font-weight: 800;
+}
+
+.sv5-auto-asset {
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
