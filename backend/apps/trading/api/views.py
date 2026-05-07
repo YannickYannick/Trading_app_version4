@@ -821,9 +821,13 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 close_price = price_data.get('close')
                 if close_price is None:
                     continue
+                try:
+                    close_num = float(close_price)
+                except (TypeError, ValueError):
+                    continue
                 prices.append({
                     'date': date_str,
-                    'close': close_price,
+                    'close': close_num,
                 })
             # Repasser en chrono (lightweight-charts / recharts apprécient)
             prices.sort(key=lambda x: x['date'])

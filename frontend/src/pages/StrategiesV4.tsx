@@ -673,7 +673,9 @@ export default function StrategiesV4() {
               ) : (
                 <div className="sv4-hover-chart">
                   {(() => {
-                    const prices = hoverPayload.prices || []
+                    const prices = (hoverPayload.prices || [])
+                      .map((p) => ({ ...p, close: Number((p as any).close) }))
+                      .filter((p) => Number.isFinite(p.close))
                     const first = prices[0]
                     const last = prices[prices.length - 1]
                     const tradePoints = (hoverPayload.trades || []).map((t) => ({
@@ -729,7 +731,7 @@ export default function StrategiesV4() {
                               }}
                             />
 
-                            <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} connectNulls />
 
                             <Scatter
                               data={tradePoints}
