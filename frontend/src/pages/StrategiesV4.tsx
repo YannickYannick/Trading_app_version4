@@ -86,8 +86,13 @@ function formatUnixMsLabel(ms: number): string {
   return `${dd}/${mm}`
 }
 
-/** Extrait YYYY-MM-DD pour aligner historique + trades (Recharts 3 : axe catégoriel fiable). */
-/** Dernier jour présent dans l’historique ≤ tradeDate (week-end / jour sans barre). */
+/** Extrait YYYY-MM-DD ; snap trades sur dernier jour d'historique <= date. */
+function normalizeChartDate(raw: unknown): string | null {
+  const s = String(raw ?? '').trim()
+  const m = s.match(/\d{4}-\d{2}-\d{2}/)
+  return m ? m[0] : null
+}
+
 function snapTradeDateToHistory(tradeDate: string, historyDatesAsc: string[]): string | null {
   if (!tradeDate || historyDatesAsc.length === 0) return null
   if (historyDatesAsc.includes(tradeDate)) return tradeDate
