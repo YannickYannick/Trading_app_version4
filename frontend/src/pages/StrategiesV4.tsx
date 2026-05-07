@@ -59,11 +59,10 @@ function formatDateLabel(isoDate: string): string {
   return `${d}/${m}`
 }
 
-function toUnixSecondsFromIsoDate(isoDate: string): number | null {
-  // isoDate: YYYY-MM-DD
-  const dt = new Date(`${isoDate}T00:00:00`)
-  const ms = dt.getTime()
-  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
+function toUnixMsFromIsoDate(isoDate: string): number | null {
+  // isoDate: YYYY-MM-DD (forcer UTC pour éviter les décalages)
+  const ms = Date.parse(`${isoDate}T00:00:00Z`)
+  return Number.isFinite(ms) ? ms : null
 }
 
 function todayIsoDate(): string {
@@ -74,10 +73,9 @@ function todayIsoDate(): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function formatUnixSecondsLabel(sec: number): string {
-  const ms = sec * 1000
+function formatUnixMsLabel(ms: number): string {
   const dt = new Date(ms)
-  if (!Number.isFinite(dt.getTime())) return String(sec)
+  if (!Number.isFinite(dt.getTime())) return String(ms)
   const dd = String(dt.getDate()).padStart(2, '0')
   const mm = String(dt.getMonth() + 1).padStart(2, '0')
   return `${dd}/${mm}`
@@ -718,7 +716,7 @@ export default function StrategiesV4() {
                   {(() => {
                     const prices = (hoverPayload.prices || [])
                       .map((p) => {
-                        const t = toUnixSecondsFromIsoDate((p as any).date)
+                        const t = toUnixMsFromIsoDate((p as any).date)
                         return { ...p, close: Number((p as any).close), t }
                       })
                       .filter((p) => Number.isFinite(p.close) && typeof p.t === 'number')
@@ -728,7 +726,7 @@ export default function StrategiesV4() {
                     const tradePoints = (hoverPayload.trades || []).map((t) => ({
                       ...t,
                       dateLabel: formatDateLabel(t.date),
-                      t: toUnixSecondsFromIsoDate(t.date),
+                      t: toUnixMsFromIsoDate(t.date),
                     }))
 
                     return (
@@ -754,7 +752,7 @@ export default function StrategiesV4() {
                               dataKey="t"
                               type="number"
                               domain={['dataMin', 'dataMax']}
-                              tickFormatter={(v: any) => formatUnixSecondsLabel(Number(v))}
+                              tickFormatter={(v: any) => formatUnixMsLabel(Number(v))}
                               tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
                               tickLine={false}
                               axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
@@ -773,7 +771,7 @@ export default function StrategiesV4() {
                               contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
                               labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
                               itemStyle={{ color: '#e5e7eb' }}
-                              labelFormatter={(l: any) => `Date: ${formatUnixSecondsLabel(Number(l))}`}
+                              labelFormatter={(l: any) => `Date: ${formatUnixMsLabel(Number(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
                                 if (name === 'price') return [Number(v).toFixed(2), 'Trade']
