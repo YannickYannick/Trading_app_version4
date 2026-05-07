@@ -18,7 +18,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Line, LineChart, Scatter, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
 import { positionService, orderService, strategyService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
@@ -875,7 +875,7 @@ export default function StrategiesV4() {
               ) : (
                 <div className="sv4-hover-chart">
                   {(() => {
-                    // Dédoublonner par jour (dernière valeur gagne) puis tri ISO — évite écarts Line vs méta.
+                    // Deduplicate prices by day (last value wins), ISO sort.
                     const byDay = new Map<string, number>()
                     for (const p of hoverPayload.prices || []) {
                       const d = normalizeChartDate((p as any).date)
@@ -894,27 +894,33 @@ export default function StrategiesV4() {
                       })
                       .filter((t) => t.date && Number.isFinite(t.price))
 
-                    // Union des jours (historique + trades) pour que le Scatter ait toujours un tick X.
-                    const allDates = [
-                      ...new Set<string>([
-                        ...byDay.keys(),
-                        ...tradePoints.map((t) => t.date).filter(Boolean),
-                      ]),
-                    ].sort((a, b) => a.localeCompare(b))
+                    // Trade markers embedded in chartPrices rows.
+                    // Using only price-history dates avoids null-close rows and the
+                    // connectNulls straight-line artefacts they caused.
+                    const tradeByDate = new Map<string, { price: number; side: string }>()
+                    for (const t of tradePoints) {
+                      if (t.date) tradeByDate.set(t.date, { price: t.price, side: t.side })
+                    }
 
-                    const chartPrices = allDates.map((date) => ({
-                      date,
-                      close: byDay.has(date) ? (byDay.get(date) as number) : null,
-                    }))
+                    const allDates = [...byDay.keys()].sort((a, b) => a.localeCompare(b))
 
-                    const first = chartPrices.find((row) => row.close != null && Number.isFinite(row.close as number))
-                    const last = [...chartPrices].reverse().find((row) => row.close != null && Number.isFinite(row.close as number))
+                    const chartPrices = allDates.map((date) => {
+                      const td = tradeByDate.get(date)
+                      return {
+                        date,
+                        close: byDay.get(date) as number,
+                        tradePrice: td ? td.price : null,
+                        tradeSide: td ? td.side : null,
+                      }
+                    })
 
-                    const numericCloses = chartPrices
-                      .map((r) => r.close)
-                      .filter((c): c is number => c != null && Number.isFinite(c))
-                    const tradePx = tradePoints.map((t) => t.price).filter((p) => Number.isFinite(p))
-                    const allY = [...numericCloses, ...tradePx]
+                    const first = chartPrices[0] ?? null
+                    const last = chartPrices[chartPrices.length - 1] ?? null
+
+                    const allY = [
+                      ...chartPrices.map((r) => r.close),
+                      ...tradePoints.map((t) => t.price).filter((p) => Number.isFinite(p)),
+                    ]
                     let yLo = allY.length ? Math.min(...allY) : 0
                     let yHi = allY.length ? Math.max(...allY) : 1
                     if (!Number.isFinite(yLo) || !Number.isFinite(yHi)) {
@@ -958,10 +964,11 @@ export default function StrategiesV4() {
 
                         <ResponsiveContainer width="100%" height={220}>
                           {/*
-                            Recharts 3 : axe catégoriel date ISO.
-                            - Éviter type="monotone" : splines peuvent se recouper sur index catégoriels.
-                            - Domaine Y explicite (historique + prix trades) pour ne pas zoomer sur un seul point.
-                            - Union des dates pour aligner les marqueurs trades.
+                            Fix: <Scatter> inside <LineChart> corrupts the categorical band-scale,
+                            producing crossed lines and wrong Y-domain. Trade markers are now a
+                            second <Line> sharing the same data array — same coordinate system,
+                            no layout corruption. tradePrice/tradeSide are embedded per row so
+                            there are no null-close rows and connectNulls is not needed.
                           */}
                           <LineChart data={chartPrices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
@@ -991,8 +998,8 @@ export default function StrategiesV4() {
                               labelFormatter={(l: any) => `Date: ${formatDateLabel(String(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
-                                if (name === 'price') return [Number(v).toFixed(2), 'Trade']
-                                return [String(v), String(name)]
+                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Trade']
+                                return [null, '']
                               }}
                             />
 
@@ -1002,26 +1009,26 @@ export default function StrategiesV4() {
                               stroke="#7dd3fc"
                               strokeWidth={2}
                               dot={false}
-                              connectNulls
                               isAnimationActive={false}
                             />
 
-                            <Scatter
-                              data={tradePoints}
-                              xAxisId={0}
-                              yAxisId={0}
-                              dataKey="price"
-                              shape={(props: any) => {
-                                const { cx, cy, payload } = props || {}
-                                if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
-                                const side = payload?.side
-                                const color = side === 'BUY' ? '#60a5fa' : '#f87171'
+                            <Line
+                              type="linear"
+                              dataKey="tradePrice"
+                              stroke="transparent"
+                              strokeWidth={0}
+                              dot={(props: any) => {
+                                const { cx, cy, payload, key } = props || {}
+                                if (payload?.tradePrice == null || !Number.isFinite(cx) || !Number.isFinite(cy))
+                                  return <g key={key} />
+                                const color = payload.tradeSide === 'BUY' ? '#60a5fa' : '#f87171'
                                 return (
-                                  <g>
-                                    <circle cx={cx} cy={cy} r={4} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
-                                  </g>
+                                  <circle key={key} cx={cx} cy={cy} r={4} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
                                 )
                               }}
+                              activeDot={false}
+                              connectNulls={false}
+                              isAnimationActive={false}
                             />
                           </LineChart>
                         </ResponsiveContainer>
