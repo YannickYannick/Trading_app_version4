@@ -60,8 +60,12 @@ function formatDateLabel(isoDate: string): string {
 }
 
 function toUnixMsFromIsoDate(isoDate: string): number | null {
-  // isoDate: YYYY-MM-DD (forcer UTC pour éviter les décalages)
-  const ms = Date.parse(`${isoDate}T00:00:00Z`)
+  // Accepte: "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS...", "YYYY-MM-DD HH:MM:SS"
+  // (forcer UTC pour éviter les décalages)
+  const raw = String(isoDate || '').trim()
+  const m = raw.match(/\d{4}-\d{2}-\d{2}/)
+  const d = m ? m[0] : raw
+  const ms = Date.parse(`${d}T00:00:00Z`)
   return Number.isFinite(ms) ? ms : null
 }
 
@@ -236,6 +240,7 @@ export default function StrategiesV4() {
   const [error, setError] = useState<string | null>(null)
 
   const chartCacheRef = useRef<Map<number, ChartTooltipPayload>>(new Map())
+  const chartCacheTimeRef = useRef<Map<number, number>>(new Map())
   const hoverReqIdRef = useRef(0)
   const [hover, setHover] = useState<HoverState>({
     visible: false,
@@ -365,7 +370,32 @@ export default function StrategiesV4() {
 
   const ensureHoverPayload = async (allAssetId: number) => {
     const cached = chartCacheRef.current.get(allAssetId)
-    if (cached) {
+    const cachedAt = chartCacheTimeRef.current.get(allAssetId) || 0
+    const isFresh = Date.now() - cachedAt < 30_000 // 30s TTL pour avoir un "now" crédible
+    if (cached && isFresh) {
+      // Même si c’est en cache, on rafraîchit le prix actuel (point "aujourd’hui")
+      try {
+        const cur = await assetService.getYahooCurrentPrice(allAssetId)
+        if (cur != null && Number.isFinite(cur) && cur > 0) {
+          const d = todayIsoDate()
+          const next = {
+            ...cached,
+            prices: (() => {
+              const prices = [...(cached.prices || [])]
+              const idx = prices.findIndex((p) => String((p as any).date) === d)
+              if (idx >= 0) prices[idx] = { ...prices[idx], close: cur }
+              else prices.push({ date: d, close: cur })
+              return prices
+            })(),
+          }
+          chartCacheRef.current.set(allAssetId, next)
+          chartCacheTimeRef.current.set(allAssetId, Date.now())
+          setHoverPayload(next)
+          return
+        }
+      } catch {
+        // ignore
+      }
       setHoverPayload(cached)
       return
     }
@@ -393,6 +423,7 @@ export default function StrategiesV4() {
       }
 
       chartCacheRef.current.set(allAssetId, data)
+      chartCacheTimeRef.current.set(allAssetId, Date.now())
       if (reqId === hoverReqIdRef.current) {
         setHoverPayload(data)
       }
