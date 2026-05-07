@@ -676,9 +676,9 @@ class PositionListSerializer(serializers.ModelSerializer):
 
     def _list_entry_price(self, obj):
         """
-        Base du PnL : priorité au PRU issu des trades (FIFO) si cohérent avec la qty
-        position — aligne Saxo / tooltip avec les exécutions réellement importées.
-        Sinon `entry_price` broker (ex. AverageOpenPrice Saxo), puis PRU FIFO « lâche ».
+        Base du PnL : PRU FIFO issu des trades si la qty restante colle à la position ;
+        sinon `entry_price` broker (ex. AverageOpenPrice Saxo).
+        Si aucune base fiable : None (pas de PRU FIFO approximatif).
         """
         avg, fifo_qty = self._fifo_open_lots_average(obj)
         qty_open = float(obj.quantity or 0)
@@ -690,7 +690,7 @@ class PositionListSerializer(serializers.ModelSerializer):
             e = float(obj.entry_price)
             if e > 0:
                 return e
-        return float(avg) if avg is not None else None
+        return None
 
     def _list_live_price(self, obj):
         if self.context.get('include_yahoo_price'):

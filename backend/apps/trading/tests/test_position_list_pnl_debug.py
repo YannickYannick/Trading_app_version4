@@ -159,3 +159,46 @@ class PositionListPnlFifoVsSaxoEntryTests(TestCase):
         self.assertAlmostEqual(float(data["pnl_mark_price"]), 153.80, places=2)
         # (153.80 - 139.72) / 139.72 * 100
         self.assertAlmostEqual(float(data["pnl_percent"]), 100.0 * (153.80 - 139.72) / 139.72, places=3)
+
+    def test_pnl_basis_none_when_fifo_qty_mismatch_and_no_entry(self):
+        """Pas de repli sur un PRU FIFO partiel si qty trades ≠ position et pas d'entry broker."""
+        user = User.objects.create_user(username="mismatch_user", password="x")
+        broker = Broker.objects.create(
+            name="Dbg",
+            broker_type=Broker.BrokerType.OTHER,
+            is_active=True,
+        )
+        asset = AllAssets.objects.create(
+            symbol="X",
+            name="X",
+            platform="OTHER",
+            asset_type="STOCK",
+            market="M",
+            currency="USD",
+            symbole_yahoo="Not_searched",
+            is_tradable=True,
+        )
+        position = Position.objects.create(
+            user=user,
+            all_asset=asset,
+            broker=broker,
+            quantity=Decimal("10"),
+            entry_price=Decimal("0"),
+            current_price=Decimal("100"),
+            side="LONG",
+            is_open=True,
+        )
+        Trade.objects.create(
+            user=user,
+            all_asset=asset,
+            broker=broker,
+            trade_type=Trade.TradeType.BUY,
+            quantity=Decimal("2"),
+            price=Decimal("50"),
+            executed_at=timezone.now(),
+        )
+        ser = PositionListSerializer(position, context={"include_yahoo_price": False})
+        data = dict(ser.data)
+        self.assertIsNone(data["pnl_basis_price"])
+        self.assertIsNone(data["pnl"])
+        self.assertIsNone(data["pnl_percent"])
