@@ -1013,7 +1013,7 @@ export default function StrategiesV4() {
                               labelFormatter={(l: any) => `Date: ${formatDateLabel(String(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
-                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Trade']
+                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Exécution']
                                 return [String(v), String(name)]
                               }}
                             />
@@ -1043,17 +1043,24 @@ export default function StrategiesV4() {
                                 ) {
                                   return null
                                 }
-                                const side = payload?.tradeSide
-                                const color = String(side).toUpperCase() === 'SELL' ? '#f87171' : '#60a5fa'
+                                const isSell = String(payload?.tradeSide).toUpperCase() === 'SELL'
+                                const fill = isSell ? '#fb7185' : '#22c55e'
+                                const halo = isSell ? 'rgba(251, 113, 133, 0.35)' : 'rgba(34, 197, 94, 0.4)'
+                                const r = 6
                                 return (
-                                  <circle
-                                    cx={cx}
-                                    cy={cy}
-                                    r={4}
-                                    fill={color}
-                                    stroke="rgba(0,0,0,0.35)"
-                                    strokeWidth={1}
-                                  />
+                                  <g aria-hidden>
+                                    <circle cx={cx} cy={cy} r={r + 5} fill={halo} />
+                                    <circle
+                                      cx={cx}
+                                      cy={cy}
+                                      r={r + 2.5}
+                                      fill="none"
+                                      stroke="#ffffff"
+                                      strokeWidth={2.5}
+                                      opacity={0.95}
+                                    />
+                                    <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#0f172a" strokeWidth={1.5} />
+                                  </g>
                                 )
                               }}
                               activeDot={false}
@@ -1065,7 +1072,10 @@ export default function StrategiesV4() {
 
                         <div className="sv4-hover-trades">
                           {(hoverPayload.trades || []).slice(-3).map((t) => (
-                            <div key={t.id} className="sv4-hover-trade">
+                            <div
+                              key={t.id}
+                              className={`sv4-hover-trade ${t.side === 'BUY' ? 'sv4-hover-trade--buy' : 'sv4-hover-trade--sell'}`}
+                            >
                               <span className={`sv4-hover-trade-side ${t.side === 'BUY' ? 'buy' : 'sell'}`}>{t.side}</span>
                               <span className="sv4-hover-trade-mid">
                                 {t.quantity.toFixed(4)} @ {t.price.toFixed(2)}
