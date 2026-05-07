@@ -883,11 +883,6 @@ export default function StrategiesV4() {
                       if (!d || !Number.isFinite(close)) continue
                       byDay.set(d, close)
                     }
-                    const chartPrices = [...byDay.entries()]
-                      .sort((a, b) => a[0].localeCompare(b[0]))
-                      .map(([date, close]) => ({ date, close }))
-                    const first = chartPrices[0]
-                    const last = chartPrices[chartPrices.length - 1]
                     const tradePoints = (hoverPayload.trades || [])
                       .map((t) => {
                         const d = normalizeChartDate(t.date)
@@ -898,6 +893,51 @@ export default function StrategiesV4() {
                         }
                       })
                       .filter((t) => t.date && Number.isFinite(t.price))
+
+                    // Union des jours (historique + trades) pour que le Scatter ait toujours un tick X.
+                    const allDates = [
+                      ...new Set<string>([
+                        ...byDay.keys(),
+                        ...tradePoints.map((t) => t.date).filter(Boolean),
+                      ]),
+                    ].sort((a, b) => a.localeCompare(b))
+
+                    const chartPrices = allDates.map((date) => ({
+                      date,
+                      close: byDay.has(date) ? (byDay.get(date) as number) : null,
+                    }))
+
+                    const first = chartPrices.find((row) => row.close != null && Number.isFinite(row.close as number))
+                    const last = [...chartPrices].reverse().find((row) => row.close != null && Number.isFinite(row.close as number))
+
+                    const numericCloses = chartPrices
+                      .map((r) => r.close)
+                      .filter((c): c is number => c != null && Number.isFinite(c))
+                    const tradePx = tradePoints.map((t) => t.price).filter((p) => Number.isFinite(p))
+                    const allY = [...numericCloses, ...tradePx]
+                    let yLo = allY.length ? Math.min(...allY) : 0
+                    let yHi = allY.length ? Math.max(...allY) : 1
+                    if (!Number.isFinite(yLo) || !Number.isFinite(yHi)) {
+                      yLo = 0
+                      yHi = 1
+                    }
+                    if (yHi - yLo < 1e-9) {
+                      const m = yLo || 1
+                      yLo = m * 0.9995
+                      yHi = m * 1.0005
+                    }
+                    const yPad = (yHi - yLo) * 0.06
+                    const yDomain: [number, number] = [yLo - yPad, yHi + yPad]
+                    const ySpan = yHi - yLo
+                    const yTickFormat = (v: number) => {
+                      if (!Number.isFinite(v)) return ''
+                      if (ySpan < 0.02) return v.toFixed(5)
+                      if (ySpan < 0.5) return v.toFixed(4)
+                      if (ySpan < 5) return v.toFixed(3)
+                      if (ySpan < 80) return v.toFixed(2)
+                      if (ySpan < 5000) return v.toFixed(1)
+                      return v.toFixed(0)
+                    }
 
                     return (
                       <>
@@ -918,8 +958,10 @@ export default function StrategiesV4() {
 
                         <ResponsiveContainer width="100%" height={220}>
                           {/*
-                            Recharts 3 : XAxis type="number" + Line peut produire une ligne verticale / une seule colonne.
-                            Axe catégoriel sur date ISO + allowDuplicatedCategory=false pour caler Scatter (trades) sur les ticks.
+                            Recharts 3 : axe catégoriel date ISO.
+                            - Éviter type="monotone" : splines peuvent se recouper sur index catégoriels.
+                            - Domaine Y explicite (historique + prix trades) pour ne pas zoomer sur un seul point.
+                            - Union des dates pour aligner les marqueurs trades.
                           */}
                           <LineChart data={chartPrices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
@@ -937,9 +979,10 @@ export default function StrategiesV4() {
                               tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
                               tickLine={false}
                               axisLine={false}
-                              width={52}
-                              domain={['auto', 'auto']}
-                              tickFormatter={(v: any) => Number(v).toFixed(0)}
+                              width={56}
+                              domain={yDomain}
+                              allowDataOverflow
+                              tickFormatter={(v: any) => yTickFormat(Number(v))}
                             />
                             <RechartsTooltip
                               contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
@@ -954,7 +997,7 @@ export default function StrategiesV4() {
                             />
 
                             <Line
-                              type="monotone"
+                              type="linear"
                               dataKey="close"
                               stroke="#7dd3fc"
                               strokeWidth={2}
