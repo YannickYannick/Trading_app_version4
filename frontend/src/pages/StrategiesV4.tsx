@@ -59,6 +59,22 @@ function formatDateLabel(isoDate: string): string {
   return `${d}/${m}`
 }
 
+function toUnixSecondsFromIsoDate(isoDate: string): number | null {
+  // isoDate: YYYY-MM-DD
+  const dt = new Date(`${isoDate}T00:00:00`)
+  const ms = dt.getTime()
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
+}
+
+function formatUnixSecondsLabel(sec: number): string {
+  const ms = sec * 1000
+  const dt = new Date(ms)
+  if (!Number.isFinite(dt.getTime())) return String(sec)
+  const dd = String(dt.getDate()).padStart(2, '0')
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}`
+}
+
 function safeNumber(v: unknown): number {
   const n = typeof v === 'string' ? Number(v) : (v as number)
   return Number.isFinite(n) ? n : 0
@@ -674,13 +690,18 @@ export default function StrategiesV4() {
                 <div className="sv4-hover-chart">
                   {(() => {
                     const prices = (hoverPayload.prices || [])
-                      .map((p) => ({ ...p, close: Number((p as any).close) }))
-                      .filter((p) => Number.isFinite(p.close))
+                      .map((p) => {
+                        const t = toUnixSecondsFromIsoDate((p as any).date)
+                        return { ...p, close: Number((p as any).close), t }
+                      })
+                      .filter((p) => Number.isFinite(p.close) && typeof p.t === 'number')
+                      .sort((a, b) => (a.t as number) - (b.t as number))
                     const first = prices[0]
                     const last = prices[prices.length - 1]
                     const tradePoints = (hoverPayload.trades || []).map((t) => ({
                       ...t,
                       dateLabel: formatDateLabel(t.date),
+                      t: toUnixSecondsFromIsoDate(t.date),
                     }))
 
                     return (
@@ -703,8 +724,10 @@ export default function StrategiesV4() {
                         <ResponsiveContainer width="100%" height={220}>
                           <LineChart data={prices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDateLabel}
+                              dataKey="t"
+                              type="number"
+                              domain={['dataMin', 'dataMax']}
+                              tickFormatter={(v: any) => formatUnixSecondsLabel(Number(v))}
                               tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
                               tickLine={false}
                               axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
@@ -723,7 +746,7 @@ export default function StrategiesV4() {
                               contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
                               labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
                               itemStyle={{ color: '#e5e7eb' }}
-                              labelFormatter={(l: any) => `Date: ${String(l)}`}
+                              labelFormatter={(l: any) => `Date: ${formatUnixSecondsLabel(Number(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
                                 if (name === 'price') return [Number(v).toFixed(2), 'Trade']
@@ -734,7 +757,7 @@ export default function StrategiesV4() {
                             <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} connectNulls />
 
                             <Scatter
-                              data={tradePoints}
+                              data={(tradePoints || []).filter((x: any) => typeof x.t === 'number')}
                               xAxisId={0}
                               yAxisId={0}
                               dataKey="price"
