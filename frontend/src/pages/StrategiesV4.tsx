@@ -86,6 +86,13 @@ function formatUnixMsLabel(ms: number): string {
   return `${dd}/${mm}`
 }
 
+/** Extrait YYYY-MM-DD pour aligner historique + trades (Recharts 3 : axe catégoriel fiable). */
+function normalizeChartDate(raw: unknown): string | null {
+  const s = String(raw ?? '').trim()
+  const m = s.match(/\d{4}-\d{2}-\d{2}/)
+  return m ? m[0] : null
+}
+
 /** Logs console — filtre: `[StrategiesV4][chart]`. Désactiver: localStorage `sv4ChartDebug=0` */
 function logHoverChartDebug(opts: {
   symbol: string
@@ -868,20 +875,29 @@ export default function StrategiesV4() {
               ) : (
                 <div className="sv4-hover-chart">
                   {(() => {
-                    const prices = (hoverPayload.prices || [])
-                      .map((p) => {
-                        const t = toUnixMsFromIsoDate((p as any).date)
-                        return { ...p, close: Number((p as any).close), t }
+                    // Dédoublonner par jour (dernière valeur gagne) puis tri ISO — évite écarts Line vs méta.
+                    const byDay = new Map<string, number>()
+                    for (const p of hoverPayload.prices || []) {
+                      const d = normalizeChartDate((p as any).date)
+                      const close = Number((p as any).close)
+                      if (!d || !Number.isFinite(close)) continue
+                      byDay.set(d, close)
+                    }
+                    const chartPrices = [...byDay.entries()]
+                      .sort((a, b) => a[0].localeCompare(b[0]))
+                      .map(([date, close]) => ({ date, close }))
+                    const first = chartPrices[0]
+                    const last = chartPrices[chartPrices.length - 1]
+                    const tradePoints = (hoverPayload.trades || [])
+                      .map((t) => {
+                        const d = normalizeChartDate(t.date)
+                        return {
+                          ...t,
+                          date: d ?? String(t.date ?? '').slice(0, 10),
+                          dateLabel: formatDateLabel(t.date),
+                        }
                       })
-                      .filter((p) => Number.isFinite(p.close) && typeof p.t === 'number')
-                      .sort((a, b) => (a.t as number) - (b.t as number))
-                    const first = prices[0]
-                    const last = prices[prices.length - 1]
-                    const tradePoints = (hoverPayload.trades || []).map((t) => ({
-                      ...t,
-                      dateLabel: formatDateLabel(t.date),
-                      t: toUnixMsFromIsoDate(t.date),
-                    }))
+                      .filter((t) => t.date && Number.isFinite(t.price))
 
                     return (
                       <>
@@ -901,12 +917,16 @@ export default function StrategiesV4() {
                         </div>
 
                         <ResponsiveContainer width="100%" height={220}>
-                          <LineChart data={prices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
+                          {/*
+                            Recharts 3 : XAxis type="number" + Line peut produire une ligne verticale / une seule colonne.
+                            Axe catégoriel sur date ISO + allowDuplicatedCategory=false pour caler Scatter (trades) sur les ticks.
+                          */}
+                          <LineChart data={chartPrices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
-                              dataKey="t"
-                              type="number"
-                              domain={['dataMin', 'dataMax']}
-                              tickFormatter={(v: any) => formatUnixMsLabel(Number(v))}
+                              dataKey="date"
+                              type="category"
+                              allowDuplicatedCategory={false}
+                              tickFormatter={(d) => formatDateLabel(String(d))}
                               tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
                               tickLine={false}
                               axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
@@ -925,7 +945,7 @@ export default function StrategiesV4() {
                               contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
                               labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
                               itemStyle={{ color: '#e5e7eb' }}
-                              labelFormatter={(l: any) => `Date: ${formatUnixMsLabel(Number(l))}`}
+                              labelFormatter={(l: any) => `Date: ${formatDateLabel(String(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
                                 if (name === 'price') return [Number(v).toFixed(2), 'Trade']
@@ -933,10 +953,18 @@ export default function StrategiesV4() {
                               }}
                             />
 
-                            <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} connectNulls />
+                            <Line
+                              type="monotone"
+                              dataKey="close"
+                              stroke="#7dd3fc"
+                              strokeWidth={2}
+                              dot={false}
+                              connectNulls
+                              isAnimationActive={false}
+                            />
 
                             <Scatter
-                              data={(tradePoints || []).filter((x: any) => typeof x.t === 'number')}
+                              data={tradePoints}
                               xAxisId={0}
                               yAxisId={0}
                               dataKey="price"
@@ -971,7 +999,7 @@ export default function StrategiesV4() {
                         </div>
 
                         <div className="sv4-hover-foot">
-                          <span>{hoverPayload.prices.length} pts</span>
+                          <span>{chartPrices.length} pts</span>
                           <span>{hoverPayload.trades.length} trades</span>
                         </div>
                       </>
