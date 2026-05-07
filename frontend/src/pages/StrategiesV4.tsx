@@ -66,6 +66,14 @@ function toUnixSecondsFromIsoDate(isoDate: string): number | null {
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : null
 }
 
+function todayIsoDate(): string {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 function formatUnixSecondsLabel(sec: number): string {
   const ms = sec * 1000
   const dt = new Date(ms)
@@ -367,6 +375,25 @@ export default function StrategiesV4() {
     const reqId = ++hoverReqIdRef.current
     try {
       const data = await assetService.getChartTooltip(allAssetId, 180, 365, 400)
+
+      // Étendre la courbe jusqu'au prix actuel (Yahoo current price, cache côté client).
+      try {
+        const cur = await assetService.getYahooCurrentPrice(allAssetId)
+        if (cur != null && Number.isFinite(cur) && cur > 0) {
+          const d = todayIsoDate()
+          const hasToday = (data.prices || []).some((p) => String((p as any).date) === d)
+          const lastDate = data.prices?.[data.prices.length - 1]?.date
+          const shouldAppend = !hasToday && d !== String(lastDate || '')
+          if (shouldAppend) {
+            data.prices = [...(data.prices || []), { date: d, close: cur }]
+          } else if (hasToday) {
+            data.prices = (data.prices || []).map((p) => (String((p as any).date) === d ? { ...p, close: cur } : p))
+          }
+        }
+      } catch {
+        // ignore (tooltip reste sur historique stocké)
+      }
+
       chartCacheRef.current.set(allAssetId, data)
       if (reqId === hoverReqIdRef.current) {
         setHoverPayload(data)
