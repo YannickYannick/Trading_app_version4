@@ -18,7 +18,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Line, LineChart, Scatter, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
 import { positionService, orderService, strategyService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
@@ -87,10 +87,16 @@ function formatUnixMsLabel(ms: number): string {
 }
 
 /** Extrait YYYY-MM-DD pour aligner historique + trades (Recharts 3 : axe catégoriel fiable). */
-function normalizeChartDate(raw: unknown): string | null {
-  const s = String(raw ?? '').trim()
-  const m = s.match(/\d{4}-\d{2}-\d{2}/)
-  return m ? m[0] : null
+/** Dernier jour présent dans l’historique ≤ tradeDate (week-end / jour sans barre). */
+function snapTradeDateToHistory(tradeDate: string, historyDatesAsc: string[]): string | null {
+  if (!tradeDate || historyDatesAsc.length === 0) return null
+  if (historyDatesAsc.includes(tradeDate)) return tradeDate
+  let best: string | null = null
+  for (const d of historyDatesAsc) {
+    if (d <= tradeDate) best = d
+    else break
+  }
+  return best ?? historyDatesAsc[0]
 }
 
 /** Logs console — filtre: `[StrategiesV4][chart]`. Désactiver: localStorage `sv4ChartDebug=0` */
@@ -877,7 +883,6 @@ export default function StrategiesV4() {
               ) : (
                 <div className="sv4-hover-chart">
                   {(() => {
-                    // Dédoublonner par jour (dernière valeur gagne) puis tri ISO — évite écarts Line vs méta.
                     const byDay = new Map<string, number>()
                     for (const p of hoverPayload.prices || []) {
                       const d = normalizeChartDate((p as any).date)
@@ -885,7 +890,10 @@ export default function StrategiesV4() {
                       if (!d || !Number.isFinite(close)) continue
                       byDay.set(d, close)
                     }
-                    const tradePoints = (hoverPayload.trades || [])
+
+                    const historyDates = [...byDay.keys()].sort((a, b) => a.localeCompare(b))
+
+                    const tradeRows = (hoverPayload.trades || [])
                       .map((t) => {
                         const d = normalizeChartDate(t.date)
                         return {
@@ -896,26 +904,31 @@ export default function StrategiesV4() {
                       })
                       .filter((t) => t.date && Number.isFinite(t.price))
 
-                    // Union des jours (historique + trades) pour que le Scatter ait toujours un tick X.
-                    const allDates = [
-                      ...new Set<string>([
-                        ...byDay.keys(),
-                        ...tradePoints.map((t) => t.date).filter(Boolean),
-                      ]),
-                    ].sort((a, b) => a.localeCompare(b))
+                    const tradeBySnappedDay = new Map<string, { price: number; side: string }>()
+                    for (const t of tradeRows) {
+                      const snap = snapTradeDateToHistory(t.date, historyDates)
+                      if (!snap) continue
+                      tradeBySnappedDay.set(snap, {
+                        price: t.price,
+                        side: String(t.side || 'BUY').toUpperCase(),
+                      })
+                    }
 
-                    const chartPrices = allDates.map((date) => ({
-                      date,
-                      close: byDay.has(date) ? (byDay.get(date) as number) : null,
-                    }))
+                    const chartPrices = historyDates.map((date) => {
+                      const tr = tradeBySnappedDay.get(date)
+                      return {
+                        date,
+                        close: byDay.get(date) as number,
+                        tradePrice: tr?.price,
+                        tradeSide: tr?.side,
+                      }
+                    })
 
-                    const first = chartPrices.find((row) => row.close != null && Number.isFinite(row.close as number))
-                    const last = [...chartPrices].reverse().find((row) => row.close != null && Number.isFinite(row.close as number))
+                    const first = chartPrices[0]
+                    const last = chartPrices[chartPrices.length - 1]
 
-                    const numericCloses = chartPrices
-                      .map((r) => r.close)
-                      .filter((c): c is number => c != null && Number.isFinite(c))
-                    const tradePx = tradePoints.map((t) => t.price).filter((p) => Number.isFinite(p))
+                    const numericCloses = chartPrices.map((r) => r.close).filter((c) => Number.isFinite(c))
+                    const tradePx = [...tradeBySnappedDay.values()].map((x) => x.price).filter((p) => Number.isFinite(p))
                     const allY = [...numericCloses, ...tradePx]
                     let yLo = allY.length ? Math.min(...allY) : 0
                     let yHi = allY.length ? Math.max(...allY) : 1
@@ -947,23 +960,25 @@ export default function StrategiesV4() {
                           <div className="sv4-hover-meta-row">
                             <span className="sv4-hover-meta-k">Début</span>
                             <span className="sv4-hover-meta-v">
-                              {first ? `${formatDateLabel(first.date)} • ${Number(first.close).toFixed(2)}` : '—'}
+                              {first
+                                ? `${formatDateLabel(first.date)} • ${Number(first.close).toFixed(2)}`
+                                : '—'}
                             </span>
                           </div>
                           <div className="sv4-hover-meta-row">
                             <span className="sv4-hover-meta-k">Fin</span>
                             <span className="sv4-hover-meta-v">
-                              {last ? `${formatDateLabel(last.date)} • ${Number(last.close).toFixed(2)}` : '—'}
+                              {last
+                                ? `${formatDateLabel(last.date)} • ${Number(last.close).toFixed(2)}`
+                                : '—'}
                             </span>
                           </div>
                         </div>
 
                         <ResponsiveContainer width="100%" height={220}>
                           {/*
-                            Recharts 3 : axe catégoriel date ISO.
-                            - Éviter type="monotone" : splines peuvent se recouper sur index catégoriels.
-                            - Domaine Y explicite (historique + prix trades) pour ne pas zoomer sur un seul point.
-                            - Union des dates pour aligner les marqueurs trades.
+                            Recharts 3 : ne pas mettre <Scatter> dans <LineChart> (band-scale catégorielle → NaN).
+                            Trades : 2e Line stroke transparent + dots. Jours trades hors historique → snap au dernier jour ≤ date.
                           */}
                           <LineChart data={chartPrices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
@@ -993,7 +1008,7 @@ export default function StrategiesV4() {
                               labelFormatter={(l: any) => `Date: ${formatDateLabel(String(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
-                                if (name === 'price') return [Number(v).toFixed(2), 'Trade']
+                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Trade']
                                 return [String(v), String(name)]
                               }}
                             />
@@ -1004,26 +1019,41 @@ export default function StrategiesV4() {
                               stroke="#7dd3fc"
                               strokeWidth={2}
                               dot={false}
-                              connectNulls
                               isAnimationActive={false}
+                              connectNulls={false}
                             />
 
-                            <Scatter
-                              data={tradePoints}
-                              xAxisId={0}
-                              yAxisId={0}
-                              dataKey="price"
-                              shape={(props: any) => {
-                                const { cx, cy, payload } = props || {}
-                                if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
-                                const side = payload?.side
-                                const color = side === 'BUY' ? '#60a5fa' : '#f87171'
+                            <Line
+                              type="linear"
+                              dataKey="tradePrice"
+                              stroke="transparent"
+                              strokeWidth={0}
+                              dot={(dotProps: any) => {
+                                const { cx, cy, payload } = dotProps
+                                if (
+                                  payload?.tradePrice == null ||
+                                  !Number.isFinite(Number(payload.tradePrice)) ||
+                                  !Number.isFinite(cx) ||
+                                  !Number.isFinite(cy)
+                                ) {
+                                  return null
+                                }
+                                const side = payload?.tradeSide
+                                const color = String(side).toUpperCase() === 'SELL' ? '#f87171' : '#60a5fa'
                                 return (
-                                  <g>
-                                    <circle cx={cx} cy={cy} r={4} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
-                                  </g>
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={4}
+                                    fill={color}
+                                    stroke="rgba(0,0,0,0.35)"
+                                    strokeWidth={1}
+                                  />
                                 )
                               }}
+                              activeDot={false}
+                              isAnimationActive={false}
+                              legendType="none"
                             />
                           </LineChart>
                         </ResponsiveContainer>
