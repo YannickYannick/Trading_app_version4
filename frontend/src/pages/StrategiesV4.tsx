@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
+import { Line, LineChart, Scatter, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
 import { positionService, orderService, strategyService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
@@ -51,6 +51,12 @@ type HoverState = {
   allAssetId: number | null
   symbol: string
   broker: string
+}
+
+function formatDateLabel(isoDate: string): string {
+  const [y, m, d] = String(isoDate || '').split('-')
+  if (!y || !m || !d) return String(isoDate || '')
+  return `${d}/${m}`
 }
 
 function safeNumber(v: unknown): number {
@@ -653,8 +659,8 @@ export default function StrategiesV4() {
             <div
               className="sv4-hover-tooltip"
               style={{
-                left: clamp(hover.x + 14, 12, window.innerWidth - 360),
-                top: clamp(hover.y + 14, 12, window.innerHeight - 220),
+                left: clamp(hover.x + 14, 12, window.innerWidth - 520),
+                top: clamp(hover.y + 14, 12, window.innerHeight - 360),
               }}
             >
               <div className="sv4-hover-head">
@@ -666,34 +672,107 @@ export default function StrategiesV4() {
                 <div className="sv4-hover-loading">Chargement du graphe…</div>
               ) : (
                 <div className="sv4-hover-chart">
-                  <ResponsiveContainer width="100%" height={140}>
-                    <LineChart data={hoverPayload.prices}>
-                      <XAxis dataKey="date" hide />
-                      <YAxis hide domain={['dataMin', 'dataMax']} />
-                      <RechartsTooltip
-                        formatter={(v: any) => [Number(v).toFixed(2), 'Close']}
-                        labelFormatter={(l: any) => String(l)}
-                        contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.08)' }}
-                        itemStyle={{ color: '#e5e7eb' }}
-                      />
-                      <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} />
+                  {(() => {
+                    const prices = hoverPayload.prices || []
+                    const first = prices[0]
+                    const last = prices[prices.length - 1]
+                    const tradePoints = (hoverPayload.trades || []).map((t) => ({
+                      ...t,
+                      dateLabel: formatDateLabel(t.date),
+                    }))
 
-                      {hoverPayload.trades.slice(-80).map((t) => (
-                        <ReferenceDot
-                          key={t.id}
-                          x={t.date}
-                          y={t.price}
-                          r={2.5}
-                          fill={t.side === 'BUY' ? '#60a5fa' : '#f87171'}
-                          stroke="rgba(0,0,0,0)"
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                  <div className="sv4-hover-foot">
-                    <span>{hoverPayload.prices.length} pts</span>
-                    <span>{hoverPayload.trades.length} trades</span>
-                  </div>
+                    return (
+                      <>
+                        <div className="sv4-hover-meta">
+                          <div className="sv4-hover-meta-row">
+                            <span className="sv4-hover-meta-k">Début</span>
+                            <span className="sv4-hover-meta-v">
+                              {first ? `${formatDateLabel(first.date)} • ${Number(first.close).toFixed(2)}` : '—'}
+                            </span>
+                          </div>
+                          <div className="sv4-hover-meta-row">
+                            <span className="sv4-hover-meta-k">Fin</span>
+                            <span className="sv4-hover-meta-v">
+                              {last ? `${formatDateLabel(last.date)} • ${Number(last.close).toFixed(2)}` : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <ResponsiveContainer width="100%" height={220}>
+                          <LineChart data={prices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDateLabel}
+                              tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                              interval="preserveStartEnd"
+                              minTickGap={20}
+                            />
+                            <YAxis
+                              tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                              width={52}
+                              domain={['auto', 'auto']}
+                              tickFormatter={(v: any) => Number(v).toFixed(0)}
+                            />
+                            <RechartsTooltip
+                              contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.10)' }}
+                              labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
+                              itemStyle={{ color: '#e5e7eb' }}
+                              labelFormatter={(l: any) => `Date: ${String(l)}`}
+                              formatter={(v: any, name: any) => {
+                                if (name === 'close') return [Number(v).toFixed(2), 'Close']
+                                if (name === 'price') return [Number(v).toFixed(2), 'Trade']
+                                return [String(v), String(name)]
+                              }}
+                            />
+
+                            <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} />
+
+                            <Scatter
+                              data={tradePoints}
+                              xAxisId={0}
+                              yAxisId={0}
+                              dataKey="price"
+                              shape={(props: any) => {
+                                const { cx, cy, payload } = props || {}
+                                if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
+                                const side = payload?.side
+                                const color = side === 'BUY' ? '#60a5fa' : '#f87171'
+                                return (
+                                  <g>
+                                    <circle cx={cx} cy={cy} r={4} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
+                                  </g>
+                                )
+                              }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+
+                        <div className="sv4-hover-trades">
+                          {(hoverPayload.trades || []).slice(-3).map((t) => (
+                            <div key={t.id} className="sv4-hover-trade">
+                              <span className={`sv4-hover-trade-side ${t.side === 'BUY' ? 'buy' : 'sell'}`}>{t.side}</span>
+                              <span className="sv4-hover-trade-mid">
+                                {t.quantity.toFixed(4)} @ {t.price.toFixed(2)}
+                              </span>
+                              <span className="sv4-hover-trade-date">{formatDateLabel(t.date)}</span>
+                            </div>
+                          ))}
+                          {(hoverPayload.trades || []).length === 0 && (
+                            <div className="sv4-hover-trade-empty">Aucun trade BUY/SELL trouvé pour cet actif.</div>
+                          )}
+                        </div>
+
+                        <div className="sv4-hover-foot">
+                          <span>{hoverPayload.prices.length} pts</span>
+                          <span>{hoverPayload.trades.length} trades</span>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               )}
             </div>
