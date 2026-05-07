@@ -407,6 +407,7 @@ export default function StrategiesV4() {
         const pnlPct = posPnlPercent(p)
         const value = posMarketValueEUR(p)
         return {
+          positionId: p.id,
           allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
@@ -424,6 +425,7 @@ export default function StrategiesV4() {
       .map((p) => {
         const size = posMarketValueEUR(p)
         return {
+          positionId: p.id,
           allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
@@ -765,7 +767,7 @@ export default function StrategiesV4() {
             <div className="sv4-positions-grid">
               {portfolioCards.map((p) => (
                 <Card
-                  key={`${p.symbol}-${p.broker}`}
+                  key={`pos-${p.positionId}`}
                   className="sv4-pos-card"
                   onMouseEnter={(e) => handleAssetEnter(e, p.allAssetId, p.symbol, p.broker)}
                   onMouseMove={handleAssetMove}
@@ -824,13 +826,13 @@ export default function StrategiesV4() {
                         const w = (a.size / sec.total) * 100
                         return (
                           <div
-                            key={`${sec.name}-${a.symbol}-${a.broker}`}
+                            key={`${sec.name}-pos-${a.positionId}`}
                             className="sv4-heat-asset"
                             style={{
                               flex: `${Math.max(3, w)} 1 0%`,
                               backgroundColor: pnlBg(a.pnl),
                             }}
-                            title={`${a.symbol} (${a.broker}) • ${a.pnl > 0 ? '+' : ''}${a.pnl.toFixed(2)}% • ${formatCurrency(a.size)}`}
+                            title={`${a.symbol} (${a.broker}) · position #${a.positionId} · ${a.pnl > 0 ? '+' : ''}${a.pnl.toFixed(2)}% · ${formatCurrency(a.size)}`}
                             onMouseEnter={(e) => handleAssetEnter(e, a.allAssetId, a.symbol, a.broker)}
                             onMouseMove={handleAssetMove}
                             onMouseLeave={handleAssetLeave}
