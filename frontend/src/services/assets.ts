@@ -455,6 +455,26 @@ export const assetService = {
       }
     }
   },
+
+  /**
+   * Payload optimisé pour tooltip de chart (historique close + trades BUY/SELL).
+   */
+  async getChartTooltip(
+    allAssetId: number,
+    days: number = 180,
+    tradesDays: number = 180,
+    maxTrades: number = 200
+  ): Promise<{
+    all_asset_id: number
+    all_asset_symbol: string
+    prices: Array<{ date: string; close: number }>
+    trades: Array<{ id: number; side: 'BUY' | 'SELL'; quantity: number; price: number; date: string; timestamp: string }>
+  }> {
+    const response = await apiClient.get(`/all-assets/${allAssetId}/chart-tooltip/`, {
+      params: { days, trades_days: tradesDays, max_trades: maxTrades },
+    })
+    return response.data
+  },
 }
 
 export default assetService

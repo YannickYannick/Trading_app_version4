@@ -384,6 +384,57 @@
   padding: 18px;
 }
 
+/* Tooltip graphique au survol (heatmap/cartes) */
+.sv4-hover-tooltip {
+  position: fixed;
+  z-index: 50;
+  width: 340px;
+  border-radius: 14px;
+  padding: 10px 10px 8px;
+  background: rgba(8, 12, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.sv4-hover-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px 6px;
+}
+
+.sv4-hover-title {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.sv4-hover-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.sv4-hover-loading {
+  padding: 10px 6px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.sv4-hover-chart {
+  padding: 0 2px 2px;
+}
+
+.sv4-hover-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 6px 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .sv4-status-card.blue { border-color: rgba(59, 130, 246, 0.22); background: rgba(59, 130, 246, 0.08); }
 .sv4-status-card.amber { border-color: rgba(245, 158, 11, 0.22); background: rgba(245, 158, 11, 0.06); }
 .sv4-status-title { margin: 0 0 8px; font-size: 12px; font-weight: 900; color: #cbd5e1; display: flex; align-items: center; gap: 8px; }

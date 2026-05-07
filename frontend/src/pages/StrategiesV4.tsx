@@ -2,7 +2,7 @@
  * StrategiesV4 - Dashboard moderne multi-broker (inspiré du mock fourni).
  * Pour l'instant : récap positions du portefeuille + ordres/stratégies en cours d'exécution.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowDownRight,
@@ -17,9 +17,11 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
+import { Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
 import { positionService, orderService, strategyService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
+import { assetService } from '@services/assets'
 import type { Order, Position, Strategy } from '@types'
 import { formatCurrency } from '@utils/format'
 import './StrategiesV4.css'
@@ -32,6 +34,22 @@ type UiOrder = {
   price: number | null
   status: string
   progress: number
+  broker: string
+}
+
+type ChartTooltipPayload = {
+  all_asset_id: number
+  all_asset_symbol: string
+  prices: Array<{ date: string; close: number }>
+  trades: Array<{ id: number; side: 'BUY' | 'SELL'; quantity: number; price: number; date: string; timestamp: string }>
+}
+
+type HoverState = {
+  visible: boolean
+  x: number
+  y: number
+  allAssetId: number | null
+  symbol: string
   broker: string
 }
 
@@ -126,6 +144,35 @@ function posMarketValueEUR(p: Position): number {
   return Math.max(0, qty * px)
 }
 
+/**
+ * % de perf par rapport au prix d’entrée.
+ * - Formule LONG : (prix_actuel − entrée) / entrée × 100
+ * - Formule SHORT : (entrée − prix_actuel) / entrée × 100
+ * Prix actuel : Yahoo si dispo (souvent enrichi ailleurs), sinon `current_price` broker en base.
+ * L’API liste (`PositionListSerializer`) ne met pas Yahoo dans `pnl_percent` : si `current_price`
+ * est vide en BDD, le backend renvoie `pnl_percent: null` → le front affichait 0 % à tort.
+ */
+function posPnlPercent(p: Position): number {
+  const entryRaw = safeNumber((p as any).entry_price)
+  const entryReconstructed = safeNumber((p as any).reconstructed_entry_price)
+  const entry = entryRaw > 0 ? entryRaw : (entryReconstructed > 0 ? entryReconstructed : 0)
+  const live = safeNumber((p as any).yahoo_current_price ?? (p as any).current_price)
+  const side = String((p as any).side || '').toUpperCase()
+  const isShort = side === 'SHORT' || side === 'SELL'
+
+  if (entry > 0 && Number.isFinite(live)) {
+    if (isShort) return ((entry - live) / entry) * 100
+    return ((live - entry) / entry) * 100
+  }
+
+  const raw = (p as any).pnl_percent
+  if (raw != null && raw !== '') {
+    const n = typeof raw === 'string' ? Number(raw) : Number(raw)
+    if (Number.isFinite(n)) return n
+  }
+  return 0
+}
+
 function posSector(p: Position): string {
   const assetType = String((p as any).all_asset_asset_type || '').toUpperCase()
   const platform = String((p as any).all_asset_platform || '').toUpperCase()
@@ -159,6 +206,18 @@ export default function StrategiesV4() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const chartCacheRef = useRef<Map<number, ChartTooltipPayload>>(new Map())
+  const hoverReqIdRef = useRef(0)
+  const [hover, setHover] = useState<HoverState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    allAssetId: null,
+    symbol: '',
+    broker: '',
+  })
+  const [hoverPayload, setHoverPayload] = useState<ChartTooltipPayload | null>(null)
 
   const loadData = async () => {
     try {
@@ -215,9 +274,10 @@ export default function StrategiesV4() {
       .sort((a, b) => posMarketValueEUR(b) - posMarketValueEUR(a))
       .slice(0, 12)
       .map((p) => {
-        const pnlPct = safeNumber((p as any).pnl_percent)
+        const pnlPct = posPnlPercent(p)
         const value = posMarketValueEUR(p)
         return {
+          allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
           qty: posQuantity(p),
@@ -234,12 +294,13 @@ export default function StrategiesV4() {
       .map((p) => {
         const size = posMarketValueEUR(p)
         return {
+          allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
           sector: posSector(p),
           broker: posBroker(p),
           size,
-          pnl: safeNumber((p as any).pnl_percent),
+          pnl: posPnlPercent(p),
         }
       })
       .filter((x) => x.size > 0)
@@ -273,6 +334,44 @@ export default function StrategiesV4() {
     () => strategies.filter((s) => Boolean(s.is_automated)).slice(0, 12),
     [strategies]
   )
+
+  const ensureHoverPayload = async (allAssetId: number) => {
+    const cached = chartCacheRef.current.get(allAssetId)
+    if (cached) {
+      setHoverPayload(cached)
+      return
+    }
+
+    const reqId = ++hoverReqIdRef.current
+    try {
+      const data = await assetService.getChartTooltip(allAssetId, 180, 365, 400)
+      chartCacheRef.current.set(allAssetId, data)
+      if (reqId === hoverReqIdRef.current) {
+        setHoverPayload(data)
+      }
+    } catch {
+      if (reqId === hoverReqIdRef.current) {
+        setHoverPayload(null)
+      }
+    }
+  }
+
+  const handleAssetEnter = (e: React.MouseEvent, allAssetId: number | null, symbol: string, broker: string) => {
+    if (!allAssetId) return
+    setHover({ visible: true, x: e.clientX, y: e.clientY, allAssetId, symbol, broker })
+    setHoverPayload(null)
+    void ensureHoverPayload(allAssetId)
+  }
+
+  const handleAssetMove = (e: React.MouseEvent) => {
+    setHover((h) => (h.visible ? { ...h, x: e.clientX, y: e.clientY } : h))
+  }
+
+  const handleAssetLeave = () => {
+    hoverReqIdRef.current++
+    setHover((h) => ({ ...h, visible: false, allAssetId: null }))
+    setHoverPayload(null)
+  }
 
   return (
     <div className="strategies-v4">
@@ -457,7 +556,13 @@ export default function StrategiesV4() {
           {centerMode === 'cards' ? (
             <div className="sv4-positions-grid">
               {portfolioCards.map((p) => (
-                <Card key={`${p.symbol}-${p.broker}`} className="sv4-pos-card">
+                <Card
+                  key={`${p.symbol}-${p.broker}`}
+                  className="sv4-pos-card"
+                  onMouseEnter={(e) => handleAssetEnter(e, p.allAssetId, p.symbol, p.broker)}
+                  onMouseMove={handleAssetMove}
+                  onMouseLeave={handleAssetLeave}
+                >
                   <div className="sv4-pos-top">
                     <div className="sv4-pos-left">
                       <div className="sv4-avatar">{(p.symbol || '?').slice(0, 1).toUpperCase()}</div>
@@ -518,6 +623,9 @@ export default function StrategiesV4() {
                               backgroundColor: pnlBg(a.pnl),
                             }}
                             title={`${a.symbol} (${a.broker}) • ${a.pnl > 0 ? '+' : ''}${a.pnl.toFixed(2)}% • ${formatCurrency(a.size)}`}
+                            onMouseEnter={(e) => handleAssetEnter(e, a.allAssetId, a.symbol, a.broker)}
+                            onMouseMove={handleAssetMove}
+                            onMouseLeave={handleAssetLeave}
                           >
                             <div className="sv4-heat-overlay" />
                             <div className="sv4-heat-center">
@@ -539,6 +647,56 @@ export default function StrategiesV4() {
                 )}
               </div>
             </Card>
+          )}
+
+          {hover.visible && hover.allAssetId && (
+            <div
+              className="sv4-hover-tooltip"
+              style={{
+                left: clamp(hover.x + 14, 12, window.innerWidth - 360),
+                top: clamp(hover.y + 14, 12, window.innerHeight - 220),
+              }}
+            >
+              <div className="sv4-hover-head">
+                <div className="sv4-hover-title">{hover.symbol}</div>
+                <div className="sv4-hover-sub">{hover.broker}</div>
+              </div>
+
+              {!hoverPayload ? (
+                <div className="sv4-hover-loading">Chargement du graphe…</div>
+              ) : (
+                <div className="sv4-hover-chart">
+                  <ResponsiveContainer width="100%" height={140}>
+                    <LineChart data={hoverPayload.prices}>
+                      <XAxis dataKey="date" hide />
+                      <YAxis hide domain={['dataMin', 'dataMax']} />
+                      <RechartsTooltip
+                        formatter={(v: any) => [Number(v).toFixed(2), 'Close']}
+                        labelFormatter={(l: any) => String(l)}
+                        contentStyle={{ backgroundColor: '#0b1220', border: '1px solid rgba(255,255,255,0.08)' }}
+                        itemStyle={{ color: '#e5e7eb' }}
+                      />
+                      <Line type="monotone" dataKey="close" stroke="#7dd3fc" strokeWidth={2} dot={false} />
+
+                      {hoverPayload.trades.slice(-80).map((t) => (
+                        <ReferenceDot
+                          key={t.id}
+                          x={t.date}
+                          y={t.price}
+                          r={2.5}
+                          fill={t.side === 'BUY' ? '#60a5fa' : '#f87171'}
+                          stroke="rgba(0,0,0,0)"
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="sv4-hover-foot">
+                    <span>{hoverPayload.prices.length} pts</span>
+                    <span>{hoverPayload.trades.length} trades</span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </section>
 

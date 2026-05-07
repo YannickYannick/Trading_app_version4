@@ -759,6 +759,112 @@ class AllAssetsViewSet(viewsets.ModelViewSet):
                 'total_days_available': len(dates),
                 'results': prices_list
             })
+
+    @action(detail=True, methods=['get'], url_path='chart-tooltip')
+    def chart_tooltip(self, request, pk=None):
+        """
+        GET /api/all-assets/{id}/chart-tooltip/
+        Retourne un payload optimisé pour un tooltip:
+        - historique (close) depuis `price_history_json` (déjà synchronisé)
+        - marqueurs trades BUY/SELL (user) pour cet AllAsset
+
+        Query params:
+        - days: nombre de jours d'historique (défaut 180)
+        - trades_days: filtre trades sur N jours (défaut = days)
+        - max_trades: limite de trades renvoyés (défaut 200)
+
+        ⚠️ Ne déclenche pas de sync yfinance pour éviter le spam (le front peut appeler
+        /sync_price_history/ explicitement via un bouton si besoin).
+        """
+        from ..models import Trade, AllAssets
+        import logging
+
+        logger = logging.getLogger('trading.api.assets')
+
+        try:
+            all_asset = AllAssets.objects.get(pk=pk)
+        except AllAssets.DoesNotExist:
+            return Response(
+                {'error': f'AllAsset {pk} not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        qp = getattr(request, 'query_params', request.GET)
+        try:
+            days = int(qp.get('days', 180))
+            if days <= 0:
+                days = 180
+        except (TypeError, ValueError):
+            days = 180
+
+        try:
+            trades_days = int(qp.get('trades_days', days))
+            if trades_days <= 0:
+                trades_days = days
+        except (TypeError, ValueError):
+            trades_days = days
+
+        try:
+            max_trades = int(qp.get('max_trades', 200))
+            if max_trades <= 0:
+                max_trades = 200
+            max_trades = min(max_trades, 1000)
+        except (TypeError, ValueError):
+            max_trades = 200
+
+        # --- Prices (close) ---
+        prices = []
+        if all_asset.has_price_history:
+            dates = all_asset.get_price_history_dates()
+            for date_str in dates[:days]:
+                price_data = all_asset.get_price_for_date(date_str) or {}
+                close_price = price_data.get('close')
+                if close_price is None:
+                    continue
+                prices.append({
+                    'date': date_str,
+                    'close': close_price,
+                })
+            # Repasser en chrono (lightweight-charts / recharts apprécient)
+            prices.sort(key=lambda x: x['date'])
+
+        # --- Trades markers ---
+        since = timezone.now() - timedelta(days=trades_days)
+        qs = (
+            Trade.objects.filter(
+                user=request.user,
+                all_asset_id=all_asset.id,
+                executed_at__gte=since,
+            )
+            .only('id', 'trade_type', 'quantity', 'price', 'executed_at')
+            .order_by('executed_at')[:max_trades]
+        )
+
+        trades = []
+        for t in qs:
+            trades.append({
+                'id': t.id,
+                'side': t.trade_type,
+                'quantity': float(t.quantity),
+                'price': float(t.price),
+                'date': t.executed_at.date().isoformat(),
+                'timestamp': t.executed_at.isoformat(),
+            })
+
+        logger.debug(
+            f"[chart-tooltip] all_asset={all_asset.id} prices={len(prices)} trades={len(trades)} days={days}"
+        )
+
+        return Response({
+            'all_asset_id': all_asset.id,
+            'all_asset_symbol': all_asset.symbol,
+            'prices_count': len(prices),
+            'trades_count': len(trades),
+            'days': days,
+            'trades_days': trades_days,
+            'prices': prices,
+            'trades': trades,
+        })
     
     @action(detail=True, methods=['get'])
     def current_price(self, request, pk=None):

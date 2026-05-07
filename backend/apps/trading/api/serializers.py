@@ -557,6 +557,7 @@ class PositionListSerializer(serializers.ModelSerializer):
 
     pnl = serializers.SerializerMethodField()
     pnl_percent = serializers.SerializerMethodField()
+    reconstructed_entry_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Position
@@ -577,6 +578,7 @@ class PositionListSerializer(serializers.ModelSerializer):
             'opened_at', 'closed_at',
             'status',
             'pnl', 'pnl_percent',
+            'reconstructed_entry_price',
         ]
 
     def get_status(self, obj):
@@ -603,6 +605,71 @@ class PositionListSerializer(serializers.ModelSerializer):
         if obj.side == 'LONG':
             return ((current_price - entry_price) / entry_price) * 100
         return ((entry_price - current_price) / entry_price) * 100
+
+    def get_reconstructed_entry_price(self, obj):
+        """
+        Reconstitue un PRU (prix de revient unitaire) à partir des trades BUY/SELL en base.
+        Objectif: Binance Spot et cas où la position a un entry_price peu fiable.
+
+        Méthode: FIFO sur les quantités (LONG uniquement). Retourne None si pas calculable.
+        """
+        try:
+            # Garder léger: pas de Yahoo ici, juste DB.
+            user = getattr(obj, 'user', None)
+            all_asset_id = getattr(obj, 'all_asset_id', None)
+            broker_id = getattr(obj, 'broker_id', None)
+            if not user or not all_asset_id or not broker_id:
+                return None
+            if str(getattr(obj, 'side', '')).upper() == 'SHORT':
+                return None
+
+            qty_open = float(obj.quantity or 0)
+            if qty_open <= 0:
+                return None
+
+            # Charger les trades pour cet asset+broker
+            trades = (
+                Trade.objects
+                .filter(user=user, all_asset_id=all_asset_id, broker_id=broker_id)
+                .only('trade_type', 'quantity', 'price', 'executed_at')
+                .order_by('executed_at')[:2000]
+            )
+
+            lots = []  # list of [qty_remaining, price]
+            for t in trades:
+                t_side = str(t.trade_type).upper()
+                t_qty = float(t.quantity or 0)
+                t_price = float(t.price or 0)
+                if t_qty <= 0 or t_price <= 0:
+                    continue
+                if t_side == 'BUY':
+                    lots.append([t_qty, t_price])
+                elif t_side == 'SELL':
+                    remaining = t_qty
+                    # Dépile FIFO
+                    while remaining > 0 and lots:
+                        lot_qty, lot_price = lots[0]
+                        take = min(lot_qty, remaining)
+                        lot_qty -= take
+                        remaining -= take
+                        if lot_qty <= 1e-12:
+                            lots.pop(0)
+                        else:
+                            lots[0][0] = lot_qty
+
+            remaining_qty = sum(q for q, _ in lots)
+            if remaining_qty <= 0:
+                return None
+
+            # Si la qty restante est très différente de la position ouverte,
+            # on calcule quand même un PRU sur le restant (c'est le meilleur signal disponible).
+            cost = sum(q * p for q, p in lots)
+            avg = cost / remaining_qty if remaining_qty else None
+            if avg is None:
+                return None
+            return float(avg)
+        except Exception:
+            return None
 class TradeSerializer(serializers.ModelSerializer):
     """
     Serializer pour Trade.
