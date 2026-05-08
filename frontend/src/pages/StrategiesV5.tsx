@@ -13,6 +13,7 @@ import {
   Layers,
   Maximize2,
   PieChart,
+  PlusCircle,
   RefreshCw,
   TrendingDown,
   TrendingUp,
@@ -319,6 +320,8 @@ export default function StrategiesV5() {
 
   const [loading, setLoading] = useState(true)
   const [syncingPortfolioHistory, setSyncingPortfolioHistory] = useState(false)
+  const [creatingStrategiesFromPortfolio, setCreatingStrategiesFromPortfolio] = useState(false)
+  const [portfolioStrategiesFeedback, setPortfolioStrategiesFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const chartCacheRef = useRef<Map<number, ChartTooltipPayload>>(new Map())
@@ -352,6 +355,30 @@ export default function StrategiesV5() {
       setError(e?.response?.data?.error || e?.message || 'Erreur de chargement')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const createStrategiesFromPortfolio = async () => {
+    setPortfolioStrategiesFeedback(null)
+    setError(null)
+    setCreatingStrategiesFromPortfolio(true)
+    try {
+      const res = await strategyService.createFromPortfolio()
+      const parts = [
+        `${res.created_count} stratégie(s) créée(s)`,
+        `${res.skipped_existing.length} déjà couverte(s)`,
+        `${res.skipped_no_broker_account.length} sans compte courtier actif`,
+      ]
+      if (res.errors.length) {
+        parts.push(`${res.errors.length} erreur(s)`)
+      }
+      setPortfolioStrategiesFeedback(parts.join(' · '))
+      await loadData()
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.response?.data?.error || e?.message || 'Échec de la création'
+      setError(msg)
+    } finally {
+      setCreatingStrategiesFromPortfolio(false)
     }
   }
 
@@ -759,8 +786,33 @@ export default function StrategiesV5() {
                 <RefreshCw size={14} className={syncingPortfolioHistory ? 'sv5-spin' : ''} aria-hidden />
                 <span>{syncingPortfolioHistory ? 'Sync…' : 'Sync historiques'}</span>
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={loading || creatingStrategiesFromPortfolio}
+                title="Crée une stratégie par actif (positions ouvertes + ordres d’achat actifs), sauf si une stratégie existe déjà pour cet actif"
+                onClick={() => void createStrategiesFromPortfolio()}
+              >
+                <PlusCircle size={14} className={creatingStrategiesFromPortfolio ? 'sv5-spin' : ''} aria-hidden />
+                <span>
+                  {creatingStrategiesFromPortfolio ? 'Création…' : 'Créer stratégies pour le portefeuille'}
+                </span>
+              </Button>
             </div>
           </div>
+
+          {portfolioStrategiesFeedback && (
+            <Card className="sv5-info-banner">
+              <div className="sv5-error-row">
+                <Badge variant="success">Portefeuille</Badge>
+                <span>{portfolioStrategiesFeedback}</span>
+                <Button size="sm" variant="outline" onClick={() => setPortfolioStrategiesFeedback(null)}>
+                  Fermer
+                </Button>
+              </div>
+            </Card>
+          )}
 
           {error && (
             <Card className="sv5-error">

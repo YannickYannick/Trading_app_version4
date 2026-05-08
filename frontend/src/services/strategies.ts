@@ -24,6 +24,15 @@ export interface StrategyCreateData {
   strategy_type?: string
 }
 
+/** Réponse POST /strategies/from_portfolio/ */
+export interface CreateStrategiesFromPortfolioResponse {
+  created: Strategy[]
+  created_count: number
+  skipped_existing: Array<{ all_asset_id: number; symbol: string }>
+  skipped_no_broker_account: Array<{ all_asset_id: number; symbol: string; broker_id: number }>
+  errors: Array<{ all_asset_id: number; symbol: string; error: string }>
+}
+
 export const strategyService = {
   /**
    * Récupérer toutes les stratégies
@@ -58,6 +67,16 @@ export const strategyService = {
    */
   async create(data: StrategyCreateData): Promise<Strategy> {
     const response = await apiClient.post<Strategy>('/strategies/', data)
+    return response.data
+  },
+
+  /**
+   * Créer en masse des stratégies pour les actifs du portefeuille (positions + ordres BUY).
+   */
+  async createFromPortfolio(): Promise<CreateStrategiesFromPortfolioResponse> {
+    const response = await apiClient.post<CreateStrategiesFromPortfolioResponse>(
+      '/strategies/from_portfolio/'
+    )
     return response.data
   },
 
