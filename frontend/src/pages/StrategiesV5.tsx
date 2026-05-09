@@ -2,31 +2,74 @@
  * StrategiesV5 - Dashboard moderne multi-broker (inspiré du mock fourni).
  * Pour l'instant : récap positions du portefeuille + ordres/stratégies en cours d'exécution.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
   BrainCircuit,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Layers,
   Maximize2,
   PieChart,
   PlusCircle,
   RefreshCw,
+  Settings,
   TrendingDown,
   TrendingUp,
   Wallet,
+  X,
 } from 'lucide-react'
 import { Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
+import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import { positionService, orderService, strategyService } from '@services'
 import strategyExecutionService, { type StrategyExecution } from '@services/strategyExecutionService'
 import { assetService } from '@services/assets'
 import type { Order, Position, Strategy } from '@types'
 import { formatCurrency } from '@utils/format'
 import './StrategiesV5.css'
+
+const ALGORITHM_LABELS: Record<string, string> = {
+  threshold: 'Threshold',
+  ma_crossover: 'MA Cross',
+  rsi: 'RSI',
+  bollinger: 'Bollinger',
+  macd: 'MACD',
+  grid: 'Grid',
+}
+
+const ALGORITHM_PARAMS: Record<string, { key: string; label: string; default: number }[]> = {
+  threshold: [
+    { key: 'threshold_low', label: 'Seuil bas', default: 60000 },
+    { key: 'threshold_high', label: 'Seuil haut', default: 68000 },
+  ],
+  ma_crossover: [
+    { key: 'ma1_period', label: 'MA courte', default: 20 },
+    { key: 'ma2_period', label: 'MA longue', default: 50 },
+  ],
+  rsi: [
+    { key: 'rsi_period', label: 'Période', default: 14 },
+    { key: 'rsi_low', label: 'Seuil bas', default: 30 },
+    { key: 'rsi_high', label: 'Seuil haut', default: 70 },
+  ],
+  bollinger: [
+    { key: 'bb_period', label: 'Période', default: 20 },
+    { key: 'bb_std', label: 'Écart-type', default: 2 },
+  ],
+  macd: [
+    { key: 'macd_fast', label: 'Rapide', default: 12 },
+    { key: 'macd_slow', label: 'Lent', default: 26 },
+    { key: 'macd_signal', label: 'Signal', default: 9 },
+  ],
+  grid: [
+    { key: 'grid_min', label: 'Prix min', default: 2800 },
+    { key: 'grid_max', label: 'Prix max', default: 3600 },
+    { key: 'grid_levels', label: 'Niveaux', default: 10 },
+  ],
+}
 
 type UiOrder = {
   id: number | string
@@ -324,6 +367,15 @@ export default function StrategiesV5() {
   const [portfolioStrategiesFeedback, setPortfolioStrategiesFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // --- Widget stratégie (inline expand) ---
+  const [expandedStrategyId, setExpandedStrategyId] = useState<number | null>(null)
+  const [inlineEdit, setInlineEdit] = useState<Record<number, Record<string, any>>>({})
+  const [savingId, setSavingId] = useState<number | null>(null)
+  const [chartPeriods, setChartPeriods] = useState<Record<number, number>>({})
+  const [chartKey, setChartKey] = useState(0)
+  const [syncingYahooId, setSyncingYahooId] = useState<number | null>(null)
+  const [yahooSyncResult, setYahooSyncResult] = useState<Record<number, { success: boolean; message: string }>>({})
+
   const chartCacheRef = useRef<Map<number, ChartTooltipPayload>>(new Map())
   const chartCacheTimeRef = useRef<Map<number, number>>(new Map())
   const hoverReqIdRef = useRef(0)
@@ -411,6 +463,148 @@ export default function StrategiesV5() {
   useEffect(() => {
     void loadData()
   }, [])
+
+  // Refresh silencieux — démarre 30s après le montage, toutes les 60s, sans toucher loading/error
+  useEffect(() => {
+    const silentRefresh = async () => {
+      try {
+        const [pos, orders, execs, strategiesRes] = await Promise.all([
+          positionService.getOpen(),
+          orderService.getActivePendingList(),
+          strategyExecutionService.getRecent(),
+          strategyService.getAll({ page_size: 500 }),
+        ])
+        setPositions(pos || [])
+        setActiveOrders(Array.isArray(orders) ? orders : [])
+        setExecutions(Array.isArray(execs) ? execs : [])
+        setStrategies((strategiesRes?.results || []) as Strategy[])
+      } catch {
+        /* erreurs réseau ignorées silencieusement */
+      }
+    }
+    const delay = setTimeout(() => {
+      const t = setInterval(() => void silentRefresh(), 60_000)
+      return () => clearInterval(t)
+    }, 30_000)
+    return () => clearTimeout(delay)
+  }, [])
+
+  // --- Helpers widget stratégie ---
+  const getAssetId = useCallback((s: Strategy): number | null => {
+    if (typeof s.all_asset === 'number') return s.all_asset
+    if (typeof s.all_asset === 'object' && (s.all_asset as any)?.id) return (s.all_asset as any).id
+    return null
+  }, [])
+
+  const getAssetSymbol = useCallback((s: Strategy): string => {
+    return (s.all_asset_symbol as string | undefined) ||
+      (typeof s.all_asset === 'object' ? (s.all_asset as any)?.symbol : null) ||
+      'N/A'
+  }, [])
+
+  const getAssetName = useCallback((s: Strategy): string => {
+    return (s.all_asset_name as string | undefined) ||
+      (typeof s.all_asset === 'object' ? (s.all_asset as any)?.name : null) ||
+      getAssetSymbol(s)
+  }, [getAssetSymbol])
+
+  const initInlineEdit = useCallback((s: Strategy) => {
+    setInlineEdit(prev => {
+      if (prev[s.id as number]) return prev
+      const params = (s.parameters as Record<string, any>) || {}
+      return {
+        ...prev,
+        [s.id as number]: {
+          algorithm_type: s.algorithm_type || 'threshold',
+          risk_level: s.risk_level || 'MEDIUM',
+          target_min_quantity: s.target_min_quantity ?? 1,
+          target_max_quantity: s.target_max_quantity ?? 10,
+          portfolio_min_quantity: s.portfolio_min_quantity ?? 0,
+          portfolio_max_quantity:
+            s.portfolio_max_quantity != null && s.portfolio_max_quantity !== ''
+              ? s.portfolio_max_quantity
+              : '',
+          check_frequency: s.check_frequency ?? 45,
+          is_automated: s.is_automated ?? false,
+          all_asset: getAssetId(s),
+          all_asset_name: getAssetName(s),
+          all_asset_symbol: getAssetSymbol(s),
+          ...params,
+        },
+      }
+    })
+  }, [getAssetId, getAssetName, getAssetSymbol])
+
+  const updateInlineEdit = useCallback((strategyId: number, key: string, value: any) => {
+    setInlineEdit(prev => ({
+      ...prev,
+      [strategyId]: { ...prev[strategyId], [key]: value },
+    }))
+  }, [])
+
+  const saveInlineEdit = useCallback(async (s: Strategy) => {
+    const edits = inlineEdit[s.id as number]
+    if (!edits) return
+    setSavingId(s.id as number)
+    try {
+      const algoParamKeys = ALGORITHM_PARAMS[edits.algorithm_type || s.algorithm_type || 'threshold']?.map(p => p.key) || []
+      const parameters: Record<string, number> = {}
+      algoParamKeys.forEach(key => {
+        if (edits[key] !== undefined) parameters[key] = parseFloat(edits[key]) || 0
+      })
+      const updateData: Record<string, any> = {
+        algorithm_type: edits.algorithm_type,
+        risk_level: edits.risk_level,
+        target_min_quantity: parseFloat(edits.target_min_quantity) || 0,
+        target_max_quantity: parseFloat(edits.target_max_quantity) || 0,
+        portfolio_min_quantity: parseFloat(String(edits.portfolio_min_quantity ?? 0)) || 0,
+        portfolio_max_quantity: (() => {
+          if (edits.portfolio_max_quantity === '' || edits.portfolio_max_quantity == null) return null
+          const v = parseFloat(String(edits.portfolio_max_quantity))
+          return Number.isFinite(v) ? v : null
+        })(),
+        check_frequency: parseInt(edits.check_frequency) || 45,
+        is_automated: edits.is_automated,
+        parameters,
+      }
+      if (edits.all_asset && edits.all_asset !== getAssetId(s)) {
+        updateData.all_asset = edits.all_asset
+      }
+      await strategyService.update(s.id as number, updateData)
+      void loadData()
+    } catch {
+      alert('Erreur lors de la sauvegarde')
+    } finally {
+      setSavingId(null)
+    }
+  }, [inlineEdit, getAssetId])
+
+  const handleSyncYahoo = useCallback(async (s: Strategy) => {
+    const assetId = getAssetId(s)
+    if (!assetId) return
+    setSyncingYahooId(s.id as number)
+    setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: false, message: 'Synchronisation...' } }))
+    try {
+      await assetService.validateYahoo(assetId)
+      const periodDays = chartPeriods[s.id as number] || 365
+      const result = await assetService.syncPriceHistory(assetId, periodDays, '1d')
+      if (result.success) {
+        setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: true, message: `${result.records || 0} points chargés` } }))
+        setChartKey(k => k + 1)
+      } else {
+        setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: false, message: result.error || 'Erreur inconnue' } }))
+      }
+    } catch {
+      setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: false, message: 'Erreur de synchronisation' } }))
+    } finally {
+      setSyncingYahooId(null)
+    }
+  }, [getAssetId, chartPeriods])
+
+  const openStrategyWidget = useCallback((s: Strategy) => {
+    initInlineEdit(s)
+    setExpandedStrategyId(s.id as number)
+  }, [initInlineEdit])
 
   const uiOrders: UiOrder[] = useMemo(() => {
     return activeOrders
@@ -949,17 +1143,29 @@ export default function StrategiesV5() {
                               const strat = strategyBySymbol.get(a.symbol)!
                               const active = isStratActive(strat)
                               return (
-                                <button
-                                  type="button"
-                                  className={`sv5-heat-strat-toggle ${active ? 'on' : 'off'}`}
-                                  title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
-                                  onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
-                                  onMouseEnter={(e) => e.stopPropagation()}
-                                  onMouseLeave={(e) => e.stopPropagation()}
-                                >
-                                  <BrainCircuit size={9} />
-                                  <span>{active ? 'ON' : 'OFF'}</span>
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    className={`sv5-heat-strat-toggle ${active ? 'on' : 'off'}`}
+                                    title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
+                                    onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
+                                    onMouseEnter={(e) => e.stopPropagation()}
+                                    onMouseLeave={(e) => e.stopPropagation()}
+                                  >
+                                    <BrainCircuit size={9} />
+                                    <span>{active ? 'ON' : 'OFF'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sv5-heat-strat-edit"
+                                    title="Configurer la stratégie"
+                                    onClick={(e) => { e.stopPropagation(); openStrategyWidget(strat) }}
+                                    onMouseEnter={(e) => e.stopPropagation()}
+                                    onMouseLeave={(e) => e.stopPropagation()}
+                                  >
+                                    <Settings size={9} />
+                                  </button>
+                                </>
                               )
                             })()}
                           </div>
@@ -1242,17 +1448,24 @@ export default function StrategiesV5() {
             {strategiesOffPortfolio.map((s) => {
               const active = isStratActive(s)
               return (
-                <Card key={s.id} className="sv5-auto-card">
+                <Card
+                  key={s.id}
+                  className="sv5-auto-card sv5-auto-card-clickable"
+                  onClick={() => openStrategyWidget(s)}
+                >
                   <div className="sv5-auto-top">
                     <span className="sv5-auto-name">{s.name}</span>
-                    <button
-                      type="button"
-                      className={`sv5-strat-toggle ${active ? 'on' : 'off'}`}
-                      title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
-                      onClick={() => void handleToggleStrategy(s)}
-                    >
-                      {active ? 'Actif' : 'Inactif'}
-                    </button>
+                    <div className="sv5-auto-actions">
+                      <button
+                        type="button"
+                        className={`sv5-strat-toggle ${active ? 'on' : 'off'}`}
+                        title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
+                        onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(s) }}
+                      >
+                        {active ? 'Actif' : 'Inactif'}
+                      </button>
+                      <ChevronDown size={14} className="sv5-auto-chevron" />
+                    </div>
                   </div>
                   <div className="sv5-auto-meta">
                     <span className="sv5-auto-algo">{(s.algorithm_type as string) || '—'}</span>
@@ -1269,6 +1482,161 @@ export default function StrategiesV5() {
           </div>
         </section>
       </main>
+
+      {/* Modal widget stratégie */}
+      {expandedStrategyId !== null && (() => {
+        const s = strategies.find(st => st.id === expandedStrategyId)
+        if (!s) return null
+        const edits = inlineEdit[expandedStrategyId] || {}
+        const currentAlgo = edits.algorithm_type || s.algorithm_type || 'threshold'
+        const algoParams = ALGORITHM_PARAMS[currentAlgo] || []
+        return (
+          <div className="sv5-modal-overlay" onClick={() => setExpandedStrategyId(null)}>
+            <div className="sv5-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="sv5-modal-header">
+                <div className="sv5-modal-title">
+                  <BrainCircuit size={16} />
+                  <span>{s.name}</span>
+                  <span className="sv5-modal-subtitle">{getAssetSymbol(s)} · ID-{s.id}</span>
+                </div>
+                <button className="sv5-modal-close" onClick={() => setExpandedStrategyId(null)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Chart */}
+              <div className="sv5-modal-chart-section">
+                <div className="sv5-modal-chart-header">
+                  <h4>Prix &amp; Signaux — {edits.all_asset_name || getAssetName(s)}</h4>
+                  <button
+                    className={`sv5-sync-btn ${syncingYahooId === s.id ? 'syncing' : ''} ${yahooSyncResult[s.id as number]?.success ? 'success' : ''}`}
+                    onClick={() => void handleSyncYahoo(s)}
+                    disabled={syncingYahooId === s.id}
+                  >
+                    {syncingYahooId === s.id ? '⏳ Chargement...' : '📊 Charger données Yahoo'}
+                  </button>
+                </div>
+                {yahooSyncResult[s.id as number] && (
+                  <div className={`sv5-sync-message ${yahooSyncResult[s.id as number].success ? 'success' : 'error'}`}>
+                    {yahooSyncResult[s.id as number].success ? '✓' : '✕'} {yahooSyncResult[s.id as number].message}
+                  </div>
+                )}
+                <StrategyVisualizationChart
+                  key={`sv5-chart-${s.id}-${chartKey}`}
+                  strategy={s}
+                  parameters={edits}
+                  initialPeriod={chartPeriods[s.id as number] || 365}
+                  onPeriodChange={(days) => {
+                    setChartPeriods(prev => ({ ...prev, [s.id as number]: days }))
+                    const assetId = getAssetId(s)
+                    if (assetId && !syncingYahooId) {
+                      setSyncingYahooId(s.id as number)
+                      assetService.syncPriceHistory(assetId, days, '1d')
+                        .then(result => {
+                          if (result.success) {
+                            setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: true, message: `${result.records || 0} points chargés` } }))
+                          }
+                        })
+                        .catch(() => {})
+                        .finally(() => setSyncingYahooId(null))
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Config */}
+              <div className="sv5-modal-config">
+                <div className="sv5-modal-config-header">
+                  <h4>Configuration</h4>
+                  <button
+                    className="sv5-modal-save-btn"
+                    onClick={() => void saveInlineEdit(s)}
+                    disabled={savingId === s.id}
+                  >
+                    {savingId === s.id ? 'Sauvegarde...' : '✓ Sauvegarder'}
+                  </button>
+                </div>
+                <div className="sv5-modal-config-list">
+                  {/* Algorithme */}
+                  <div className="sv5-cfg-row">
+                    <span className="sv5-cfg-key">Algorithme</span>
+                    <select
+                      className="sv5-cfg-select"
+                      value={currentAlgo}
+                      onChange={(e) => {
+                        updateInlineEdit(expandedStrategyId, 'algorithm_type', e.target.value)
+                        const newParams = ALGORITHM_PARAMS[e.target.value] || []
+                        newParams.forEach(p => updateInlineEdit(expandedStrategyId, p.key, p.default))
+                      }}
+                    >
+                      {Object.entries(ALGORITHM_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Params algo */}
+                  {algoParams.map(param => (
+                    <div key={param.key} className="sv5-cfg-row">
+                      <span className="sv5-cfg-key">{param.label}</span>
+                      <input
+                        type="number"
+                        className="sv5-cfg-input"
+                        value={edits[param.key] ?? param.default}
+                        onChange={(e) => updateInlineEdit(expandedStrategyId, param.key, e.target.value)}
+                        step="any"
+                      />
+                    </div>
+                  ))}
+                  <div className="sv5-cfg-separator" />
+                  {/* Qté par trade */}
+                  <div className="sv5-cfg-row">
+                    <span className="sv5-cfg-key">Qté par trade</span>
+                    <div className="sv5-cfg-range">
+                      <input
+                        type="number"
+                        className="sv5-cfg-input small"
+                        value={edits.target_min_quantity ?? s.target_min_quantity ?? 1}
+                        onChange={(e) => updateInlineEdit(expandedStrategyId, 'target_min_quantity', e.target.value)}
+                        step="any"
+                      />
+                      <span className="sv5-range-sep">–</span>
+                      <input
+                        type="number"
+                        className="sv5-cfg-input small"
+                        value={edits.target_max_quantity ?? s.target_max_quantity ?? 10}
+                        onChange={(e) => updateInlineEdit(expandedStrategyId, 'target_max_quantity', e.target.value)}
+                        step="any"
+                      />
+                    </div>
+                  </div>
+                  {/* Portefeuille */}
+                  <div className="sv5-cfg-row">
+                    <span className="sv5-cfg-key">Portefeuille (actions)</span>
+                    <div className="sv5-cfg-range">
+                      <input
+                        type="number"
+                        className="sv5-cfg-input small"
+                        value={edits.portfolio_min_quantity !== undefined ? edits.portfolio_min_quantity : (s.portfolio_min_quantity ?? 0)}
+                        onChange={(e) => updateInlineEdit(expandedStrategyId, 'portfolio_min_quantity', e.target.value)}
+                        step="any" min={0}
+                      />
+                      <span className="sv5-range-sep">–</span>
+                      <input
+                        type="number"
+                        className="sv5-cfg-input small"
+                        placeholder="∞"
+                        value={edits.portfolio_max_quantity !== undefined ? edits.portfolio_max_quantity : (s.portfolio_max_quantity ?? '')}
+                        onChange={(e) => updateInlineEdit(expandedStrategyId, 'portfolio_max_quantity', e.target.value)}
+                        step="any" min={0}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
