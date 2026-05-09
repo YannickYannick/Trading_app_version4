@@ -462,8 +462,10 @@
 .sv5-heat-strat-edit:hover { background: rgba(99, 102, 241, 0.55); }
 
 /* Carte clickable (colonne droite) */
-.sv5-auto-card-clickable { cursor: pointer; transition: border-color 120ms ease; }
-.sv5-auto-card-clickable:hover { border-color: rgba(168, 85, 247, 0.5); }
+.sv5-auto-card-clickable { cursor: pointer; display: block; }
+.sv5-auto-card-clickable:hover .sv5-auto-card { border-color: rgba(168, 85, 247, 0.5); }
+.sv5-auto-card-clickable:focus { outline: none; }
+.sv5-auto-card-clickable:focus-visible .sv5-auto-card { border-color: rgba(168, 85, 247, 0.7); }
 .sv5-auto-actions { display: flex; align-items: center; gap: 6px; }
 .sv5-auto-chevron { color: #64748b; flex-shrink: 0; }
 

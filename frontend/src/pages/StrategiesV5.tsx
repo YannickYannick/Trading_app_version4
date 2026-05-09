@@ -1425,8 +1425,7 @@ export default function StrategiesV5() {
               <CheckCircle2 size={16} /> Robot status
             </h3>
             <p className="sv5-status-text">
-              Rafraîchissement auto toutes les 12s. Dernier load :{' '}
-              {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.
+              Données chargées au démarrage. Rafraîchissement silencieux toutes les 60s.
             </p>
           </Card>
 
@@ -1448,30 +1447,35 @@ export default function StrategiesV5() {
             {strategiesOffPortfolio.map((s) => {
               const active = isStratActive(s)
               return (
-                <Card
+                <div
                   key={s.id}
-                  className="sv5-auto-card sv5-auto-card-clickable"
+                  className="sv5-auto-card-clickable"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => openStrategyWidget(s)}
+                  onKeyDown={(e) => e.key === 'Enter' && openStrategyWidget(s)}
                 >
-                  <div className="sv5-auto-top">
-                    <span className="sv5-auto-name">{s.name}</span>
-                    <div className="sv5-auto-actions">
-                      <button
-                        type="button"
-                        className={`sv5-strat-toggle ${active ? 'on' : 'off'}`}
-                        title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
-                        onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(s) }}
-                      >
-                        {active ? 'Actif' : 'Inactif'}
-                      </button>
-                      <ChevronDown size={14} className="sv5-auto-chevron" />
+                  <Card className="sv5-auto-card">
+                    <div className="sv5-auto-top">
+                      <span className="sv5-auto-name">{s.name}</span>
+                      <div className="sv5-auto-actions">
+                        <button
+                          type="button"
+                          className={`sv5-strat-toggle ${active ? 'on' : 'off'}`}
+                          title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
+                          onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(s) }}
+                        >
+                          {active ? 'Actif' : 'Inactif'}
+                        </button>
+                        <ChevronDown size={14} className="sv5-auto-chevron" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="sv5-auto-meta">
-                    <span className="sv5-auto-algo">{(s.algorithm_type as string) || '—'}</span>
-                    <span className="sv5-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
-                  </div>
-                </Card>
+                    <div className="sv5-auto-meta">
+                      <span className="sv5-auto-algo">{(s.algorithm_type as string) || '—'}</span>
+                      <span className="sv5-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
+                    </div>
+                  </Card>
+                </div>
               )
             })}
             {!loading && strategiesOffPortfolio.length === 0 && (
