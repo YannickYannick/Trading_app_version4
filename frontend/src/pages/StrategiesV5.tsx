@@ -1533,18 +1533,6 @@ export default function StrategiesV5() {
                   initialPeriod={chartPeriods[s.id as number] || 365}
                   onPeriodChange={(days) => {
                     setChartPeriods(prev => ({ ...prev, [s.id as number]: days }))
-                    const assetId = getAssetId(s)
-                    if (assetId && !syncingYahooId) {
-                      setSyncingYahooId(s.id as number)
-                      assetService.syncPriceHistory(assetId, days, '1d')
-                        .then(result => {
-                          if (result.success) {
-                            setYahooSyncResult(prev => ({ ...prev, [s.id as number]: { success: true, message: `${result.records || 0} points chargés` } }))
-                          }
-                        })
-                        .catch(() => {})
-                        .finally(() => setSyncingYahooId(null))
-                    }
                   }}
                 />
               </div>
