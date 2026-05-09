@@ -86,11 +86,22 @@ function formatUnixMsLabel(ms: number): string {
   return `${dd}/${mm}`
 }
 
-/** Extrait YYYY-MM-DD pour aligner historique + trades (Recharts 3 : axe catégoriel fiable). */
+/** Extrait YYYY-MM-DD ; snap trades sur dernier jour d'historique <= date. */
 function normalizeChartDate(raw: unknown): string | null {
   const s = String(raw ?? '').trim()
   const m = s.match(/\d{4}-\d{2}-\d{2}/)
   return m ? m[0] : null
+}
+
+function snapTradeDateToHistory(tradeDate: string, historyDatesAsc: string[]): string | null {
+  if (!tradeDate || historyDatesAsc.length === 0) return null
+  if (historyDatesAsc.includes(tradeDate)) return tradeDate
+  let best: string | null = null
+  for (const d of historyDatesAsc) {
+    if (d <= tradeDate) best = d
+    else break
+  }
+  return best ?? historyDatesAsc[0]
 }
 
 /** Logs console — filtre: `[StrategiesV4][chart]`. Désactiver: localStorage `sv4ChartDebug=0` */
@@ -407,6 +418,7 @@ export default function StrategiesV4() {
         const pnlPct = posPnlPercent(p)
         const value = posMarketValueEUR(p)
         return {
+          positionId: p.id,
           allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
@@ -424,6 +436,7 @@ export default function StrategiesV4() {
       .map((p) => {
         const size = posMarketValueEUR(p)
         return {
+          positionId: p.id,
           allAssetId: (p as any).all_asset_id ?? (p as any).all_asset?.id ?? null,
           symbol: posSymbol(p),
           name: posName(p),
@@ -460,10 +473,62 @@ export default function StrategiesV4() {
   const totalValue = useMemo(() => portfolioCards.reduce((s, p) => s + p.value, 0), [portfolioCards])
 
   const runningExecs = useMemo(() => executions.filter((e) => e.status === 'running'), [executions])
-  const automatedStrategies = useMemo(
-    () => strategies.filter((s) => Boolean(s.is_automated)).slice(0, 12),
+
+  // Ensemble des symboles en portefeuille (pour le filtrage des stratégies).
+  const portfolioSymbols = useMemo(
+    () => new Set(positions.map((p) => posSymbol(p)).filter(Boolean)),
+    [positions]
+  )
+
+  const allAutomated = useMemo(
+    () => strategies.filter((s) => Boolean(s.is_automated)).slice(0, 20),
     [strategies]
   )
+
+  // Stratégies liées à un actif EN portefeuille → badge sur la tuile heatmap.
+  const strategiesOnPortfolio = useMemo(
+    () => allAutomated.filter((s) => portfolioSymbols.has(String(s.all_asset_symbol || ''))),
+    [allAutomated, portfolioSymbols]
+  )
+
+  // Stratégies liées à un actif HORS portefeuille → colonne de droite.
+  const strategiesOffPortfolio = useMemo(
+    () => allAutomated.filter((s) => !portfolioSymbols.has(String(s.all_asset_symbol || ''))),
+    [allAutomated, portfolioSymbols]
+  )
+
+  // Map symbol → stratégie pour lookup rapide dans la heatmap.
+  const strategyBySymbol = useMemo(() => {
+    const m = new Map<string, Strategy>()
+    for (const s of strategiesOnPortfolio) {
+      const sym = String(s.all_asset_symbol || '')
+      if (sym) m.set(sym, s)
+    }
+    return m
+  }, [strategiesOnPortfolio])
+
+  // État optimiste du toggle (stratId → is_active), effacé après rechargement.
+  const [stratActiveOverride, setStratActiveOverride] = useState<Map<number, boolean>>(new Map())
+
+  const handleToggleStrategy = async (s: Strategy) => {
+    const current = stratActiveOverride.has(s.id as number)
+      ? (stratActiveOverride.get(s.id as number) as boolean)
+      : Boolean(s.is_active)
+    const next = !current
+    setStratActiveOverride((prev) => new Map(prev).set(s.id as number, next))
+    try {
+      await strategyService.toggleActive(s.id as number, next)
+      void loadData()
+    } catch {
+      // rollback
+      setStratActiveOverride((prev) => new Map(prev).set(s.id as number, current))
+    }
+  }
+
+  const isStratActive = (s: Strategy) =>
+    stratActiveOverride.has(s.id as number)
+      ? (stratActiveOverride.get(s.id as number) as boolean)
+      : Boolean(s.is_active)
 
   const ensureHoverPayload = async (
     allAssetId: number,
@@ -765,7 +830,7 @@ export default function StrategiesV4() {
             <div className="sv4-positions-grid">
               {portfolioCards.map((p) => (
                 <Card
-                  key={`${p.symbol}-${p.broker}`}
+                  key={`pos-${p.positionId}`}
                   className="sv4-pos-card"
                   onMouseEnter={(e) => handleAssetEnter(e, p.allAssetId, p.symbol, p.broker)}
                   onMouseMove={handleAssetMove}
@@ -824,13 +889,13 @@ export default function StrategiesV4() {
                         const w = (a.size / sec.total) * 100
                         return (
                           <div
-                            key={`${sec.name}-${a.symbol}-${a.broker}`}
+                            key={`${sec.name}-pos-${a.positionId}`}
                             className="sv4-heat-asset"
                             style={{
                               flex: `${Math.max(3, w)} 1 0%`,
                               backgroundColor: pnlBg(a.pnl),
                             }}
-                            title={`${a.symbol} (${a.broker}) • ${a.pnl > 0 ? '+' : ''}${a.pnl.toFixed(2)}% • ${formatCurrency(a.size)}`}
+                            title={`${a.symbol} (${a.broker}) · position #${a.positionId} · ${a.pnl > 0 ? '+' : ''}${a.pnl.toFixed(2)}% · ${formatCurrency(a.size)}`}
                             onMouseEnter={(e) => handleAssetEnter(e, a.allAssetId, a.symbol, a.broker)}
                             onMouseMove={handleAssetMove}
                             onMouseLeave={handleAssetLeave}
@@ -843,6 +908,23 @@ export default function StrategiesV4() {
                               </div>
                             </div>
                             <div className="sv4-heat-value">{formatCurrency(a.size)}</div>
+                            {strategyBySymbol.has(a.symbol) && (() => {
+                              const strat = strategyBySymbol.get(a.symbol)!
+                              const active = isStratActive(strat)
+                              return (
+                                <button
+                                  type="button"
+                                  className={`sv4-heat-strat-toggle ${active ? 'on' : 'off'}`}
+                                  title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
+                                  onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
+                                  onMouseEnter={(e) => e.stopPropagation()}
+                                  onMouseLeave={(e) => e.stopPropagation()}
+                                >
+                                  <BrainCircuit size={9} />
+                                  <span>{active ? 'ON' : 'OFF'}</span>
+                                </button>
+                              )
+                            })()}
                           </div>
                         )
                       })}
@@ -875,7 +957,6 @@ export default function StrategiesV4() {
               ) : (
                 <div className="sv4-hover-chart">
                   {(() => {
-                    // Deduplicate prices by day (last value wins), ISO sort.
                     const byDay = new Map<string, number>()
                     for (const p of hoverPayload.prices || []) {
                       const d = normalizeChartDate((p as any).date)
@@ -883,7 +964,10 @@ export default function StrategiesV4() {
                       if (!d || !Number.isFinite(close)) continue
                       byDay.set(d, close)
                     }
-                    const tradePoints = (hoverPayload.trades || [])
+
+                    const historyDates = [...byDay.keys()].sort((a, b) => a.localeCompare(b))
+
+                    const tradeRows = (hoverPayload.trades || [])
                       .map((t) => {
                         const d = normalizeChartDate(t.date)
                         return {
@@ -894,33 +978,32 @@ export default function StrategiesV4() {
                       })
                       .filter((t) => t.date && Number.isFinite(t.price))
 
-                    // Trade markers embedded in chartPrices rows.
-                    // Using only price-history dates avoids null-close rows and the
-                    // connectNulls straight-line artefacts they caused.
-                    const tradeByDate = new Map<string, { price: number; side: string }>()
-                    for (const t of tradePoints) {
-                      if (t.date) tradeByDate.set(t.date, { price: t.price, side: t.side })
+                    const tradeBySnappedDay = new Map<string, { price: number; side: string }>()
+                    for (const t of tradeRows) {
+                      const snap = snapTradeDateToHistory(t.date, historyDates)
+                      if (!snap) continue
+                      tradeBySnappedDay.set(snap, {
+                        price: t.price,
+                        side: String(t.side || 'BUY').toUpperCase(),
+                      })
                     }
 
-                    const allDates = [...byDay.keys()].sort((a, b) => a.localeCompare(b))
-
-                    const chartPrices = allDates.map((date) => {
-                      const td = tradeByDate.get(date)
+                    const chartPrices = historyDates.map((date) => {
+                      const tr = tradeBySnappedDay.get(date)
                       return {
                         date,
                         close: byDay.get(date) as number,
-                        tradePrice: td ? td.price : null,
-                        tradeSide: td ? td.side : null,
+                        tradePrice: tr?.price,
+                        tradeSide: tr?.side,
                       }
                     })
 
-                    const first = chartPrices[0] ?? null
-                    const last = chartPrices[chartPrices.length - 1] ?? null
+                    const first = chartPrices[0]
+                    const last = chartPrices[chartPrices.length - 1]
 
-                    const allY = [
-                      ...chartPrices.map((r) => r.close),
-                      ...tradePoints.map((t) => t.price).filter((p) => Number.isFinite(p)),
-                    ]
+                    const numericCloses = chartPrices.map((r) => r.close).filter((c) => Number.isFinite(c))
+                    const tradePx = [...tradeBySnappedDay.values()].map((x) => x.price).filter((p) => Number.isFinite(p))
+                    const allY = [...numericCloses, ...tradePx]
                     let yLo = allY.length ? Math.min(...allY) : 0
                     let yHi = allY.length ? Math.max(...allY) : 1
                     if (!Number.isFinite(yLo) || !Number.isFinite(yHi)) {
@@ -951,24 +1034,25 @@ export default function StrategiesV4() {
                           <div className="sv4-hover-meta-row">
                             <span className="sv4-hover-meta-k">Début</span>
                             <span className="sv4-hover-meta-v">
-                              {first ? `${formatDateLabel(first.date)} • ${Number(first.close).toFixed(2)}` : '—'}
+                              {first
+                                ? `${formatDateLabel(first.date)} • ${Number(first.close).toFixed(2)}`
+                                : '—'}
                             </span>
                           </div>
                           <div className="sv4-hover-meta-row">
                             <span className="sv4-hover-meta-k">Fin</span>
                             <span className="sv4-hover-meta-v">
-                              {last ? `${formatDateLabel(last.date)} • ${Number(last.close).toFixed(2)}` : '—'}
+                              {last
+                                ? `${formatDateLabel(last.date)} • ${Number(last.close).toFixed(2)}`
+                                : '—'}
                             </span>
                           </div>
                         </div>
 
                         <ResponsiveContainer width="100%" height={220}>
                           {/*
-                            Fix: <Scatter> inside <LineChart> corrupts the categorical band-scale,
-                            producing crossed lines and wrong Y-domain. Trade markers are now a
-                            second <Line> sharing the same data array — same coordinate system,
-                            no layout corruption. tradePrice/tradeSide are embedded per row so
-                            there are no null-close rows and connectNulls is not needed.
+                            Recharts 3 : ne pas mettre <Scatter> dans <LineChart> (band-scale catégorielle → NaN).
+                            Trades : 2e Line stroke transparent + dots. Jours trades hors historique → snap au dernier jour ≤ date.
                           */}
                           <LineChart data={chartPrices} margin={{ top: 10, right: 10, bottom: 8, left: 0 }}>
                             <XAxis
@@ -998,8 +1082,8 @@ export default function StrategiesV4() {
                               labelFormatter={(l: any) => `Date: ${formatDateLabel(String(l))}`}
                               formatter={(v: any, name: any) => {
                                 if (name === 'close') return [Number(v).toFixed(2), 'Close']
-                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Trade']
-                                return [null, '']
+                                if (name === 'tradePrice') return [Number(v).toFixed(2), 'Exécution']
+                                return [String(v), String(name)]
                               }}
                             />
 
@@ -1010,6 +1094,7 @@ export default function StrategiesV4() {
                               strokeWidth={2}
                               dot={false}
                               isAnimationActive={false}
+                              connectNulls={false}
                             />
 
                             <Line
@@ -1017,25 +1102,49 @@ export default function StrategiesV4() {
                               dataKey="tradePrice"
                               stroke="transparent"
                               strokeWidth={0}
-                              dot={(props: any) => {
-                                const { cx, cy, payload, key } = props || {}
-                                if (payload?.tradePrice == null || !Number.isFinite(cx) || !Number.isFinite(cy))
-                                  return <g key={key} />
-                                const color = payload.tradeSide === 'BUY' ? '#60a5fa' : '#f87171'
+                              dot={(dotProps: any) => {
+                                const { cx, cy, payload } = dotProps
+                                if (
+                                  payload?.tradePrice == null ||
+                                  !Number.isFinite(Number(payload.tradePrice)) ||
+                                  !Number.isFinite(cx) ||
+                                  !Number.isFinite(cy)
+                                ) {
+                                  return null
+                                }
+                                const isSell = String(payload?.tradeSide).toUpperCase() === 'SELL'
+                                const fill = isSell ? '#fb7185' : '#22c55e'
+                                const halo = isSell ? 'rgba(251, 113, 133, 0.35)' : 'rgba(34, 197, 94, 0.4)'
+                                const r = 6
                                 return (
-                                  <circle key={key} cx={cx} cy={cy} r={4} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
+                                  <g aria-hidden>
+                                    <circle cx={cx} cy={cy} r={r + 5} fill={halo} />
+                                    <circle
+                                      cx={cx}
+                                      cy={cy}
+                                      r={r + 2.5}
+                                      fill="none"
+                                      stroke="#ffffff"
+                                      strokeWidth={2.5}
+                                      opacity={0.95}
+                                    />
+                                    <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#0f172a" strokeWidth={1.5} />
+                                  </g>
                                 )
                               }}
                               activeDot={false}
-                              connectNulls={false}
                               isAnimationActive={false}
+                              legendType="none"
                             />
                           </LineChart>
                         </ResponsiveContainer>
 
                         <div className="sv4-hover-trades">
                           {(hoverPayload.trades || []).slice(-3).map((t) => (
-                            <div key={t.id} className="sv4-hover-trade">
+                            <div
+                              key={t.id}
+                              className={`sv4-hover-trade ${t.side === 'BUY' ? 'sv4-hover-trade--buy' : 'sv4-hover-trade--sell'}`}
+                            >
                               <span className={`sv4-hover-trade-side ${t.side === 'BUY' ? 'buy' : 'sell'}`}>{t.side}</span>
                               <span className="sv4-hover-trade-mid">
                                 {t.quantity.toFixed(4)} @ {t.price.toFixed(2)}
@@ -1093,21 +1202,31 @@ export default function StrategiesV4() {
           </div>
 
           <div className="sv4-stack">
-            {automatedStrategies.map((s) => (
-              <Card key={s.id} className="sv4-auto-card">
-                <div className="sv4-auto-top">
-                  <span className="sv4-auto-name">{s.name}</span>
-                  <Badge variant={s.is_active ? 'success' : 'warning'}>{s.is_active ? 'Actif' : 'Inactif'}</Badge>
-                </div>
-                <div className="sv4-auto-meta">
-                  <span className="sv4-auto-algo">{(s.algorithm_type as string) || '—'}</span>
-                  <span className="sv4-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
-                </div>
-              </Card>
-            ))}
-            {!loading && automatedStrategies.length === 0 && (
+            {strategiesOffPortfolio.map((s) => {
+              const active = isStratActive(s)
+              return (
+                <Card key={s.id} className="sv4-auto-card">
+                  <div className="sv4-auto-top">
+                    <span className="sv4-auto-name">{s.name}</span>
+                    <button
+                      type="button"
+                      className={`sv4-strat-toggle ${active ? 'on' : 'off'}`}
+                      title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
+                      onClick={() => void handleToggleStrategy(s)}
+                    >
+                      {active ? 'Actif' : 'Inactif'}
+                    </button>
+                  </div>
+                  <div className="sv4-auto-meta">
+                    <span className="sv4-auto-algo">{(s.algorithm_type as string) || '—'}</span>
+                    <span className="sv4-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
+                  </div>
+                </Card>
+              )
+            })}
+            {!loading && strategiesOffPortfolio.length === 0 && (
               <Card className="sv4-empty">
-                <p>Aucune stratégie automatisée.</p>
+                <p>Toutes les stratégies actives sont liées à des actifs en portefeuille.</p>
               </Card>
             )}
           </div>
