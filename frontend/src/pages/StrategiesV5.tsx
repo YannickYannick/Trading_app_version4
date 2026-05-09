@@ -369,6 +369,7 @@ export default function StrategiesV5() {
 
   // --- Widget stratégie (inline expand) ---
   const [expandedStrategyId, setExpandedStrategyId] = useState<number | null>(null)
+  const [expandedStrategy, setExpandedStrategy] = useState<Strategy | null>(null)
   const [inlineEdit, setInlineEdit] = useState<Record<number, Record<string, any>>>({})
   const [savingId, setSavingId] = useState<number | null>(null)
   const [chartPeriods, setChartPeriods] = useState<Record<number, number>>({})
@@ -603,6 +604,7 @@ export default function StrategiesV5() {
 
   const openStrategyWidget = useCallback((s: Strategy) => {
     initInlineEdit(s)
+    setExpandedStrategy(s)
     setExpandedStrategyId(s.id as number)
   }, [initInlineEdit])
 
@@ -1488,14 +1490,13 @@ export default function StrategiesV5() {
       </main>
 
       {/* Modal widget stratégie */}
-      {expandedStrategyId !== null && (() => {
-        const s = strategies.find(st => st.id === expandedStrategyId)
-        if (!s) return null
+      {expandedStrategyId !== null && expandedStrategy !== null && (() => {
+        const s = expandedStrategy
         const edits = inlineEdit[expandedStrategyId] || {}
         const currentAlgo = edits.algorithm_type || s.algorithm_type || 'threshold'
         const algoParams = ALGORITHM_PARAMS[currentAlgo] || []
         return (
-          <div className="sv5-modal-overlay" onClick={() => setExpandedStrategyId(null)}>
+          <div className="sv5-modal-overlay" onClick={() => { setExpandedStrategyId(null); setExpandedStrategy(null) }}>
             <div className="sv5-modal" onClick={(e) => e.stopPropagation()}>
               <div className="sv5-modal-header">
                 <div className="sv5-modal-title">
@@ -1503,7 +1504,7 @@ export default function StrategiesV5() {
                   <span>{s.name}</span>
                   <span className="sv5-modal-subtitle">{getAssetSymbol(s)} · ID-{s.id}</span>
                 </div>
-                <button className="sv5-modal-close" onClick={() => setExpandedStrategyId(null)}>
+                <button className="sv5-modal-close" onClick={() => { setExpandedStrategyId(null); setExpandedStrategy(null) }}>
                   <X size={18} />
                 </button>
               </div>
