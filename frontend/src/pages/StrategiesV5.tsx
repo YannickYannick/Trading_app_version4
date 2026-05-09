@@ -412,14 +412,6 @@ export default function StrategiesV5() {
     void loadData()
   }, [])
 
-  // Rafraîchissement léger pour donner une sensation “live”
-  useEffect(() => {
-    const t = setInterval(() => {
-      void loadData()
-    }, 12000)
-    return () => clearInterval(t)
-  }, [])
-
   const uiOrders: UiOrder[] = useMemo(() => {
     return activeOrders
       .filter(hasAllAssetLink)

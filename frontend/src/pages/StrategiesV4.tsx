@@ -385,14 +385,6 @@ export default function StrategiesV4() {
     void loadData()
   }, [])
 
-  // Rafraîchissement léger pour donner une sensation “live”
-  useEffect(() => {
-    const t = setInterval(() => {
-      void loadData()
-    }, 12000)
-    return () => clearInterval(t)
-  }, [])
-
   const uiOrders: UiOrder[] = useMemo(() => {
     return activeOrders
       .filter(hasAllAssetLink)
@@ -1182,8 +1174,7 @@ export default function StrategiesV4() {
               <CheckCircle2 size={16} /> Robot status
             </h3>
             <p className="sv4-status-text">
-              Rafraîchissement auto toutes les 12s. Dernier load :{' '}
-              {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.
+              Données chargées au démarrage. Cliquez sur Rafraîchir pour mettre à jour.
             </p>
           </Card>
 
