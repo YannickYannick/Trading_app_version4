@@ -473,10 +473,62 @@ export default function StrategiesV4() {
   const totalValue = useMemo(() => portfolioCards.reduce((s, p) => s + p.value, 0), [portfolioCards])
 
   const runningExecs = useMemo(() => executions.filter((e) => e.status === 'running'), [executions])
-  const automatedStrategies = useMemo(
-    () => strategies.filter((s) => Boolean(s.is_automated)).slice(0, 12),
+
+  // Ensemble des symboles en portefeuille (pour le filtrage des stratégies).
+  const portfolioSymbols = useMemo(
+    () => new Set(positions.map((p) => posSymbol(p)).filter(Boolean)),
+    [positions]
+  )
+
+  const allAutomated = useMemo(
+    () => strategies.filter((s) => Boolean(s.is_automated)).slice(0, 20),
     [strategies]
   )
+
+  // Stratégies liées à un actif EN portefeuille → badge sur la tuile heatmap.
+  const strategiesOnPortfolio = useMemo(
+    () => allAutomated.filter((s) => portfolioSymbols.has(String(s.all_asset_symbol || ''))),
+    [allAutomated, portfolioSymbols]
+  )
+
+  // Stratégies liées à un actif HORS portefeuille → colonne de droite.
+  const strategiesOffPortfolio = useMemo(
+    () => allAutomated.filter((s) => !portfolioSymbols.has(String(s.all_asset_symbol || ''))),
+    [allAutomated, portfolioSymbols]
+  )
+
+  // Map symbol → stratégie pour lookup rapide dans la heatmap.
+  const strategyBySymbol = useMemo(() => {
+    const m = new Map<string, Strategy>()
+    for (const s of strategiesOnPortfolio) {
+      const sym = String(s.all_asset_symbol || '')
+      if (sym) m.set(sym, s)
+    }
+    return m
+  }, [strategiesOnPortfolio])
+
+  // État optimiste du toggle (stratId → is_active), effacé après rechargement.
+  const [stratActiveOverride, setStratActiveOverride] = useState<Map<number, boolean>>(new Map())
+
+  const handleToggleStrategy = async (s: Strategy) => {
+    const current = stratActiveOverride.has(s.id as number)
+      ? (stratActiveOverride.get(s.id as number) as boolean)
+      : Boolean(s.is_active)
+    const next = !current
+    setStratActiveOverride((prev) => new Map(prev).set(s.id as number, next))
+    try {
+      await strategyService.toggleActive(s.id as number, next)
+      void loadData()
+    } catch {
+      // rollback
+      setStratActiveOverride((prev) => new Map(prev).set(s.id as number, current))
+    }
+  }
+
+  const isStratActive = (s: Strategy) =>
+    stratActiveOverride.has(s.id as number)
+      ? (stratActiveOverride.get(s.id as number) as boolean)
+      : Boolean(s.is_active)
 
   const ensureHoverPayload = async (
     allAssetId: number,
@@ -856,6 +908,23 @@ export default function StrategiesV4() {
                               </div>
                             </div>
                             <div className="sv4-heat-value">{formatCurrency(a.size)}</div>
+                            {strategyBySymbol.has(a.symbol) && (() => {
+                              const strat = strategyBySymbol.get(a.symbol)!
+                              const active = isStratActive(strat)
+                              return (
+                                <button
+                                  type="button"
+                                  className={`sv4-heat-strat-toggle ${active ? 'on' : 'off'}`}
+                                  title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
+                                  onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
+                                  onMouseEnter={(e) => e.stopPropagation()}
+                                  onMouseLeave={(e) => e.stopPropagation()}
+                                >
+                                  <BrainCircuit size={9} />
+                                  <span>{active ? 'ON' : 'OFF'}</span>
+                                </button>
+                              )
+                            })()}
                           </div>
                         )
                       })}
@@ -1133,21 +1202,31 @@ export default function StrategiesV4() {
           </div>
 
           <div className="sv4-stack">
-            {automatedStrategies.map((s) => (
-              <Card key={s.id} className="sv4-auto-card">
-                <div className="sv4-auto-top">
-                  <span className="sv4-auto-name">{s.name}</span>
-                  <Badge variant={s.is_active ? 'success' : 'warning'}>{s.is_active ? 'Actif' : 'Inactif'}</Badge>
-                </div>
-                <div className="sv4-auto-meta">
-                  <span className="sv4-auto-algo">{(s.algorithm_type as string) || '—'}</span>
-                  <span className="sv4-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
-                </div>
-              </Card>
-            ))}
-            {!loading && automatedStrategies.length === 0 && (
+            {strategiesOffPortfolio.map((s) => {
+              const active = isStratActive(s)
+              return (
+                <Card key={s.id} className="sv4-auto-card">
+                  <div className="sv4-auto-top">
+                    <span className="sv4-auto-name">{s.name}</span>
+                    <button
+                      type="button"
+                      className={`sv4-strat-toggle ${active ? 'on' : 'off'}`}
+                      title={active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}
+                      onClick={() => void handleToggleStrategy(s)}
+                    >
+                      {active ? 'Actif' : 'Inactif'}
+                    </button>
+                  </div>
+                  <div className="sv4-auto-meta">
+                    <span className="sv4-auto-algo">{(s.algorithm_type as string) || '—'}</span>
+                    <span className="sv4-auto-asset">{(s.all_asset_symbol as string) || '—'}</span>
+                  </div>
+                </Card>
+              )
+            })}
+            {!loading && strategiesOffPortfolio.length === 0 && (
               <Card className="sv4-empty">
-                <p>Aucune stratégie automatisée.</p>
+                <p>Toutes les stratégies actives sont liées à des actifs en portefeuille.</p>
               </Card>
             )}
           </div>
