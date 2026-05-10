@@ -50,9 +50,6 @@ export function simulateTradesFromSignals(
 ): TradeSimulation[] {
   const trades: TradeSimulation[] = []
   let currentPosition: TradeSimulation | null = null
-  // Track if we've ever had a position - used to determine if short selling is allowed
-  // Short selling (starting with SELL) is only allowed if minQuantity < 0
-  let hasHadPosition = false
   const allowShortSelling = minQuantityPerTrade < 0
 
   // Créer un map pour accéder rapidement aux prix par date
@@ -130,7 +127,7 @@ export function simulateTradesFromSignals(
         const newQ = oldQ + addQ
         currentPosition.quantity = newQ
         currentPosition.entryPrice = (oldP * oldQ + price * addQ) / newQ
-        hasHadPosition = true
+
       } else {
         currentPosition = {
           entryTime: signal.time,
@@ -143,12 +140,11 @@ export function simulateTradesFromSignals(
           pnlPercent: null,
           status: 'OPEN',
         }
-        hasHadPosition = true
+
       }
     } else if (signal.signal === 'SELL' && (!currentPosition || currentPosition.side === 'BUY')) {
-      // Check if we're allowed to open a SELL position
-      // If no position ever existed, SELL is only allowed if short selling is enabled (minQuantity < 0)
-      const canOpenShort = hasHadPosition || allowShortSelling
+      // Ouvrir un short seulement si explicitement autorisé (minQuantityPerTrade < 0)
+      const canOpenShort = allowShortSelling
 
       // Fermer la position BUY (totalement ou partiellement) si elle existe
       if (currentPosition && currentPosition.status === 'OPEN' && currentPosition.side === 'BUY') {
@@ -186,7 +182,7 @@ export function simulateTradesFromSignals(
           trades.push(closed)
           currentPosition.quantity = Q - sellQty
         }
-        hasHadPosition = true
+
       }
 
       // Ouvrir une position SELL (short) seulement si autorisé et à plat (pas de long ouvert)
