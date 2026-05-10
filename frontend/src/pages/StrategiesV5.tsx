@@ -16,7 +16,6 @@ import {
   PieChart,
   PlusCircle,
   RefreshCw,
-  Settings,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -1120,10 +1119,11 @@ export default function StrategiesV5() {
                     <div className="sv5-sector-assets">
                       {sec.assets.map((a) => {
                         const w = (a.size / sec.total) * 100
+                        const strat = strategyBySymbol.get(a.symbol)
                         return (
                           <div
                             key={`${sec.name}-pos-${a.positionId}`}
-                            className="sv5-heat-asset"
+                            className={`sv5-heat-asset${strat ? ' sv5-heat-asset-clickable' : ''}`}
                             style={{
                               flex: `${Math.max(3, w)} 1 0%`,
                               backgroundColor: pnlBg(a.pnl),
@@ -1132,6 +1132,7 @@ export default function StrategiesV5() {
                             onMouseEnter={(e) => handleAssetEnter(e, a.allAssetId, a.symbol, a.broker)}
                             onMouseMove={handleAssetMove}
                             onMouseLeave={handleAssetLeave}
+                            onClick={() => strat && openStrategyWidget(strat)}
                           >
                             <div className="sv5-heat-overlay" />
                             <div className="sv5-heat-center">
@@ -1141,33 +1142,20 @@ export default function StrategiesV5() {
                               </div>
                             </div>
                             <div className="sv5-heat-value">{formatCurrency(a.size)}</div>
-                            {strategyBySymbol.has(a.symbol) && (() => {
-                              const strat = strategyBySymbol.get(a.symbol)!
+                            {strat && (() => {
                               const active = isStratActive(strat)
                               return (
-                                <>
-                                  <button
-                                    type="button"
-                                    className={`sv5-heat-strat-toggle ${active ? 'on' : 'off'}`}
-                                    title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
-                                    onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
-                                    onMouseEnter={(e) => e.stopPropagation()}
-                                    onMouseLeave={(e) => e.stopPropagation()}
-                                  >
-                                    <BrainCircuit size={9} />
-                                    <span>{active ? 'ON' : 'OFF'}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="sv5-heat-strat-edit"
-                                    title="Configurer la stratégie"
-                                    onClick={(e) => { e.stopPropagation(); openStrategyWidget(strat) }}
-                                    onMouseEnter={(e) => e.stopPropagation()}
-                                    onMouseLeave={(e) => e.stopPropagation()}
-                                  >
-                                    <Settings size={9} />
-                                  </button>
-                                </>
+                                <button
+                                  type="button"
+                                  className={`sv5-heat-strat-toggle ${active ? 'on' : 'off'}`}
+                                  title={`${strat.name} — ${active ? 'Actif · cliquer pour désactiver' : 'Inactif · cliquer pour activer'}`}
+                                  onClick={(e) => { e.stopPropagation(); void handleToggleStrategy(strat) }}
+                                  onMouseEnter={(e) => e.stopPropagation()}
+                                  onMouseLeave={(e) => e.stopPropagation()}
+                                >
+                                  <BrainCircuit size={9} />
+                                  <span>{active ? 'ON' : 'OFF'}</span>
+                                </button>
                               )
                             })()}
                           </div>
