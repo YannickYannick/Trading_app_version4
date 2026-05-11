@@ -21,7 +21,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts'
 import { Card, Badge, Button, Loading } from '@components/common'
 import StrategyVisualizationChart from '@components/strategies/StrategyVisualizationChart'
 import { positionService, orderService, strategyService } from '@services'
