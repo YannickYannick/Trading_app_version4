@@ -63,6 +63,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
   // Handler pour changer la période
   const handlePeriodChange = useCallback((days: number) => {
+    const label = periodOptions.find(o => o.value === days)?.label ?? `${days}j`
+    console.log(`[SVC] 1. Utilisateur a cliqué — période: ${label} (${days}j)`)
     setPeriodDays(days)
     onPeriodChange?.(days)
   }, [onPeriodChange])
@@ -163,6 +165,9 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     const loadData = async () => {
       if (!strategy || !strategy.all_asset) return
 
+      const t0 = performance.now()
+      console.log(`[SVC] 2. Chargement des données démarré (stratégie: ${strategy.id}, asset: ${strategy.all_asset_name || strategy.all_asset}, période: ${periodDays}j)`)
+
       setLoading(true)
       setError(null)
 
@@ -181,7 +186,10 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
         }
 
         // Charger l'historique des prix selon la période sélectionnée
+        console.log(`[SVC] 3a. Fetch prix démarré`)
+        const tPrix0 = performance.now()
         const historyResponse = await assetService.getPriceHistory(assetId, periodDays, 'list')
+        console.log(`[SVC] 3a. Fetch prix terminé — ${(performance.now() - tPrix0).toFixed(0)}ms`)
 
         const priceData: PriceHistoryPoint[] = (historyResponse.results || [])
           .map((point: any) => ({
@@ -200,7 +208,10 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
         // Charger les trades filtrés par asset
         try {
+          console.log(`[SVC] 3b. Fetch trades démarré`)
+          const tTrades0 = performance.now()
           const tradesResponse = await tradeService.getAll({} as any)
+          console.log(`[SVC] 3b. Fetch trades terminé — ${(performance.now() - tTrades0).toFixed(0)}ms`)
           const allTrades = tradesResponse.results || tradesResponse || []
           // Filtrer les trades par asset (all_asset_id ou asset.id)
           const assetTrades = allTrades.filter((t: any) => {
@@ -218,7 +229,10 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
         // Charger les positions pour calculer la quantité en portefeuille
         try {
+          console.log(`[SVC] 3c. Fetch positions démarré`)
+          const tPos0 = performance.now()
           const openPositions = await positionService.getOpen()
+          console.log(`[SVC] 3c. Fetch positions terminé — ${(performance.now() - tPos0).toFixed(0)}ms`)
           const assetPositions = openPositions.filter((p: any) => {
             const posAssetId = p.all_asset_id 
               || (typeof p.all_asset === 'object' ? p.all_asset?.id : null)
@@ -231,6 +245,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           console.warn('[StrategyVisualizationChart] Could not load positions:', err)
           setPortfolioQuantity(0)
         }
+        console.log(`[SVC] 4. Données chargées — total: ${(performance.now() - t0).toFixed(0)}ms`)
       } catch (err: any) {
         setError(err.response?.data?.error || err.message || 'Erreur lors du chargement des données')
         console.error('[StrategyVisualizationChart] Error loading data:', err)
@@ -465,6 +480,8 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     }
 
     // Calculer les signaux
+    console.log(`[SVC] 3d. Calcul signaux + simulation démarré (${prices.length} points)`)
+    const tSig0 = performance.now()
     const signals = calculateStrategySignals(algorithmType, prices, dates, strategyParams)
 
     // Simuler les trades basés sur les signaux
@@ -501,6 +518,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
     // Calculer les métriques de performance
     const metrics = calculatePerformanceMetrics(simulated)
     setPerformanceMetrics(metrics)
+    console.log(`[SVC] 3d. Calcul signaux + simulation terminé — ${(performance.now() - tSig0).toFixed(0)}ms (${signals.filter(s => s.signal !== 'HOLD').length} signaux, ${simulated.length} trades simulés)`)
 
     // Afficher les signaux qui ont déclenché un trade (entry points) + tous les signaux BUY/SELL importants
     // Pour éviter trop de marqueurs, on montre:
@@ -594,6 +612,7 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           }
           chartRef.current.timeScale().fitContent()
         }
+        console.log(`[SVC] 5. Graphique prêt (rendu canvas terminé)`)
       })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
