@@ -808,3 +808,58 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 }
 
+
+/* Allocation Snapshot */
+.sv5-alloc-card { padding: 16px 18px; }
+
+.sv5-alloc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sv5-alloc-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sv5-alloc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sv5-alloc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.sv5-alloc-legend-item i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sv5-alloc-empty {
+  color: #475569;
+  font-size: 12px;
+  text-align: center;
+  padding: 24px 0;
+  margin: 0;
+}
+
+.recharts-bar-rectangle { transition: opacity 80ms ease; }
+.recharts-bar-rectangle:hover { opacity: 0.85; }

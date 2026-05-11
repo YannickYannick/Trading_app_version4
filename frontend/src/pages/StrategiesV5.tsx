@@ -358,7 +358,7 @@ export default function StrategiesV5() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([])
   const [executions, setExecutions] = useState<StrategyExecution[]>([])
   const [strategies, setStrategies] = useState<Strategy[]>([])
-  const [centerMode, setCenterMode] = useState<'heatmap' | 'cards'>('heatmap')
+  const [centerMode, setCenterMode] = useState<'heatmap' | 'cards' | 'allocation'>('heatmap')
 
   const [loading, setLoading] = useState(true)
   const [syncingPortfolioHistory, setSyncingPortfolioHistory] = useState(false)
@@ -697,6 +697,54 @@ export default function StrategiesV5() {
     [strategies]
   )
 
+  // --- Allocation Snapshot ---
+  const ALLOC_COLORS = [
+    '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+    '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#14b8a6',
+  ]
+
+  const allocationSnapshot = useMemo(() => {
+    // Build position value map: symbol → value (€)
+    const posValueBySymbol = new Map<string, number>()
+    for (const p of positions) {
+      const sym = posSymbol(p)
+      if (!sym) continue
+      const val = posMarketValueEUR(p)
+      posValueBySymbol.set(sym, (posValueBySymbol.get(sym) ?? 0) + val)
+    }
+    const posQtyBySymbol = new Map<string, number>()
+    for (const p of positions) {
+      const sym = posSymbol(p)
+      if (!sym) continue
+      posQtyBySymbol.set(sym, (posQtyBySymbol.get(sym) ?? 0) + posQuantity(p))
+    }
+
+    // Collect all unique asset symbols across active strategies
+    const allSymbols = [...new Set(
+      allAutomated.map(s => String(s.all_asset_symbol || '')).filter(Boolean)
+    )]
+
+    // Build one row per strategy
+    const rows = allAutomated.map(s => {
+      const stratSymbol = String(s.all_asset_symbol || '')
+      const row: Record<string, any> = {
+        name: s.name.length > 22 ? s.name.slice(0, 20) + '…' : s.name,
+        algo: (s.algorithm_type as string) || '?',
+        active: Boolean(s.is_active),
+        _symbol: stratSymbol,
+      }
+      // Fill all asset slots to 0 first
+      allSymbols.forEach(sym => { row[sym] = 0 })
+      // Fill actual position value for this strategy's asset
+      if (stratSymbol && posValueBySymbol.has(stratSymbol)) {
+        row[stratSymbol] = posValueBySymbol.get(stratSymbol) ?? 0
+      }
+      return row
+    })
+
+    return { rows, symbols: allSymbols }
+  }, [allAutomated, positions])
+
   const strategiesOnPortfolio = useMemo(
     () => allAutomated.filter((s) => portfolioSymbols.has(String(s.all_asset_symbol || ''))),
     [allAutomated, portfolioSymbols]
@@ -1005,6 +1053,14 @@ export default function StrategiesV5() {
                 >
                   Cartes
                 </button>
+                <button
+                  type="button"
+                  className={centerMode === 'allocation' ? 'active' : ''}
+                  onClick={() => setCenterMode('allocation')}
+                  title="Allocation par stratégie"
+                >
+                  Allocation
+                </button>
               </div>
               <Button
                 type="button"
@@ -1058,7 +1114,72 @@ export default function StrategiesV5() {
             </Card>
           )}
 
-          {centerMode === 'cards' ? (
+          {centerMode === 'allocation' ? (
+            <Card className="sv5-alloc-card">
+              <div className="sv5-alloc-header">
+                <h3 className="sv5-alloc-title">Allocation par stratégie — snapshot actuel</h3>
+                <div className="sv5-alloc-legend">
+                  {allocationSnapshot.symbols.map((sym, i) => (
+                    <span key={sym} className="sv5-alloc-legend-item">
+                      <i style={{ background: ALLOC_COLORS[i % ALLOC_COLORS.length] }} />
+                      {sym}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {allocationSnapshot.rows.length === 0 ? (
+                <p className="sv5-alloc-empty">Aucune stratégie automatisée active.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(200, allocationSnapshot.rows.length * 52 + 40)}>
+                  <BarChart
+                    data={allocationSnapshot.rows}
+                    layout="vertical"
+                    margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
+                    barCategoryGap="28%"
+                  >
+                    <XAxis
+                      type="number"
+                      tickFormatter={(v: number) => `${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)}€`}
+                      tick={{ fill: '#64748b', fontSize: 10 }}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={160}
+                      tick={({ x, y, payload }: any) => {
+                        const row = allocationSnapshot.rows.find(r => r.name === payload.value)
+                        return (
+                          <g>
+                            <text x={x - 4} y={y + 4} textAnchor="end" fill={row?.active ? '#e2e8f0' : '#475569'} fontSize={11}>
+                              {payload.value}
+                            </text>
+                          </g>
+                        )
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <RechartsTooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      contentStyle={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
+                      formatter={(value: number, name: string) => [`${value.toFixed(2)} €`, name]}
+                    />
+                    {allocationSnapshot.symbols.map((sym, i) => (
+                      <Bar
+                        key={sym}
+                        dataKey={sym}
+                        stackId="alloc"
+                        fill={ALLOC_COLORS[i % ALLOC_COLORS.length]}
+                        radius={i === allocationSnapshot.symbols.length - 1 ? [0, 3, 3, 0] : [0, 0, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </Card>
+          ) : centerMode === 'cards' ? (
             <div className="sv5-positions-grid">
               {portfolioCards.map((p) => (
                 <Card
