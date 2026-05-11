@@ -358,13 +358,17 @@ export default function StrategiesV5() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([])
   const [executions, setExecutions] = useState<StrategyExecution[]>([])
   const [strategies, setStrategies] = useState<Strategy[]>([])
-  const [centerMode, setCenterMode] = useState<'heatmap' | 'cards' | 'allocation'>('heatmap')
+  const [centerMode, setCenterMode] = useState<'heatmap' | 'cards' | 'allocation' | 'signaux'>('heatmap')
 
   const [loading, setLoading] = useState(true)
   const [syncingPortfolioHistory, setSyncingPortfolioHistory] = useState(false)
   const [creatingStrategiesFromPortfolio, setCreatingStrategiesFromPortfolio] = useState(false)
   const [portfolioStrategiesFeedback, setPortfolioStrategiesFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // --- Mode Signaux : prix courants pour les assets hors portefeuille ---
+  const [signalPrices, setSignalPrices] = useState<Record<string, number>>({})
+  const [loadingSignalPrices, setLoadingSignalPrices] = useState(false)
 
   // --- Widget stratégie (inline expand) ---
   const [expandedStrategyId, setExpandedStrategyId] = useState<number | null>(null)
@@ -755,6 +759,103 @@ export default function StrategiesV5() {
     [allAutomated, portfolioSymbols]
   )
 
+  // Prix dérivé des positions ouvertes (valeur / quantité)
+  const priceFromPositions = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of positions) {
+      const sym = posSymbol(p)
+      const qty = posQuantity(p)
+      const val = posMarketValueEUR(p)
+      if (sym && qty > 0 && val > 0) map.set(sym, val / qty)
+    }
+    return map
+  }, [positions])
+
+  // Fetch prix Yahoo pour les assets hors portefeuille quand mode Signaux actif
+  useEffect(() => {
+    if (centerMode !== 'signaux') return
+    const missing = allAutomated.filter(s => {
+      const sym = String(s.all_asset_symbol || '')
+      return sym && !priceFromPositions.has(sym)
+    })
+    if (missing.length === 0) return
+    setLoadingSignalPrices(true)
+    Promise.all(
+      missing.map(async s => {
+        const assetId = getAssetId(s)
+        if (!assetId) return null
+        try {
+          const price = await assetService.getYahooCurrentPrice(assetId)
+          return price && price > 0 ? { sym: String(s.all_asset_symbol || ''), price } : null
+        } catch { return null }
+      })
+    ).then(results => {
+      const next: Record<string, number> = {}
+      results.forEach(r => { if (r) next[r.sym] = r.price })
+      setSignalPrices(prev => ({ ...prev, ...next }))
+    }).finally(() => setLoadingSignalPrices(false))
+  }, [centerMode, allAutomated, priceFromPositions, getAssetId])
+
+  // Données signaux : proximité prix / seuils pour chaque stratégie
+  const signalRows = useMemo(() => {
+    return allAutomated.map(s => {
+      const sym = String(s.all_asset_symbol || '')
+      const currentPrice = priceFromPositions.get(sym) ?? signalPrices[sym] ?? null
+      const params = (s.parameters as Record<string, any>) || {}
+      const algo = String(s.algorithm_type || 'threshold')
+
+      let low: number | null = null
+      let high: number | null = null
+      let lowLabel = 'Seuil bas'
+      let highLabel = 'Seuil haut'
+
+      if (algo === 'threshold') {
+        low = parseFloat(params.threshold_low) || null
+        high = parseFloat(params.threshold_high) || null
+      } else if (algo === 'rsi') {
+        low = parseFloat(params.rsi_low) || null
+        high = parseFloat(params.rsi_high) || null
+        lowLabel = 'RSI bas'
+        highLabel = 'RSI haut'
+      } else if (algo === 'ma_crossover') {
+        low = parseFloat(params.ma1_period) || null
+        high = parseFloat(params.ma2_period) || null
+        lowLabel = 'MA courte'
+        highLabel = 'MA longue'
+      }
+
+      let pct: number | null = null
+      let distToLow: number | null = null
+      let distToHigh: number | null = null
+      let zone: 'buy' | 'sell' | 'neutral' | 'unknown' = 'unknown'
+
+      if (currentPrice !== null && low !== null && high !== null && high > low) {
+        pct = Math.max(0, Math.min(100, ((currentPrice - low) / (high - low)) * 100))
+        distToLow = ((currentPrice - low) / low) * 100
+        distToHigh = ((high - currentPrice) / currentPrice) * 100
+        zone = currentPrice <= low ? 'buy' : currentPrice >= high ? 'sell' : 'neutral'
+      }
+
+      return {
+        id: s.id as number,
+        name: s.name,
+        sym,
+        algo,
+        active: Boolean(s.is_active),
+        currentPrice,
+        low,
+        high,
+        lowLabel,
+        highLabel,
+        pct,
+        distToLow,
+        distToHigh,
+        zone,
+        strategy: s,
+      }
+    })
+  }, [allAutomated, priceFromPositions, signalPrices])
+
   const strategyBySymbol = useMemo(() => {
     const m = new Map<string, Strategy>()
     for (const s of strategiesOnPortfolio) {
@@ -1061,6 +1162,14 @@ export default function StrategiesV5() {
                 >
                   Allocation
                 </button>
+                <button
+                  type="button"
+                  className={centerMode === 'signaux' ? 'active' : ''}
+                  onClick={() => setCenterMode('signaux')}
+                  title="Proximité prix / seuils de déclenchement"
+                >
+                  Signaux
+                </button>
               </div>
               <Button
                 type="button"
@@ -1114,7 +1223,87 @@ export default function StrategiesV5() {
             </Card>
           )}
 
-          {centerMode === 'allocation' ? (
+          {centerMode === 'signaux' ? (
+            <Card className="sv5-signal-card">
+              <div className="sv5-signal-header">
+                <h3 className="sv5-alloc-title">Proximité Prix / Seuils de déclenchement</h3>
+                {loadingSignalPrices && <span className="sv5-signal-loading">Chargement des prix…</span>}
+              </div>
+              {signalRows.length === 0 ? (
+                <p className="sv5-alloc-empty">Aucune stratégie automatisée active.</p>
+              ) : (
+                <div className="sv5-signal-list">
+                  {signalRows.map(row => (
+                    <div
+                      key={row.id}
+                      className={`sv5-signal-row${!row.active ? ' sv5-signal-inactive' : ''}`}
+                      onClick={() => openStrategyWidget(row.strategy)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={e => e.key === 'Enter' && openStrategyWidget(row.strategy)}
+                    >
+                      {/* Nom + meta */}
+                      <div className="sv5-signal-meta">
+                        <div className="sv5-signal-name">{row.name}</div>
+                        <div className="sv5-signal-tags">
+                          <span className="sv5-signal-sym">{row.sym || '—'}</span>
+                          <span className="sv5-signal-algo">{row.algo}</span>
+                          {!row.active && <span className="sv5-signal-off">OFF</span>}
+                        </div>
+                      </div>
+
+                      {/* Prix courant */}
+                      <div className="sv5-signal-price">
+                        {row.currentPrice !== null
+                          ? <span className="sv5-signal-price-val">{row.currentPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          : <span className="sv5-signal-price-na">—</span>}
+                      </div>
+
+                      {/* Barre de proximité */}
+                      <div className="sv5-signal-bar-wrap">
+                        {row.pct !== null && row.low !== null && row.high !== null ? (
+                          <>
+                            <div className="sv5-signal-bar-labels">
+                              <span className="sv5-signal-low">{row.lowLabel} {row.low.toLocaleString()}</span>
+                              <span className="sv5-signal-high">{row.highLabel} {row.high.toLocaleString()}</span>
+                            </div>
+                            <div className="sv5-signal-bar-track">
+                              <div
+                                className={`sv5-signal-bar-fill zone-${row.zone}`}
+                                style={{ width: `${row.pct}%` }}
+                              />
+                              <div
+                                className="sv5-signal-bar-cursor"
+                                style={{ left: `${row.pct}%` }}
+                              />
+                            </div>
+                            <div className="sv5-signal-distances">
+                              {row.zone === 'buy' && (
+                                <span className="sv5-dist buy">BUY ZONE</span>
+                              )}
+                              {row.zone === 'sell' && (
+                                <span className="sv5-dist sell">SELL ZONE</span>
+                              )}
+                              {row.zone === 'neutral' && row.distToLow !== null && row.distToHigh !== null && (
+                                <>
+                                  <span className="sv5-dist buy">+{row.distToLow.toFixed(1)}% / BUY</span>
+                                  <span className="sv5-dist sell">{row.distToHigh.toFixed(1)}% / SELL</span>
+                                </>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="sv5-signal-no-trigger">
+                            {row.currentPrice === null ? 'Prix indisponible' : 'Seuils non configurés'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ) : centerMode === 'allocation' ? (
             <Card className="sv5-alloc-card">
               <div className="sv5-alloc-header">
                 <h3 className="sv5-alloc-title">Allocation par stratégie — snapshot actuel</h3>

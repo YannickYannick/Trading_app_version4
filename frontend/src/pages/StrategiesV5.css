@@ -863,3 +863,136 @@
 
 .recharts-bar-rectangle { transition: opacity 80ms ease; }
 .recharts-bar-rectangle:hover { opacity: 0.85; }
+
+/* Mode Signaux — proximité prix / seuils */
+.sv5-signal-card { padding: 16px 18px; }
+
+.sv5-signal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.sv5-signal-loading {
+  font-size: 11px;
+  color: #64748b;
+  animation: sv5-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sv5-pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+.sv5-signal-list { display: flex; flex-direction: column; gap: 10px; }
+
+.sv5-signal-row {
+  display: grid;
+  grid-template-columns: 220px 90px 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.sv5-signal-row:hover { border-color: rgba(99,102,241,0.35); background: rgba(99,102,241,0.05); }
+.sv5-signal-inactive { opacity: 0.45; }
+
+.sv5-signal-meta { min-width: 0; }
+.sv5-signal-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv5-signal-tags { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+.sv5-signal-sym {
+  font-size: 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: #94a3b8;
+}
+.sv5-signal-algo {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(192,132,252,0.85);
+  font-weight: 800;
+}
+.sv5-signal-off {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(100,116,139,0.2);
+  color: #64748b;
+}
+
+.sv5-signal-price { text-align: right; }
+.sv5-signal-price-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.sv5-signal-price-na { color: #475569; font-size: 12px; }
+
+.sv5-signal-bar-wrap { min-width: 0; }
+
+.sv5-signal-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #475569;
+  margin-bottom: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.sv5-signal-low { color: #34d399; }
+.sv5-signal-high { color: #f87171; }
+
+.sv5-signal-bar-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  overflow: visible;
+}
+
+.sv5-signal-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 500ms ease;
+}
+.sv5-signal-bar-fill.zone-buy  { background: linear-gradient(90deg, #10b981, #34d399); }
+.sv5-signal-bar-fill.zone-sell { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+.sv5-signal-bar-fill.zone-neutral { background: linear-gradient(90deg, #10b981, #f59e0b); }
+
+.sv5-signal-bar-cursor {
+  position: absolute;
+  top: -3px;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+}
+
+.sv5-signal-distances {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+
+.sv5-dist {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.sv5-dist.buy  { background: rgba(16,185,129,0.15); color: #34d399; }
+.sv5-dist.sell { background: rgba(244,63,94,0.15); color: #f87171; }
+
+.sv5-signal-no-trigger { font-size: 11px; color: #475569; font-style: italic; }
