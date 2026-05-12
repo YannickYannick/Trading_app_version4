@@ -307,19 +307,22 @@ class StrategySerializer(serializers.ModelSerializer):
         ]
     
     def get_total_trades(self, obj):
-        """Calcule le nombre total de trades pour cette stratégie."""
+        cached = getattr(obj, '_total_trades_count', None)
+        if cached is not None:
+            return cached
         return Trade.objects.filter(strategy=obj).count()
-    
+
     def get_successful_trades(self, obj):
-        """Calcule le nombre de positions gagnantes (PnL > 0)."""
-        # PnL est une propriété calculée, impossible de filtrer via l'ORM directement
-        positions = Position.objects.filter(strategy=obj, is_open=False)
-        return sum(1 for p in positions if p.pnl and p.pnl > 0)
-    
+        closed = getattr(obj, '_closed_positions_cache', None)
+        if closed is None:
+            closed = Position.objects.filter(strategy=obj, is_open=False)
+        return sum(1 for p in closed if p.pnl and p.pnl > 0)
+
     def get_total_pnl(self, obj):
-        """Calcule le P&L total de toutes les positions fermées."""
-        positions = Position.objects.filter(strategy=obj, is_open=False)
-        return sum((p.pnl or 0) for p in positions)
+        closed = getattr(obj, '_closed_positions_cache', None)
+        if closed is None:
+            closed = Position.objects.filter(strategy=obj, is_open=False)
+        return sum((p.pnl or 0) for p in closed)
     
     def update(self, instance, validated_data):
         """Mise à jour avec gestion des algorithm_parameters."""

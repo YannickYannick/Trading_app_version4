@@ -50,7 +50,7 @@ export const positionService = {
    */
   async getOpen(filters?: Omit<PositionFilters, 'status'>): Promise<Position[]> {
     const response = await apiClient.get<ApiResponse<Position>>('/positions/', {
-      params: { include_yahoo_price: 1, ...filters, status: 'OPEN' },
+      params: { ...filters, status: 'OPEN' },
     })
     return response.data.results
   },

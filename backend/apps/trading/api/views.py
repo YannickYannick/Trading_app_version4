@@ -2294,7 +2294,22 @@ class StrategyViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        return Strategy.objects.filter(user=self.request.user)
+        from django.db.models import Prefetch
+        from apps.trading.models import Position as Pos
+        return (
+            Strategy.objects.filter(user=self.request.user)
+            .select_related('all_asset', 'broker_account')
+            .prefetch_related(
+                'algorithm_parameters',
+                Prefetch(
+                    'positions',
+                    queryset=Pos.objects.filter(is_open=False)
+                        .only('id', 'strategy_id', 'side', 'entry_price', 'current_price', 'quantity'),
+                    to_attr='_closed_positions_cache',
+                ),
+            )
+            .annotate(_total_trades_count=Count('trades', distinct=True))
+        )
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
