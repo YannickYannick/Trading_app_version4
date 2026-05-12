@@ -1180,7 +1180,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     
-    filterset_fields = ['is_open', 'side', 'broker', 'strategy']
+    filterset_fields = ['is_open', 'side', 'broker', 'strategy', 'all_asset']
     search_fields = ['all_asset__symbol', 'all_asset__name', 'asset__symbol', 'asset__name']
     ordering_fields = ['opened_at', 'entry_price', 'quantity']
     ordering = ['-opened_at']
@@ -1215,13 +1215,16 @@ class PositionViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def open(self, request):
-        """GET /api/positions/open/ → Positions ouvertes uniquement."""
+        """GET /api/positions/open/ → Positions ouvertes uniquement (serializer léger, sans Yahoo)."""
+        from .serializers import PositionListSerializer
         positions = self.filter_queryset(self.get_queryset().filter(is_open=True))
         page = self.paginate_queryset(positions)
+        ctx = self.get_serializer_context()
+        ctx['include_yahoo_price'] = False
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer = PositionListSerializer(page, many=True, context=ctx)
             return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(positions, many=True)
+        serializer = PositionListSerializer(positions, many=True, context=ctx)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])

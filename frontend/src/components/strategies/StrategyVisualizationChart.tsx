@@ -185,11 +185,15 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
           })
         }
 
-        // Charger l'historique des prix selon la période sélectionnée
+        // Fetch prix + trades en parallèle (non bloquants l'un l'autre)
         console.log(`[SVC] 3a. Fetch prix démarré`)
-        const tPrix0 = performance.now()
-        const historyResponse = await assetService.getPriceHistory(assetId, periodDays, 'list')
-        console.log(`[SVC] 3a. Fetch prix terminé — ${(performance.now() - tPrix0).toFixed(0)}ms`)
+        console.log(`[SVC] 3b. Fetch trades démarré`)
+        const tParallel0 = performance.now()
+        const [historyResponse, tradesResponse] = await Promise.all([
+          assetService.getPriceHistory(assetId, periodDays, 'list'),
+          tradeService.getAll({} as any).catch(() => ({ results: [] })),
+        ])
+        console.log(`[SVC] 3a+3b. Fetch prix+trades terminé — ${(performance.now() - tParallel0).toFixed(0)}ms`)
 
         const priceData: PriceHistoryPoint[] = (historyResponse.results || [])
           .map((point: any) => ({
@@ -206,51 +210,36 @@ const StrategyVisualizationChart: React.FC<StrategyVisualizationChartProps> = ({
 
         setPriceHistory(priceData)
 
-        // Charger les trades filtrés par asset
-        try {
-          console.log(`[SVC] 3b. Fetch trades démarré`)
-          const tTrades0 = performance.now()
-          const tradesResponse = await tradeService.getAll({} as any)
-          console.log(`[SVC] 3b. Fetch trades terminé — ${(performance.now() - tTrades0).toFixed(0)}ms`)
-          const allTrades = tradesResponse.results || tradesResponse || []
-          // Filtrer les trades par asset (all_asset_id ou asset.id)
-          const assetTrades = allTrades.filter((t: any) => {
-            const tradeAssetId = t.all_asset_id 
-              || (typeof t.all_asset === 'object' ? t.all_asset?.id : null)
-              || (typeof t.all_asset === 'number' ? t.all_asset : null)
-              || (typeof t.asset === 'object' ? t.asset?.id : null)
-            return tradeAssetId === assetId
-          })
-          setTrades(assetTrades)
-        } catch (err) {
-          console.warn('[StrategyVisualizationChart] Could not load trades:', err)
-          setTrades([])
-        }
+        const allTrades = (tradesResponse as any).results || tradesResponse || []
+        const assetTrades = allTrades.filter((t: any) => {
+          const tradeAssetId = t.all_asset_id
+            || (typeof t.all_asset === 'object' ? t.all_asset?.id : null)
+            || (typeof t.all_asset === 'number' ? t.all_asset : null)
+            || (typeof t.asset === 'object' ? t.asset?.id : null)
+          return tradeAssetId === assetId
+        })
+        setTrades(assetTrades)
 
-        // Charger les positions pour calculer la quantité en portefeuille
-        try {
-          console.log(`[SVC] 3c. Fetch positions démarré`)
-          const tPos0 = performance.now()
-          const openPositions = await positionService.getOpen()
-          console.log(`[SVC] 3c. Fetch positions terminé — ${(performance.now() - tPos0).toFixed(0)}ms`)
-          const assetPositions = openPositions.filter((p: any) => {
-            const posAssetId = p.all_asset_id 
-              || (typeof p.all_asset === 'object' ? p.all_asset?.id : null)
-              || (typeof p.all_asset === 'number' ? p.all_asset : null)
-            return posAssetId === assetId
-          })
-          const totalQty = assetPositions.reduce((sum: number, p: any) => sum + (Number(p.quantity) || 0), 0)
-          setPortfolioQuantity(totalQty)
-        } catch (err) {
-          console.warn('[StrategyVisualizationChart] Could not load positions:', err)
-          setPortfolioQuantity(0)
-        }
         console.log(`[SVC] 4. Données chargées — total: ${(performance.now() - t0).toFixed(0)}ms`)
+
+        // Positions : fetch en arrière-plan, ne bloque pas l'affichage du chart
+        console.log(`[SVC] 3c. Fetch positions démarré (arrière-plan, sans Yahoo)`)
+        const tPos0 = performance.now()
+        positionService.getAll({ all_asset: assetId, is_open: true, page_size: 100 } as any)
+          .then((res: any) => {
+            const openPositions = res.results || []
+            const totalQty = openPositions.reduce((sum: number, p: any) => sum + (Number(p.quantity) || 0), 0)
+            setPortfolioQuantity(totalQty)
+            console.log(`[SVC] 3c. Fetch positions terminé — ${(performance.now() - tPos0).toFixed(0)}ms`)
+          }).catch(() => {
+            setPortfolioQuantity(0)
+          })
+
       } catch (err: any) {
         setError(err.response?.data?.error || err.message || 'Erreur lors du chargement des données')
         console.error('[StrategyVisualizationChart] Error loading data:', err)
       } finally {
-        setLoading(false)
+        setLoading(false)  // chart visible dès que prix+trades sont prêts
       }
     }
 
