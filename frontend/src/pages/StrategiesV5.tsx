@@ -394,19 +394,29 @@ export default function StrategiesV5() {
   const [hoverPayload, setHoverPayload] = useState<ChartTooltipPayload | null>(null)
 
   const loadData = async () => {
+    const t0 = performance.now()
+    console.log('[V5] 1. Chargement page démarré')
     try {
       setLoading(true)
       setError(null)
+      const timed = <T,>(label: string, p: Promise<T>): Promise<T> => {
+        const t = performance.now()
+        console.log(`[V5] ${label} démarré`)
+        return p.then(r => { console.log(`[V5] ${label} terminé — ${(performance.now() - t).toFixed(0)}ms`); return r })
+      }
+      const tFetch = performance.now()
       const [pos, orders, execs, strategiesRes] = await Promise.all([
-        positionService.getOpen(),
-        orderService.getActivePendingList(),
-        strategyExecutionService.getRecent(),
-        strategyService.getAll({ page_size: 500 }),
+        timed('2a. positions.getOpen', positionService.getOpen()),
+        timed('2b. orders.getActivePendingList', orderService.getActivePendingList()),
+        timed('2c. strategyExecution.getRecent', strategyExecutionService.getRecent()),
+        timed('2d. strategies.getAll', strategyService.getAll({ page_size: 500 })),
       ])
+      console.log(`[V5] 2. Tous les fetches terminés — ${(performance.now() - tFetch).toFixed(0)}ms`)
       setPositions(pos || [])
       setActiveOrders(Array.isArray(orders) ? orders : [])
       setExecutions(Array.isArray(execs) ? execs : [])
       setStrategies((strategiesRes?.results || []) as Strategy[])
+      console.log(`[V5] 3. Page prête — total: ${(performance.now() - t0).toFixed(0)}ms`)
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur de chargement')
     } finally {
