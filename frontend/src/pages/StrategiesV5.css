@@ -951,6 +951,23 @@
 }
 .sv5-signal-low { color: #34d399; }
 .sv5-signal-high { color: #f87171; }
+.sv5-signal-threshold-editable {
+  cursor: text;
+  border-bottom: 1px dashed currentColor;
+  padding-bottom: 1px;
+}
+.sv5-signal-threshold-editable:hover { opacity: 0.75; }
+.sv5-signal-threshold-input {
+  width: 80px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 4px;
+  color: #e5e7eb;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  outline: none;
+}
+.sv5-signal-threshold-input:focus { border-color: #6366f1; }
 
 .sv5-signal-bar-track {
   position: relative;

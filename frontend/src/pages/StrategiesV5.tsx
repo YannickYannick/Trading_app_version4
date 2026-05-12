@@ -368,6 +368,7 @@ export default function StrategiesV5() {
 
   // --- Mode Signaux : prix courants pour les assets hors portefeuille ---
   const [signalPrices, setSignalPrices] = useState<Record<string, number>>({})
+  const [signalEditing, setSignalEditing] = useState<{ strategyId: number; field: 'low' | 'high'; value: string } | null>(null)
   const [loadingSignalPrices, setLoadingSignalPrices] = useState(false)
 
   // --- Widget stratégie (inline expand) ---
@@ -635,6 +636,31 @@ export default function StrategiesV5() {
     setExpandedStrategy(s)
     setExpandedStrategyId(s.id as number)
   }, [initInlineEdit])
+
+  const SIGNAL_PARAM_KEYS: Record<string, { low: string; high: string }> = {
+    threshold: { low: 'threshold_low', high: 'threshold_high' },
+    rsi:       { low: 'rsi_low',       high: 'rsi_high' },
+    ma_crossover: { low: 'ma1_period', high: 'ma2_period' },
+  }
+
+  const saveSignalThreshold = useCallback(async (row: { id: number; algo: string; strategy: Strategy; low: number | null; high: number | null }) => {
+    if (!signalEditing || signalEditing.strategyId !== row.id) return
+    const val = parseFloat(signalEditing.value.replace(',', '.'))
+    setSignalEditing(null)
+    if (isNaN(val)) return
+    const keys = SIGNAL_PARAM_KEYS[row.algo]
+    if (!keys) return
+    const paramKey = signalEditing.field === 'low' ? keys.low : keys.high
+    const existingParams = (row.strategy.parameters as Record<string, any>) || {}
+    const newParams = { ...existingParams, [paramKey]: val }
+    try {
+      await strategyService.update(row.id, {
+        parameters: newParams,
+        algorithm_parameters_data: [{ key: paramKey, value: String(val), param_type: 'float' }],
+      } as any)
+      void loadData()
+    } catch { /* silently ignore */ }
+  }, [signalEditing])
 
   const uiOrders: UiOrder[] = useMemo(() => {
     return activeOrders
@@ -1296,8 +1322,52 @@ export default function StrategiesV5() {
                         {row.pct !== null && row.low !== null && row.high !== null ? (
                           <>
                             <div className="sv5-signal-bar-labels">
-                              <span className="sv5-signal-low">{row.lowLabel} {row.low.toLocaleString()}</span>
-                              <span className="sv5-signal-high">{row.highLabel} {row.high.toLocaleString()}</span>
+                              {signalEditing?.strategyId === row.id && signalEditing.field === 'low' ? (
+                                <input
+                                  className="sv5-signal-threshold-input"
+                                  value={signalEditing.value}
+                                  autoFocus
+                                  onClick={e => e.stopPropagation()}
+                                  onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
+                                  onBlur={() => void saveSignalThreshold(row)}
+                                  onKeyDown={e => {
+                                    e.stopPropagation()
+                                    if (e.key === 'Enter') void saveSignalThreshold(row)
+                                    if (e.key === 'Escape') setSignalEditing(null)
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  className="sv5-signal-low sv5-signal-threshold-editable"
+                                  onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'low', value: String(row.low ?? '') }) }}
+                                  title="Cliquer pour modifier"
+                                >
+                                  {row.lowLabel} {row.low.toLocaleString()}
+                                </span>
+                              )}
+                              {signalEditing?.strategyId === row.id && signalEditing.field === 'high' ? (
+                                <input
+                                  className="sv5-signal-threshold-input"
+                                  value={signalEditing.value}
+                                  autoFocus
+                                  onClick={e => e.stopPropagation()}
+                                  onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
+                                  onBlur={() => void saveSignalThreshold(row)}
+                                  onKeyDown={e => {
+                                    e.stopPropagation()
+                                    if (e.key === 'Enter') void saveSignalThreshold(row)
+                                    if (e.key === 'Escape') setSignalEditing(null)
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  className="sv5-signal-high sv5-signal-threshold-editable"
+                                  onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'high', value: String(row.high ?? '') }) }}
+                                  title="Cliquer pour modifier"
+                                >
+                                  {row.highLabel} {row.high.toLocaleString()}
+                                </span>
+                              )}
                             </div>
                             <div className="sv5-signal-bar-track">
                               <div
