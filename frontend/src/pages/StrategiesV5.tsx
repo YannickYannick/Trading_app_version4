@@ -516,6 +516,14 @@ export default function StrategiesV5() {
     setInlineEdit(prev => {
       if (prev[s.id as number]) return prev
       const params = (s.parameters as Record<string, any>) || {}
+      // Also merge algorithm_parameters (new system, takes priority over JSON field)
+      const algoParams: Record<string, any> = {}
+      if (s.algorithm_parameters) {
+        for (const ap of s.algorithm_parameters) {
+          const v = parseFloat(ap.value)
+          algoParams[ap.key] = isNaN(v) ? ap.value : v
+        }
+      }
       return {
         ...prev,
         [s.id as number]: {
@@ -534,6 +542,7 @@ export default function StrategiesV5() {
           all_asset_name: getAssetName(s),
           all_asset_symbol: getAssetSymbol(s),
           ...params,
+          ...algoParams,
         },
       }
     })
@@ -553,8 +562,13 @@ export default function StrategiesV5() {
     try {
       const algoParamKeys = ALGORITHM_PARAMS[edits.algorithm_type || s.algorithm_type || 'threshold']?.map(p => p.key) || []
       const parameters: Record<string, number> = {}
+      const algorithm_parameters_data: Array<{ key: string; value: string; param_type: string }> = []
       algoParamKeys.forEach(key => {
-        if (edits[key] !== undefined) parameters[key] = parseFloat(edits[key]) || 0
+        if (edits[key] !== undefined) {
+          const v = parseFloat(edits[key]) || 0
+          parameters[key] = v
+          algorithm_parameters_data.push({ key, value: String(v), param_type: 'float' })
+        }
       })
       const updateData: Record<string, any> = {
         algorithm_type: edits.algorithm_type,
@@ -570,6 +584,7 @@ export default function StrategiesV5() {
         check_frequency: parseInt(edits.check_frequency) || 45,
         is_automated: edits.is_automated,
         parameters,
+        algorithm_parameters_data,
       }
       if (edits.all_asset && edits.all_asset !== getAssetId(s)) {
         updateData.all_asset = edits.all_asset
@@ -801,7 +816,14 @@ export default function StrategiesV5() {
     return allAutomated.map(s => {
       const sym = String(s.all_asset_symbol || '')
       const currentPrice = priceFromPositions.get(sym) ?? signalPrices[sym] ?? null
-      const params = (s.parameters as Record<string, any>) || {}
+      // Merge parameters: JSON field first, algorithm_parameters overrides (mirrors backend logic)
+      const params: Record<string, any> = { ...(s.parameters || {}) }
+      if (s.algorithm_parameters) {
+        for (const ap of s.algorithm_parameters) {
+          const v = parseFloat(ap.value)
+          params[ap.key] = isNaN(v) ? ap.value : v
+        }
+      }
       const algo = String(s.algorithm_type || 'threshold')
 
       let low: number | null = null
