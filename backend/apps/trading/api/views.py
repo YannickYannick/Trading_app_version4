@@ -1180,7 +1180,7 @@ class PositionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     
-    filterset_fields = ['is_open', 'side', 'broker', 'strategy']
+    filterset_fields = ['is_open', 'side', 'broker', 'strategy', 'all_asset']
     search_fields = ['all_asset__symbol', 'all_asset__name', 'asset__symbol', 'asset__name']
     ordering_fields = ['opened_at', 'entry_price', 'quantity']
     ordering = ['-opened_at']
@@ -1215,13 +1215,16 @@ class PositionViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def open(self, request):
-        """GET /api/positions/open/ → Positions ouvertes uniquement."""
+        """GET /api/positions/open/ → Positions ouvertes uniquement (serializer léger, sans Yahoo)."""
+        from .serializers import PositionListSerializer
         positions = self.filter_queryset(self.get_queryset().filter(is_open=True))
         page = self.paginate_queryset(positions)
+        ctx = self.get_serializer_context()
+        ctx['include_yahoo_price'] = False
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer = PositionListSerializer(page, many=True, context=ctx)
             return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(positions, many=True)
+        serializer = PositionListSerializer(positions, many=True, context=ctx)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
@@ -2280,7 +2283,7 @@ class StrategyViewSet(viewsets.ModelViewSet):
     - GET /api/strategies/1/performance/ → Performance de la stratégie
     - GET /api/strategies/1/positions/ → Positions de la stratégie
     - POST /api/strategies/1/activate/ → Activer la stratégie
-    - POST /api/strategies/1/deactivate/ → Désactiver la stratégie
+    - POST /api/strategies/from_portfolio/ → Créer stratégies pour actifs du portefeuille / ordres BUY
     """
     serializer_class = StrategySerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -2291,10 +2294,140 @@ class StrategyViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     def get_queryset(self):
-        return Strategy.objects.filter(user=self.request.user)
+        from django.db.models import Prefetch
+        from apps.trading.models import Position as Pos
+        return (
+            Strategy.objects.filter(user=self.request.user)
+            .select_related('all_asset', 'broker_account')
+            .prefetch_related(
+                'algorithm_parameters',
+                Prefetch(
+                    'positions',
+                    queryset=Pos.objects.filter(is_open=False)
+                        .only('id', 'strategy_id', 'side', 'entry_price', 'current_price', 'quantity'),
+                    to_attr='_closed_positions_cache',
+                ),
+            )
+            .annotate(_total_trades_count=Count('trades', distinct=True))
+        )
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['post'], url_path='from_portfolio')
+    def from_portfolio(self, request):
+        """
+        POST /api/strategies/from_portfolio/
+        Crée une stratégie par AllAsset présent en position ouverte ou en ordre BUY actif,
+        sauf si une stratégie existe déjà pour cet AllAsset (tous brokers confondus).
+        """
+        user = request.user
+        existing = set(
+            Strategy.objects.filter(user=user, all_asset_id__isnull=False).values_list(
+                'all_asset_id', flat=True
+            )
+        )
+
+        active_order_statuses = (
+            Order.OrderStatus.PENDING,
+            Order.OrderStatus.OPEN,
+            Order.OrderStatus.PARTIALLY_FILLED,
+        )
+
+        candidates = {}
+        for pos in (
+            Position.objects.filter(user=user, is_open=True)
+            .only('all_asset_id', 'broker_id')
+            .order_by('id')
+        ):
+            aid = pos.all_asset_id
+            if aid and aid not in candidates:
+                candidates[aid] = pos.broker_id
+
+        for ord_ in (
+            Order.objects.filter(
+                user=user,
+                side=Order.OrderSide.BUY,
+                status__in=active_order_statuses,
+            )
+            .only('all_asset_id', 'broker_id')
+            .order_by('id')
+        ):
+            aid = ord_.all_asset_id
+            if aid and aid not in candidates:
+                candidates[aid] = ord_.broker_id
+
+        symbol_by_id = dict(
+            AllAssets.objects.filter(id__in=candidates.keys()).values_list('id', 'symbol')
+        )
+
+        created = []
+        skipped_existing = []
+        skipped_no_broker_account = []
+        errors = []
+
+        name_max = Strategy._meta.get_field('name').max_length
+
+        for all_asset_id, broker_id in candidates.items():
+            sym = symbol_by_id.get(all_asset_id) or str(all_asset_id)
+            if all_asset_id in existing:
+                skipped_existing.append({'all_asset_id': all_asset_id, 'symbol': sym})
+                continue
+
+            ba = (
+                BrokerAccount.objects.filter(
+                    user=user, broker_id=broker_id, is_active=True
+                )
+                .order_by('id')
+                .first()
+            )
+            if not ba:
+                skipped_no_broker_account.append(
+                    {
+                        'all_asset_id': all_asset_id,
+                        'symbol': sym,
+                        'broker_id': broker_id,
+                    }
+                )
+                continue
+
+            base_name = f'Auto-{sym}'[:name_max]
+
+            try:
+                strat = Strategy.objects.create(
+                    user=user,
+                    all_asset_id=all_asset_id,
+                    broker_account=ba,
+                    name=base_name,
+                    description='Créée automatiquement depuis le portefeuille (Stratégies V5).',
+                    algorithm_type=Strategy.AlgorithmType.THRESHOLD,
+                )
+                try:
+                    strat.initialize_default_parameters()
+                except Exception:
+                    pass
+                created.append(
+                    StrategySerializer(strat, context={'request': request}).data
+                )
+                existing.add(all_asset_id)
+            except Exception as e:
+                logger.exception(
+                    'from_portfolio: failed for all_asset_id=%s', all_asset_id
+                )
+                errors.append(
+                    {'all_asset_id': all_asset_id, 'symbol': sym, 'error': str(e)}
+                )
+
+        return Response(
+            {
+                'created': created,
+                'created_count': len(created),
+                'skipped_existing': skipped_existing,
+                'skipped_no_broker_account': skipped_no_broker_account,
+                'errors': errors,
+            },
+            status=status.HTTP_200_OK,
+        )
     
     @action(detail=True, methods=['get'])
     def performance(self, request, pk=None):

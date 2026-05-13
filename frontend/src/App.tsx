@@ -15,6 +15,7 @@ import Strategies from '@pages/Strategies'
 import StrategiesV2 from '@pages/StrategiesV2'
 import StrategiesV3 from '@pages/StrategiesV3'
 import StrategiesV4 from '@pages/StrategiesV4'
+import StrategiesV5 from '@pages/StrategiesV5'
 import Brokers from '@pages/Brokers'
 import Settings from '@pages/Settings'
 import AIAdvisor from '@pages/AIAdvisor'
@@ -62,6 +63,7 @@ function App() {
         <Route path="strategies-v2" element={<StrategiesV2 />} />
         <Route path="strategies-v3" element={<StrategiesV3 />} />
         <Route path="strategies-v4" element={<StrategiesV4 />} />
+        <Route path="strategies-v5" element={<StrategiesV5 />} />
 
         {/* Brokers */}
         <Route path="brokers" element={<Brokers />} />

@@ -17,6 +17,7 @@ function Sidebar() {
     { path: '/strategies-v2', label: 'Stratégies V2', icon: '✨' },
     { path: '/strategies-v3', label: 'Stratégies V3', icon: '🖥️' },
     { path: '/strategies-v4', label: 'Stratégies V4', icon: '🧠' },
+    { path: '/strategies-v5', label: 'Stratégies V5', icon: '🧬' },
     { path: '/assets', label: 'Assets', icon: '💰' },
     { path: '/brokers', label: 'Brokers', icon: '🏦' },
     { path: '/blog', label: 'Blog', icon: '📰' },
