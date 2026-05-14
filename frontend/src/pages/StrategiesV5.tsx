@@ -369,6 +369,12 @@ export default function StrategiesV5() {
   // --- Mode Signaux : prix courants pour les assets hors portefeuille ---
   const [signalPrices, setSignalPrices] = useState<Record<string, number>>({})
   const [signalEditing, setSignalEditing] = useState<{ strategyId: number; field: 'low' | 'high'; value: string } | null>(null)
+  const [signalDragging, setSignalDragging] = useState<{
+    strategyId: number; field: 'low' | 'high'
+    startX: number; startValue: number; pricePerPx: number; currentValue: number
+    algo: string; strategy: Strategy; low: number; high: number
+  } | null>(null)
+  const signalBarRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [loadingSignalPrices, setLoadingSignalPrices] = useState(false)
 
   // --- Widget stratégie (inline expand) ---
@@ -661,6 +667,64 @@ export default function StrategiesV5() {
       void loadData()
     } catch { /* silently ignore */ }
   }, [signalEditing])
+
+  const handleSignalDragStart = useCallback((
+    e: React.MouseEvent,
+    row: { id: number; algo: string; strategy: Strategy; low: number; high: number },
+    field: 'low' | 'high'
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const barEl = signalBarRefs.current.get(row.id)
+    if (!barEl) return
+    const barWidth = barEl.clientWidth
+    if (barWidth === 0) return
+    const pricePerPx = (row.high - row.low) / barWidth
+    setSignalDragging({
+      strategyId: row.id, field,
+      startX: e.clientX,
+      startValue: field === 'low' ? row.low : row.high,
+      pricePerPx,
+      currentValue: field === 'low' ? row.low : row.high,
+      algo: row.algo, strategy: row.strategy, low: row.low, high: row.high,
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!signalDragging) return
+    const onMove = (e: MouseEvent) => {
+      const dx = e.clientX - signalDragging.startX
+      const rawVal = signalDragging.startValue + dx * signalDragging.pricePerPx
+      const newVal = signalDragging.field === 'low'
+        ? Math.min(rawVal, signalDragging.high - 0.01)
+        : Math.max(rawVal, signalDragging.low + 0.01)
+      setSignalDragging(prev => prev ? { ...prev, currentValue: newVal } : null)
+    }
+    const onUp = async () => {
+      if (!signalDragging) return
+      const { strategyId, field, currentValue, algo, strategy } = signalDragging
+      setSignalDragging(null)
+      const keys = SIGNAL_PARAM_KEYS[algo]
+      if (!keys) return
+      const paramKey = field === 'low' ? keys.low : keys.high
+      const val = Math.round(currentValue * 100) / 100
+      const existingParams = (strategy.parameters as Record<string, any>) || {}
+      const newParams = { ...existingParams, [paramKey]: val }
+      try {
+        await strategyService.update(strategyId, {
+          parameters: newParams,
+          algorithm_parameters_data: [{ key: paramKey, value: String(val), param_type: 'float' }],
+        } as any)
+        void loadData()
+      } catch { /* silently ignore */ }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [signalDragging])
 
   const uiOrders: UiOrder[] = useMemo(() => {
     return activeOrders
@@ -1321,64 +1385,81 @@ export default function StrategiesV5() {
                       <div className="sv5-signal-bar-wrap">
                         {row.pct !== null && row.low !== null && row.high !== null ? (
                           <>
-                            <div className="sv5-signal-bar-labels">
-                              {signalEditing?.strategyId === row.id && signalEditing.field === 'low' ? (
-                                <input
-                                  className="sv5-signal-threshold-input"
-                                  value={signalEditing.value}
-                                  autoFocus
-                                  onClick={e => e.stopPropagation()}
-                                  onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
-                                  onBlur={() => void saveSignalThreshold(row)}
-                                  onKeyDown={e => {
-                                    e.stopPropagation()
-                                    if (e.key === 'Enter') void saveSignalThreshold(row)
-                                    if (e.key === 'Escape') setSignalEditing(null)
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  className="sv5-signal-low sv5-signal-threshold-editable"
-                                  onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'low', value: String(row.low ?? '') }) }}
-                                  title="Cliquer pour modifier"
-                                >
-                                  {row.lowLabel} {row.low.toLocaleString()}
-                                </span>
-                              )}
-                              {signalEditing?.strategyId === row.id && signalEditing.field === 'high' ? (
-                                <input
-                                  className="sv5-signal-threshold-input"
-                                  value={signalEditing.value}
-                                  autoFocus
-                                  onClick={e => e.stopPropagation()}
-                                  onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
-                                  onBlur={() => void saveSignalThreshold(row)}
-                                  onKeyDown={e => {
-                                    e.stopPropagation()
-                                    if (e.key === 'Enter') void saveSignalThreshold(row)
-                                    if (e.key === 'Escape') setSignalEditing(null)
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  className="sv5-signal-high sv5-signal-threshold-editable"
-                                  onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'high', value: String(row.high ?? '') }) }}
-                                  title="Cliquer pour modifier"
-                                >
-                                  {row.highLabel} {row.high.toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                            <div className="sv5-signal-bar-track">
-                              <div
-                                className={`sv5-signal-bar-fill zone-${row.zone}`}
-                                style={{ width: `${row.pct}%` }}
-                              />
-                              <div
-                                className="sv5-signal-bar-cursor"
-                                style={{ left: `${row.pct}%` }}
-                              />
-                            </div>
+                            {(() => {
+                                const isDraggingLow = signalDragging?.strategyId === row.id && signalDragging.field === 'low'
+                                const isDraggingHigh = signalDragging?.strategyId === row.id && signalDragging.field === 'high'
+                                const dispLow = isDraggingLow ? signalDragging!.currentValue : row.low
+                                const dispHigh = isDraggingHigh ? signalDragging!.currentValue : row.high
+                                const dispPct = row.currentPrice !== null && dispLow !== null && dispHigh !== null && dispHigh > dispLow
+                                  ? Math.max(0, Math.min(100, ((row.currentPrice - dispLow) / (dispHigh - dispLow)) * 100))
+                                  : row.pct ?? 0
+                                return (
+                                  <>
+                                    <div className="sv5-signal-bar-labels">
+                                      {signalEditing?.strategyId === row.id && signalEditing.field === 'low' ? (
+                                        <input
+                                          className="sv5-signal-threshold-input"
+                                          value={signalEditing.value}
+                                          autoFocus
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
+                                          onBlur={() => void saveSignalThreshold(row)}
+                                          onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') void saveSignalThreshold(row); if (e.key === 'Escape') setSignalEditing(null) }}
+                                        />
+                                      ) : (
+                                        <span
+                                          className="sv5-signal-low sv5-signal-threshold-editable"
+                                          onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'low', value: String(row.low ?? '') }) }}
+                                          title="Cliquer pour modifier"
+                                        >
+                                          {row.lowLabel} {(isDraggingLow ? Math.round(signalDragging!.currentValue) : row.low).toLocaleString()}
+                                        </span>
+                                      )}
+                                      {signalEditing?.strategyId === row.id && signalEditing.field === 'high' ? (
+                                        <input
+                                          className="sv5-signal-threshold-input"
+                                          value={signalEditing.value}
+                                          autoFocus
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => setSignalEditing(prev => prev ? { ...prev, value: e.target.value } : prev)}
+                                          onBlur={() => void saveSignalThreshold(row)}
+                                          onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') void saveSignalThreshold(row); if (e.key === 'Escape') setSignalEditing(null) }}
+                                        />
+                                      ) : (
+                                        <span
+                                          className="sv5-signal-high sv5-signal-threshold-editable"
+                                          onClick={e => { e.stopPropagation(); setSignalEditing({ strategyId: row.id, field: 'high', value: String(row.high ?? '') }) }}
+                                          title="Cliquer pour modifier"
+                                        >
+                                          {row.highLabel} {(isDraggingHigh ? Math.round(signalDragging!.currentValue) : row.high).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div
+                                      className="sv5-signal-bar-track"
+                                      ref={el => { if (el) signalBarRefs.current.set(row.id, el); else signalBarRefs.current.delete(row.id) }}
+                                    >
+                                      <div className={`sv5-signal-bar-fill zone-${row.zone}`} style={{ width: `${dispPct}%` }} />
+                                      <div className="sv5-signal-bar-cursor" style={{ left: `${dispPct}%` }} />
+                                      {/* Poignées de glissement */}
+                                      {row.low !== null && row.high !== null && (
+                                        <>
+                                          <div
+                                            className="sv5-signal-drag-handle sv5-signal-drag-low"
+                                            onMouseDown={e => handleSignalDragStart(e, { id: row.id, algo: row.algo, strategy: row.strategy, low: row.low!, high: row.high! }, 'low')}
+                                            title={`Glisser pour ajuster ${row.lowLabel}`}
+                                          />
+                                          <div
+                                            className="sv5-signal-drag-handle sv5-signal-drag-high"
+                                            onMouseDown={e => handleSignalDragStart(e, { id: row.id, algo: row.algo, strategy: row.strategy, low: row.low!, high: row.high! }, 'high')}
+                                            title={`Glisser pour ajuster ${row.highLabel}`}
+                                          />
+                                        </>
+                                      )}
+                                    </div>
+                                  </>
+                                )
+                              })()}
                             <div className="sv5-signal-distances">
                               {row.zone === 'buy' && (
                                 <span className="sv5-dist buy">BUY ZONE</span>
