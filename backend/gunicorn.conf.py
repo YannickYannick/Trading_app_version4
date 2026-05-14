@@ -2,7 +2,7 @@
 proc_name = 'trading_app_v4'
 
 # Adresses d'écoute
-bind = '127.0.0.1:8000'
+bind = '0.0.0.0:8000'
 
 # Workers — fixed at 2 for Railway Hobby plan (0.5 vCPU, 0.5 GB RAM)
 workers = 2
