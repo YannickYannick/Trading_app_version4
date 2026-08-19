@@ -1991,8 +1991,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             }, status=400)
 
         try:
-            from apps.trading.brokers.saxo import SaxoBroker
-            broker = SaxoBroker(account.credentials)
+            from apps.trading.services.broker_service import BrokerService
+            broker_svc = BrokerService(request.user)
+            broker = broker_svc.get_broker_instance(account)
 
             if not uic and all_asset_id:
                 try:
