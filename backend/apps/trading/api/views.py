@@ -1985,7 +1985,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         broker_type = account.broker.broker_type if account.broker else None
 
-        if broker_type != 'saxo':
+        if (broker_type or '').upper() != 'SAXO':
             return Response({
                 'error': f'Estimation des coûts non supportée pour le broker {broker_type}'
             }, status=400)
