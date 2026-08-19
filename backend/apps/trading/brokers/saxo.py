@@ -891,7 +891,173 @@ class SaxoBroker(BrokerBase):
         except Exception as e:
             logger.error(f"Saxo get_price_details error: {e}")
             return {}
-    
+
+    def get_spread_info(
+        self,
+        uic: int,
+        asset_type: str = "Stock"
+    ) -> Dict[str, Any]:
+        """
+        Récupérer le spread Bid/Ask et les détails de prix pour un instrument.
+        """
+        try:
+            saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
+                asset_type.lower(), asset_type
+            )
+            params = {
+                "Uic": uic,
+                "AssetType": saxo_asset_type,
+                "FieldGroups": "DisplayAndFormat,InstrumentPriceDetails,PriceInfo,PriceInfoDetails,Quote",
+            }
+            data = self._make_request('GET', '/trade/v1/infoprices', params=params)
+
+            quote = data.get('Quote', {})
+            bid = quote.get('Bid')
+            ask = quote.get('Ask')
+            mid = quote.get('Mid')
+
+            spread = None
+            spread_pct = None
+            if bid is not None and ask is not None:
+                spread = round(ask - bid, 6)
+                if mid:
+                    spread_pct = round((spread / mid) * 100, 4)
+
+            return {
+                'bid': bid,
+                'ask': ask,
+                'mid': mid,
+                'spread': spread,
+                'spread_pct': spread_pct,
+                'price_info': data.get('PriceInfo', {}),
+                'price_info_details': data.get('PriceInfoDetails', {}),
+                'display_and_format': data.get('DisplayAndFormat', {}),
+            }
+        except Exception as e:
+            logger.error(f"Saxo get_spread_info error: {e}")
+            return {}
+
+    def precheck_order(
+        self,
+        uic: int,
+        asset_type: str,
+        side: str,
+        quantity: float,
+        order_type: str = "Market",
+        price: float = None,
+        stop_price: float = None,
+    ) -> Dict[str, Any]:
+        """
+        Appeler /trade/v2/orders/precheck pour obtenir les coûts estimés
+        avant placement d'un ordre.
+        """
+        try:
+            saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
+                asset_type.lower(), asset_type
+            )
+            keys = self._get_account_keys()
+            account_key = keys.get('account_key')
+
+            if not account_key:
+                return {'error': 'No account key available'}
+
+            payload = {
+                "Uic": uic,
+                "AssetType": saxo_asset_type,
+                "Amount": quantity,
+                "BuySell": "Buy" if side.lower() == 'buy' else "Sell",
+                "OrderType": order_type,
+                "AccountKey": account_key,
+                "OrderDuration": {"DurationType": "DayOrder"},
+                "FieldGroups": ["Costs"],
+            }
+
+            if price and order_type in ['Limit', 'StopLimit']:
+                payload["OrderPrice"] = price
+            if stop_price and order_type in ['Stop', 'StopLimit']:
+                payload["StopPrice"] = stop_price
+
+            data = self._make_request('POST', '/trade/v2/orders/precheck', json_data=payload)
+
+            costs = data.get('Costs', {})
+            trading_cost = costs.get('TradingCost', 0)
+            commission = costs.get('Commission', {})
+            spread_cost = costs.get('SpreadCost', 0)
+
+            return {
+                'precheck_ok': True,
+                'estimated_commission': commission.get('Value', 0) if isinstance(commission, dict) else commission,
+                'commission_currency': commission.get('Currency', '') if isinstance(commission, dict) else '',
+                'trading_cost': trading_cost,
+                'spread_cost': spread_cost,
+                'costs_raw': costs,
+                'raw_response': data,
+            }
+        except BrokerError as e:
+            logger.error(f"Saxo precheck_order broker error: {e}")
+            return {'precheck_ok': False, 'error': str(e)}
+        except Exception as e:
+            logger.error(f"Saxo precheck_order error: {e}")
+            return {'precheck_ok': False, 'error': str(e)}
+
+    def estimate_order_costs(
+        self,
+        uic: int,
+        asset_type: str,
+        side: str,
+        quantity: float,
+        order_type: str = "Market",
+        price: float = None,
+        stop_price: float = None,
+    ) -> Dict[str, Any]:
+        """
+        Estimation complète : spread + coûts d'achat + coûts estimés de revente.
+        Combine get_spread_info + precheck_order pour les 2 sens (achat + vente).
+        """
+        spread_info = self.get_spread_info(uic, asset_type)
+
+        buy_costs = self.precheck_order(
+            uic=uic, asset_type=asset_type, side='buy',
+            quantity=quantity, order_type=order_type,
+            price=price, stop_price=stop_price,
+        )
+
+        sell_costs = self.precheck_order(
+            uic=uic, asset_type=asset_type, side='sell',
+            quantity=quantity, order_type=order_type,
+            price=price, stop_price=stop_price,
+        )
+
+        mid = spread_info.get('mid')
+        ask = spread_info.get('ask')
+        bid = spread_info.get('bid')
+
+        entry_price = ask if side.lower() == 'buy' else bid
+        exit_price = bid if side.lower() == 'buy' else ask
+
+        total_buy_cost = buy_costs.get('estimated_commission', 0) or 0
+        total_sell_cost = sell_costs.get('estimated_commission', 0) or 0
+
+        estimated_resale_value = None
+        total_round_trip_cost = None
+        if entry_price and exit_price and quantity:
+            gross_value = exit_price * quantity
+            estimated_resale_value = round(gross_value - total_sell_cost, 2)
+            total_round_trip_cost = round(total_buy_cost + total_sell_cost, 2)
+
+        return {
+            'spread': spread_info,
+            'buy_costs': buy_costs,
+            'sell_costs': sell_costs,
+            'entry_price': entry_price,
+            'exit_price': exit_price,
+            'quantity': quantity,
+            'gross_entry_value': round(entry_price * quantity, 2) if entry_price else None,
+            'gross_exit_value': round(exit_price * quantity, 2) if exit_price else None,
+            'total_round_trip_cost': total_round_trip_cost,
+            'estimated_resale_value': estimated_resale_value,
+        }
+
     def get_historical_prices(
         self,
         uic: int,

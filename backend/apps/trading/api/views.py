@@ -1949,6 +1949,82 @@ class OrderViewSet(viewsets.ModelViewSet):
             'order': OrderSerializer(order).data
         })
     
+    @action(detail=False, methods=['post'], url_path='estimate-costs')
+    def estimate_costs(self, request):
+        """
+        POST /api/orders/estimate-costs/
+        Estime les coûts d'un ordre avant placement :
+        - Commissions (achat + vente)
+        - Spread Bid/Ask
+        - Estimation de la valeur de revente nette
+        """
+        broker_account_id = request.data.get('broker_account_id')
+        uic = request.data.get('uic')
+        asset_type = request.data.get('asset_type', 'Stock')
+        side = request.data.get('side', 'buy')
+        quantity = request.data.get('quantity')
+        order_type = request.data.get('order_type', 'Market')
+        price = request.data.get('price')
+        stop_price = request.data.get('stop_price')
+        symbol = request.data.get('symbol')
+        all_asset_id = request.data.get('all_asset_id')
+
+        if not broker_account_id:
+            return Response({'error': 'broker_account_id requis'}, status=400)
+        if not quantity:
+            return Response({'error': 'quantity requis'}, status=400)
+
+        try:
+            account = BrokerAccount.objects.get(
+                pk=broker_account_id,
+                user=request.user,
+                is_active=True
+            )
+        except BrokerAccount.DoesNotExist:
+            return Response({'error': 'Compte broker non trouvé'}, status=404)
+
+        broker_type = account.broker.broker_type if account.broker else None
+
+        if broker_type != 'saxo':
+            return Response({
+                'error': f'Estimation des coûts non supportée pour le broker {broker_type}'
+            }, status=400)
+
+        try:
+            from apps.trading.brokers.saxo import SaxoBroker
+            broker = SaxoBroker(account.credentials)
+
+            if not uic and all_asset_id:
+                try:
+                    from apps.trading.models import AllAssets
+                    aa = AllAssets.objects.get(pk=all_asset_id)
+                    uic = aa.saxo_uic
+                    asset_type = aa.saxo_asset_type or asset_type
+                except AllAssets.DoesNotExist:
+                    pass
+
+            if not uic and symbol:
+                uic = broker._get_uic_from_symbol(symbol, asset_type)
+
+            if not uic:
+                return Response({'error': 'UIC introuvable pour cet asset'}, status=400)
+
+            result = broker.estimate_order_costs(
+                uic=int(uic),
+                asset_type=asset_type,
+                side=side,
+                quantity=float(quantity),
+                order_type=order_type,
+                price=float(price) if price else None,
+                stop_price=float(stop_price) if stop_price else None,
+            )
+
+            return Response(result)
+
+        except Exception as e:
+            logger.error(f"estimate_costs error: {e}")
+            return Response({'error': str(e)}, status=500)
+
     @action(detail=False, methods=['post'])
     def get_asset_price(self, request):
         """

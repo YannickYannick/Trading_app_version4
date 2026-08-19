@@ -7,6 +7,7 @@ import Input from '@components/common/Input'
 import Loading from '@components/common/Loading'
 import Badge from '@components/common/Badge'
 import { orderService, brokerService, assetService } from '@services'
+import type { OrderCostEstimate } from '@services/orders'
 import { formatCurrency } from '@utils/format'
 import type { BrokerAccount } from '@types'
 import './PlaceOrderModal.css'
@@ -67,6 +68,11 @@ export default function PlaceOrderModal({
   } | null>(null)
   const [loadingPrice, setLoadingPrice] = useState(false)
   const [priceError, setPriceError] = useState<string | null>(null)
+
+  // Estimation des coûts
+  const [costEstimate, setCostEstimate] = useState<OrderCostEstimate | null>(null)
+  const [loadingCosts, setLoadingCosts] = useState(false)
+  const [costError, setCostError] = useState<string | null>(null)
 
   // Charger les broker accounts
   useEffect(() => {
@@ -223,6 +229,38 @@ export default function PlaceOrderModal({
     }
   }
   
+  const fetchCostEstimate = async () => {
+    if (!brokerAccountId || !quantity || parseFloat(quantity) <= 0) return
+    if (!allAssetId && !symbol.trim()) return
+
+    setLoadingCosts(true)
+    setCostError(null)
+    setCostEstimate(null)
+
+    try {
+      const result = await orderService.estimateCosts({
+        broker_account_id: brokerAccountId as number,
+        quantity: parseFloat(quantity),
+        side: side.toLowerCase(),
+        all_asset_id: allAssetId || undefined,
+        symbol: symbol.trim().toUpperCase(),
+        order_type: orderType === 'STOP_LIMIT' ? 'StopLimit' : orderType.charAt(0) + orderType.slice(1).toLowerCase(),
+        price: price ? parseFloat(price) : undefined,
+        stop_price: stopPrice ? parseFloat(stopPrice) : undefined,
+      })
+
+      if (result.error) {
+        setCostError(result.error)
+      } else {
+        setCostEstimate(result)
+      }
+    } catch (err: any) {
+      setCostError(err.response?.data?.error || err.message || 'Erreur lors de l\'estimation')
+    } finally {
+      setLoadingCosts(false)
+    }
+  }
+
   // Récupérer automatiquement les prix quand l'asset est sélectionné
   useEffect(() => {
     if (allAssetId && brokerAccountId && symbol) {
@@ -312,6 +350,8 @@ export default function PlaceOrderModal({
     setShowAutocomplete(false)
     setPriceData(null)
     setPriceError(null)
+    setCostEstimate(null)
+    setCostError(null)
     if (autocompleteTimeoutRef.current) {
       clearTimeout(autocompleteTimeoutRef.current)
     }
@@ -584,6 +624,131 @@ export default function PlaceOrderModal({
                     disabled={loading}
                     min="0.0001"
                   />
+                </div>
+              )}
+
+              {/* Estimation des coûts */}
+              {(allAssetId || symbol) && quantity && parseFloat(quantity) > 0 && (
+                <div className="form-group">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    fullWidth
+                    onClick={fetchCostEstimate}
+                    disabled={loadingCosts || loading}
+                  >
+                    {loadingCosts ? <><Loading size="sm" /> Estimation en cours...</> : 'Estimer les coûts'}
+                  </Button>
+
+                  {costError && (
+                    <div className="cost-error" style={{ marginTop: '0.5rem', color: 'var(--color-danger, #ef4444)', fontSize: '0.85rem' }}>
+                      {costError}
+                    </div>
+                  )}
+
+                  {costEstimate && (
+                    <div className="cost-estimate-card" style={{
+                      marginTop: '0.75rem',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      background: 'var(--color-surface, #1e1e2e)',
+                      border: '1px solid var(--color-border, #333)',
+                      fontSize: '0.85rem',
+                    }}>
+                      <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem' }}>Estimation des coûts</h4>
+
+                      {/* Spread */}
+                      {costEstimate.spread?.bid != null && costEstimate.spread?.ask != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Spread (Bid/Ask)</span>
+                          <span>
+                            {costEstimate.spread.bid.toFixed(2)} / {costEstimate.spread.ask.toFixed(2)}
+                            {costEstimate.spread.spread != null && (
+                              <span style={{ color: 'var(--color-warning, #f59e0b)', marginLeft: '0.5rem' }}>
+                                ({costEstimate.spread.spread.toFixed(4)} = {costEstimate.spread.spread_pct?.toFixed(3)}%)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Prix d'entrée / sortie */}
+                      {costEstimate.entry_price != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Prix d'entrée estimé</span>
+                          <span>{costEstimate.entry_price.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {costEstimate.exit_price != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Prix de sortie estimé</span>
+                          <span>{costEstimate.exit_price.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
+
+                      {/* Commissions */}
+                      {costEstimate.buy_costs?.precheck_ok && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission achat</span>
+                          <span>{costEstimate.buy_costs.estimated_commission?.toFixed(2)} {costEstimate.buy_costs.commission_currency}</span>
+                        </div>
+                      )}
+                      {costEstimate.sell_costs?.precheck_ok && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission vente (estimée)</span>
+                          <span>{costEstimate.sell_costs.estimated_commission?.toFixed(2)} {costEstimate.sell_costs.commission_currency}</span>
+                        </div>
+                      )}
+
+                      {/* Coûts totaux */}
+                      {costEstimate.total_round_trip_cost != null && (
+                        <>
+                          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Coût total aller-retour</span>
+                            <span style={{ color: 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
+                              {costEstimate.total_round_trip_cost.toFixed(2)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Valeurs brutes */}
+                      {costEstimate.gross_entry_value != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Valeur brute d'achat</span>
+                          <span>{costEstimate.gross_entry_value.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {/* Estimation revente */}
+                      {costEstimate.estimated_resale_value != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', paddingTop: '0.25rem' }}>
+                          <span style={{ fontWeight: 600 }}>Estimation revente nette</span>
+                          <span style={{ fontWeight: 600, color: 'var(--color-success, #22c55e)' }}>
+                            {costEstimate.estimated_resale_value.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* P&L instantané */}
+                      {costEstimate.gross_entry_value != null && costEstimate.estimated_resale_value != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--color-border, #555)' }}>
+                          <span style={{ fontWeight: 600 }}>P&L instantané (si revente immédiate)</span>
+                          <span style={{
+                            fontWeight: 700,
+                            color: (costEstimate.estimated_resale_value - costEstimate.gross_entry_value) >= 0
+                              ? 'var(--color-success, #22c55e)'
+                              : 'var(--color-danger, #ef4444)',
+                          }}>
+                            {(costEstimate.estimated_resale_value - costEstimate.gross_entry_value).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

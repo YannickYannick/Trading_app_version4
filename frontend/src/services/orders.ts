@@ -60,6 +60,43 @@ export interface AssetPriceResponse {
   }
 }
 
+export interface OrderCostEstimate {
+  spread: {
+    bid: number | null
+    ask: number | null
+    mid: number | null
+    spread: number | null
+    spread_pct: number | null
+    price_info: Record<string, unknown>
+    price_info_details: Record<string, unknown>
+    display_and_format: Record<string, unknown>
+  }
+  buy_costs: {
+    precheck_ok: boolean
+    estimated_commission: number
+    commission_currency: string
+    trading_cost: number
+    spread_cost: number
+    error?: string
+  }
+  sell_costs: {
+    precheck_ok: boolean
+    estimated_commission: number
+    commission_currency: string
+    trading_cost: number
+    spread_cost: number
+    error?: string
+  }
+  entry_price: number | null
+  exit_price: number | null
+  quantity: number
+  gross_entry_value: number | null
+  gross_exit_value: number | null
+  total_round_trip_cost: number | null
+  estimated_resale_value: number | null
+  error?: string
+}
+
 export const orderService = {
   /**
    * Récupérer tous les ordres
@@ -231,6 +268,22 @@ export const orderService = {
     all_asset_id?: number
   }): Promise<AssetPriceResponse> {
     const response = await apiClient.post<AssetPriceResponse>('/orders/get_asset_price/', data)
+    return response.data
+  },
+
+  async estimateCosts(data: {
+    broker_account_id: number
+    quantity: number
+    side: string
+    uic?: number
+    all_asset_id?: number
+    symbol?: string
+    asset_type?: string
+    order_type?: string
+    price?: number
+    stop_price?: number
+  }): Promise<OrderCostEstimate> {
+    const response = await apiClient.post<OrderCostEstimate>('/orders/estimate-costs/', data)
     return response.data
   },
 }
