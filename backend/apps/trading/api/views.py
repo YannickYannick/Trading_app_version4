@@ -2000,7 +2000,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                     from apps.trading.models import AllAssets
                     aa = AllAssets.objects.get(pk=all_asset_id)
                     uic = aa.saxo_uic
-                    asset_type = aa.saxo_asset_type or asset_type
+                    if aa.asset_type:
+                        asset_type = aa.asset_type
                 except AllAssets.DoesNotExist:
                     pass
 
@@ -2019,6 +2020,22 @@ class OrderViewSet(viewsets.ModelViewSet):
                 price=float(price) if price else None,
                 stop_price=float(stop_price) if stop_price else None,
             )
+
+            try:
+                from apps.trading.services.saxo import SaxoCostService
+                cost_service = SaxoCostService.from_credentials(account.get_credentials_dict())
+                saxo_asset_type = broker.ASSET_TYPE_MAPPING.get(str(asset_type).lower(), asset_type)
+                illustration = cost_service.estimate_instrument_cost(
+                    uic=int(uic),
+                    asset_type=saxo_asset_type,
+                    amount=float(quantity),
+                    price=float(price) if price else result.get('entry_price'),
+                    holding_days=int(request.data.get('holding_days') or 1),
+                )
+                result['instrument_cost'] = illustration.to_dict()
+            except Exception as cost_exc:
+                logger.warning(f"tradingconditions/cost failed: {cost_exc}")
+                result['instrument_cost_error'] = str(cost_exc)
 
             return Response(result)
 

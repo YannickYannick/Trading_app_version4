@@ -1,0 +1,12 @@
+{
+  "PreCheckResult": "Ok",
+  "EstimatedCashRequired": 57.2,
+  "EstimatedCashRequiredCurrency": "EUR",
+  "EstimatedTotalCost": 1.0,
+  "Cost": {
+    "Commission": 1.0,
+    "ExchangeFee": 0,
+    "StampDuty": 0,
+    "GuaranteedStopFee": 0
+  }
+}

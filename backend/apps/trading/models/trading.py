@@ -162,6 +162,58 @@ class Trade(TimeStampedModel):
         return self.quantity * self.price
 
 
+class TransactionCost(TimeStampedModel):
+    """Coûts de transaction Saxo (estimés ou réalisés)."""
+
+    class Source(models.TextChoices):
+        PRECHECK = 'precheck', 'Precheck'
+        REPORT = 'report', 'Report'
+        TRADING_CONDITIONS = 'trading_conditions', 'Trading conditions'
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='transaction_costs'
+    )
+    trade = models.ForeignKey(
+        Trade, on_delete=models.CASCADE, related_name='transaction_costs',
+        null=True, blank=True,
+    )
+    commission = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    exchange_fee = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    spread_cost = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    financing_cost = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    tax = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    total_cost = models.DecimalField(max_digits=20, decimal_places=8, default=0)
+    currency = models.CharField(max_length=10, default='EUR')
+    is_estimate = models.BooleanField(default=True)
+    source = models.CharField(max_length=32, choices=Source.choices)
+    saxo_trade_id = models.CharField(max_length=100, blank=True, default='')
+    uic = models.IntegerField(null=True, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['-fetched_at']
+        verbose_name = 'Transaction cost'
+        verbose_name_plural = 'Transaction costs'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['trade', 'source'],
+                name='uniq_transaction_cost_trade_source',
+                condition=models.Q(trade__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=['saxo_trade_id', 'source'],
+                name='uniq_transaction_cost_saxo_trade_source',
+                condition=~models.Q(saxo_trade_id=''),
+            ),
+        ]
+
+    def __str__(self):
+        kind = 'est.' if self.is_estimate else 'réel'
+        return f"{self.source} {kind} {self.total_cost} {self.currency}"
+
+
+
 class Order(TimeStampedModel):
     """Ordre en attente d'exécution."""
     

@@ -1,0 +1,16 @@
+{
+  "Data": [
+    {
+      "TradeId": "1001",
+      "Uic": 23255427,
+      "AssetType": "Stock",
+      "Amount": 1,
+      "BuySell": "Buy",
+      "TradeDate": "2026-08-24T14:36:00Z",
+      "Commissions": [{"Value": 1.0}],
+      "ExchangeFee": 0,
+      "AccountCurrency": "EUR"
+    }
+  ],
+  "__next": "https://gateway.saxobank.com/openapi/cs/v1/reports/trades/next-page"
+}

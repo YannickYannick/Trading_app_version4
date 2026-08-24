@@ -688,31 +688,92 @@ export default function PlaceOrderModal({
 
                       <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
 
-                      {/* Commissions */}
-                      {costEstimate.buy_costs?.precheck_ok && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission achat</span>
-                          <span>{costEstimate.buy_costs.estimated_commission?.toFixed(2)} {costEstimate.buy_costs.commission_currency}</span>
-                        </div>
-                      )}
-                      {costEstimate.sell_costs?.precheck_ok && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission vente (estimée)</span>
-                          <span>{costEstimate.sell_costs.estimated_commission?.toFixed(2)} {costEstimate.sell_costs.commission_currency}</span>
+                      {costEstimate.instrument_cost_error && (
+                        <div style={{ marginBottom: '0.5rem', color: 'var(--color-warning, #f59e0b)' }}>
+                          Coûts Saxo : {costEstimate.instrument_cost_error}
                         </div>
                       )}
 
-                      {/* Coûts totaux */}
-                      {costEstimate.total_round_trip_cost != null && (
+                      {costEstimate.instrument_cost?.long && (
                         <>
-                          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Coût total aller-retour</span>
-                            <span style={{ color: 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
-                              {costEstimate.total_round_trip_cost.toFixed(2)}
+                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission (illustration Saxo)</span>
+                            <span>
+                              {costEstimate.instrument_cost.long.trading.commissions.toFixed(2)} {costEstimate.instrument_cost.long.currency}
+                            </span>
+                          </div>
+                          {costEstimate.instrument_cost.long.trading.conversion_cost > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Conversion de devise</span>
+                              <span>{costEstimate.instrument_cost.long.trading.conversion_cost.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {costEstimate.instrument_cost.long.holding.tax > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Taxes / holding</span>
+                              <span>{costEstimate.instrument_cost.long.holding.tax.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>
+                              Coût total illustration ({costEstimate.instrument_cost.holding_period_in_days} j)
+                            </span>
+                            <span style={{ fontWeight: 600 }}>
+                              {costEstimate.instrument_cost.long.total_cost.toFixed(2)} {costEstimate.instrument_cost.account_currency}
                             </span>
                           </div>
                         </>
+                      )}
+
+                      {/* Commissions achat */}
+                      {costEstimate.buy_costs?.precheck_ok && (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission achat</span>
+                            <span>{costEstimate.buy_costs.commission?.toFixed(2)}</span>
+                          </div>
+                          {costEstimate.buy_costs.exchange_fee > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Frais de bourse (achat)</span>
+                              <span>{costEstimate.buy_costs.exchange_fee.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Commissions vente */}
+                      {costEstimate.sell_costs?.precheck_ok && (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission vente (estimée)</span>
+                            <span>{costEstimate.sell_costs.commission?.toFixed(2)}</span>
+                          </div>
+                          {costEstimate.sell_costs.exchange_fee > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Frais de bourse (vente)</span>
+                              <span>{costEstimate.sell_costs.exchange_fee.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Coûts totaux */}
+                      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
+                      {costEstimate.total_round_trip_cost != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Coût total aller-retour</span>
+                          <span style={{ color: 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
+                            {costEstimate.total_round_trip_cost.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Cash requis */}
+                      {costEstimate.buy_costs?.estimated_cash_required > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Cash requis</span>
+                          <span>{costEstimate.buy_costs.estimated_cash_required.toFixed(2)} {costEstimate.buy_costs.estimated_cash_currency}</span>
+                        </div>
                       )}
 
                       {/* Valeurs brutes */}

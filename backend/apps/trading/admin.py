@@ -6,7 +6,7 @@ from django.utils.safestring import mark_safe
 from django.db.models import Count, Min, Max
 from .models import (
     AllAssets, Asset, AssetPrice, AllAssetPriceHistory,
-    Position, Trade, Order,
+    Position, Trade, Order, TransactionCost,
     Strategy, StrategyPerformance,
     AlgorithmParameter, AlgorithmSchema, AlgorithmParameterDefinition,
     Broker, BrokerAccount, BrokerSyncLog,
@@ -395,6 +395,17 @@ class TradeAdmin(admin.ModelAdmin):
         """Affiche le symbole Yahoo de l'AllAsset."""
         return obj.all_asset.symbole_yahoo if obj.all_asset and obj.all_asset.symbole_yahoo else '-'
     all_asset_yahoo_symbol.short_description = 'Symbole Yahoo'
+
+
+@admin.register(TransactionCost)
+class TransactionCostAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'trade', 'source', 'is_estimate', 'commission', 'total_cost',
+        'currency', 'saxo_trade_id', 'fetched_at',
+    ]
+    list_filter = ['source', 'is_estimate', 'currency']
+    search_fields = ['saxo_trade_id', 'trade__broker_trade_id']
+    ordering = ['-fetched_at']
 
 
 @admin.register(Order)

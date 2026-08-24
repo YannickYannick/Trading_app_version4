@@ -1,0 +1,13 @@
+{
+  "Data": [
+    {
+      "TradeId": "1002",
+      "Uic": 211,
+      "Amount": 10,
+      "BuySell": "Sell",
+      "TradeDate": "2026-08-20T10:00:00Z",
+      "Commission": 2.5,
+      "AccountCurrency": "EUR"
+    }
+  ]
+}

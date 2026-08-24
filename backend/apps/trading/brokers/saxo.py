@@ -6,6 +6,7 @@ Il gère l'authentification OAuth2, la récupération des assets, des prix,
 des positions, des trades et le placement d'ordres.
 """
 
+import json
 import requests
 import logging
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from typing import Dict, List, Optional, Any
 from decimal import Decimal
 from urllib.parse import urlencode, urlparse, urlunparse
 from django.utils import timezone
+from apps.trading.services.saxo.payloads import build_order_payload
 
 from .base import (
     BrokerBase, 
@@ -58,6 +60,8 @@ class SaxoBroker(BrokerBase):
     
     BROKER_NAME = "Saxo Bank"
     BROKER_TYPE = "saxo"
+    LIVE_BASE_URL = "https://gateway.saxobank.com/openapi"
+    SIM_BASE_URL = "https://gateway.saxobank.com/sim/openapi"
     
     # Mapping des types d'assets Saxo
     ASSET_TYPE_MAPPING = {
@@ -121,10 +125,10 @@ class SaxoBroker(BrokerBase):
         # ✅ MIGRATION: Défaut changé de 'simulation' vers 'live'
         environment = credentials.get('environment', 'live')
         if environment == 'live':
-            self.base_url = "https://gateway.saxobank.com/openapi"
+            self.base_url = self.LIVE_BASE_URL
             self.auth_url = "https://live.logonvalidation.net"
         else:
-            self.base_url = "https://gateway.saxobank.com/sim/openapi"
+            self.base_url = self.SIM_BASE_URL
             self.auth_url = "https://sim.logonvalidation.net"
         
         # Détecter automatiquement un mismatch Token/URL
@@ -895,21 +899,65 @@ class SaxoBroker(BrokerBase):
     def get_spread_info(
         self,
         uic: int,
-        asset_type: str = "Stock"
+        asset_type: str = "Stock",
+        quantity: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Récupérer le spread Bid/Ask et les détails de prix pour un instrument.
+
+        Priorité au endpoint `/trade/v1/infoprices/list` documenté par Saxo,
+        qui accepte notamment AccountKey, Amount et Uics.
+        Repli sur `/trade/v1/prices`, puis `/trade/v1/infoprices` si nécessaire.
         """
         try:
             saxo_asset_type = self.ASSET_TYPE_MAPPING.get(
                 asset_type.lower(), asset_type
             )
+            keys = self._get_account_keys()
             params = {
                 "Uic": uic,
                 "AssetType": saxo_asset_type,
                 "FieldGroups": "DisplayAndFormat,InstrumentPriceDetails,PriceInfo,PriceInfoDetails,Quote",
             }
-            data = self._make_request('GET', '/trade/v1/infoprices', params=params)
+
+            if keys.get('account_key'):
+                params["AccountKey"] = keys["account_key"]
+            if keys.get('client_key'):
+                params["ClientKey"] = keys["client_key"]
+
+            data = {}
+            try:
+                list_params = {
+                    "Uics": str(uic),
+                    "AssetType": saxo_asset_type,
+                    "FieldGroups": "DisplayAndFormat,InstrumentPriceDetails,PriceInfo,PriceInfoDetails,Quote",
+                    "ToOpenClose": "ToOpen",
+                }
+                if keys.get('account_key'):
+                    list_params["AccountKey"] = keys["account_key"]
+                if quantity:
+                    list_params["Amount"] = quantity
+
+                list_data = self._make_request('GET', '/trade/v1/infoprices/list', params=list_params)
+                if isinstance(list_data, dict) and list_data.get("Data"):
+                    data = list_data["Data"][0] or {}
+                    logger.debug(f"Saxo get_spread_info using infoprices/list for UIC {uic}")
+                else:
+                    raise ValueError("Empty Data from /trade/v1/infoprices/list")
+            except Exception as list_error:
+                logger.warning(
+                    f"Saxo infoprices/list unavailable for UIC {uic}: {list_error}. "
+                    "Fallback to /trade/v1/prices."
+                )
+                try:
+                    data = self._make_request('GET', '/trade/v1/prices', params=params)
+                    logger.debug(f"Saxo get_spread_info using tradable prices for UIC {uic}")
+                except Exception as prices_error:
+                    logger.warning(
+                        f"Saxo tradable prices unavailable for UIC {uic}: {prices_error}. "
+                        "Fallback to /trade/v1/infoprices."
+                    )
+                    data = self._make_request('GET', '/trade/v1/infoprices', params=params)
 
             quote = data.get('Quote', {})
             bid = quote.get('Bid')
@@ -961,37 +1009,48 @@ class SaxoBroker(BrokerBase):
             if not account_key:
                 return {'error': 'No account key available'}
 
-            payload = {
-                "Uic": uic,
-                "AssetType": saxo_asset_type,
-                "Amount": quantity,
-                "BuySell": "Buy" if side.lower() == 'buy' else "Sell",
-                "OrderType": order_type,
-                "AccountKey": account_key,
-                "OrderDuration": {"DurationType": "DayOrder"},
-                "FieldGroups": ["Costs"],
-            }
-
-            if price and order_type in ['Limit', 'StopLimit']:
-                payload["OrderPrice"] = price
-            if stop_price and order_type in ['Stop', 'StopLimit']:
-                payload["StopPrice"] = stop_price
+            payload = build_order_payload(
+                uic=uic,
+                asset_type=saxo_asset_type,
+                side=side,
+                quantity=quantity,
+                account_key=account_key,
+                order_type=order_type,
+                price=price,
+                stop_price=stop_price,
+                include_costs_field_group=True,
+            )
 
             data = self._make_request('POST', '/trade/v2/orders/precheck', json_data=payload)
 
-            costs = data.get('Costs', {})
-            trading_cost = costs.get('TradingCost', 0)
-            commission = costs.get('Commission', {})
-            spread_cost = costs.get('SpreadCost', 0)
+            logger.info(f"Saxo precheck_order raw response: {json.dumps(data, indent=2, default=str)}")
+
+            cost = data.get('Cost', {})
+            commission = cost.get('Commission', 0)
+            exchange_fee = cost.get('ExchangeFee', 0)
+            stamp_duty = cost.get('StampDuty', 0)
+            guaranteed_stop_fee = cost.get('GuaranteedStopFee', 0)
+
+            estimated_total_cost = data.get('EstimatedTotalCost', 0)
+            estimated_total_cost_acc = data.get('EstimatedTotalCostInAccountCurrency', 0)
+            estimated_cash_required = data.get('EstimatedCashRequired', 0)
+            estimated_cash_currency = data.get('EstimatedCashRequiredCurrency', '')
+            conversion_rate = data.get('InstrumentToAccountConversionRate', 1)
 
             return {
-                'precheck_ok': True,
-                'estimated_commission': commission.get('Value', 0) if isinstance(commission, dict) else commission,
-                'commission_currency': commission.get('Currency', '') if isinstance(commission, dict) else '',
-                'trading_cost': trading_cost,
-                'spread_cost': spread_cost,
-                'costs_raw': costs,
-                'raw_response': data,
+                'precheck_ok': data.get('PreCheckResult') == 'Ok',
+                'precheck_result': data.get('PreCheckResult', ''),
+                'commission': commission,
+                'exchange_fee': exchange_fee,
+                'stamp_duty': stamp_duty,
+                'guaranteed_stop_fee': guaranteed_stop_fee,
+                'total_cost': commission + exchange_fee + stamp_duty + guaranteed_stop_fee,
+                'estimated_total_cost': estimated_total_cost,
+                'estimated_total_cost_account_currency': estimated_total_cost_acc,
+                'estimated_cash_required': estimated_cash_required,
+                'estimated_cash_currency': estimated_cash_currency,
+                'conversion_rate': conversion_rate,
+                'cost_raw': cost,
             }
         except BrokerError as e:
             logger.error(f"Saxo precheck_order broker error: {e}")
@@ -1014,7 +1073,7 @@ class SaxoBroker(BrokerBase):
         Estimation complète : spread + coûts d'achat + coûts estimés de revente.
         Combine get_spread_info + precheck_order pour les 2 sens (achat + vente).
         """
-        spread_info = self.get_spread_info(uic, asset_type)
+        spread_info = self.get_spread_info(uic, asset_type, quantity=quantity)
 
         buy_costs = self.precheck_order(
             uic=uic, asset_type=asset_type, side='buy',
@@ -1035,8 +1094,8 @@ class SaxoBroker(BrokerBase):
         entry_price = ask if side.lower() == 'buy' else bid
         exit_price = bid if side.lower() == 'buy' else ask
 
-        total_buy_cost = buy_costs.get('estimated_commission', 0) or 0
-        total_sell_cost = sell_costs.get('estimated_commission', 0) or 0
+        total_buy_cost = buy_costs.get('total_cost', 0) or 0
+        total_sell_cost = sell_costs.get('total_cost', 0) or 0
 
         estimated_resale_value = None
         total_round_trip_cost = None
@@ -1842,35 +1901,25 @@ class SaxoBroker(BrokerBase):
                 asset_type.lower(), 
                 asset_type
             )
-            
-            # Construire les données de l'ordre
-            order_data = {
-                "Uic": uic,
-                "AssetType": saxo_asset_type,
-                "Amount": float(quantity),
-                "BuySell": "Buy" if side.lower() == 'buy' else "Sell",
-                "OrderType": order_type,
-                "ManualOrder": kwargs.get('manual_order', False),  # Required by Saxo API
-            }
-            
-            # Ajouter le compte si disponible
-            if self.account_key:
-                order_data["AccountKey"] = self.account_key
-            
-            # Ajouter le prix pour les ordres limite
-            if price and order_type in ['Limit', 'StopLimit']:
-                order_data["OrderPrice"] = float(price)
-            
-            # Ajouter le prix stop pour les ordres stop (peut venir du paramètre direct ou de kwargs)
-            stop_price_param = stop_price or kwargs.get('stop_price') or kwargs.get('stopPrice')
-            if stop_price_param and order_type in ['Stop', 'StopLimit']:
-                order_data["StopPrice"] = float(stop_price_param)
-            
-            # Durée de l'ordre
+            keys = self._get_account_keys()
+            account_key = keys.get('account_key') or self.account_key
+            if not account_key:
+                return OrderResult(success=False, error="No account key available")
+
             duration = kwargs.get('duration', 'DayOrder')
-            order_data["OrderDuration"] = {"DurationType": duration}
-            
-            # Placer l'ordre
+            order_data = build_order_payload(
+                uic=uic,
+                asset_type=saxo_asset_type,
+                side=side,
+                quantity=float(quantity),
+                account_key=account_key,
+                order_type=order_type,
+                price=float(price) if price is not None else None,
+                stop_price=float(stop_price) if stop_price is not None else None,
+                duration=duration,
+                manual_order=kwargs.get('manual_order', True),
+            )
+
             data = self._make_request('POST', '/trade/v2/orders', json_data=order_data)
             
             order_id = data.get('OrderId')

@@ -1,0 +1,5 @@
+{
+  "PreCheckResult": "Error",
+  "ErrorInfo": {"ErrorCode": "InsufficientCash", "Message": "Not enough cash"},
+  "Cost": {}
+}

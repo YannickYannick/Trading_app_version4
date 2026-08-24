@@ -73,18 +73,32 @@ export interface OrderCostEstimate {
   }
   buy_costs: {
     precheck_ok: boolean
-    estimated_commission: number
-    commission_currency: string
-    trading_cost: number
-    spread_cost: number
+    precheck_result: string
+    commission: number
+    exchange_fee: number
+    stamp_duty: number
+    guaranteed_stop_fee: number
+    total_cost: number
+    estimated_total_cost: number
+    estimated_total_cost_account_currency: number
+    estimated_cash_required: number
+    estimated_cash_currency: string
+    conversion_rate: number
     error?: string
   }
   sell_costs: {
     precheck_ok: boolean
-    estimated_commission: number
-    commission_currency: string
-    trading_cost: number
-    spread_cost: number
+    precheck_result: string
+    commission: number
+    exchange_fee: number
+    stamp_duty: number
+    guaranteed_stop_fee: number
+    total_cost: number
+    estimated_total_cost: number
+    estimated_total_cost_account_currency: number
+    estimated_cash_required: number
+    estimated_cash_currency: string
+    conversion_rate: number
     error?: string
   }
   entry_price: number | null
@@ -94,6 +108,34 @@ export interface OrderCostEstimate {
   gross_exit_value: number | null
   total_round_trip_cost: number | null
   estimated_resale_value: number | null
+  instrument_cost?: {
+    account_currency: string
+    instrument: string
+    holding_period_in_days: number
+    long: {
+      total_cost: number
+      total_cost_pct: number
+      currency: string
+      trading: {
+        commissions: number
+        spread: number
+        conversion_cost: number
+        exchange_fee: number
+        ticket: number
+      }
+      holding: {
+        funding_cost: number
+        carrying_cost: number
+        custody: number
+        tax: number
+      }
+    }
+    short: {
+      total_cost: number
+      trading: { commissions: number }
+    }
+  }
+  instrument_cost_error?: string
   error?: string
 }
 

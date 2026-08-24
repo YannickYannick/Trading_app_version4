@@ -1,0 +1,43 @@
+{
+  "AccountCurrency": "EUR",
+  "AccountID": "123",
+  "Amount": 1,
+  "AssetType": "Stock",
+  "Cost": {
+    "Long": {
+      "BuySell": "Buy",
+      "Currency": "EUR",
+      "HoldingCost": {
+        "FundingCost": {"Value": 0.02},
+        "CarryingCost": {"Value": 0},
+        "Custody": {"Value": 0.01},
+        "Tax": [{"Value": 0.5, "Pct": 0.3}]
+      },
+      "TotalCost": 3.61,
+      "TotalCostPct": 1.14,
+      "TradingCost": {
+        "Commissions": [{"Value": 1.0, "Pct": 0.316}],
+        "Spread": {"Value": 0.03},
+        "ConversionCost": {"Value": 2.58},
+        "ExchangeFee": {"Value": 0},
+        "Ticket": {"Value": 0}
+      }
+    },
+    "Short": {
+      "BuySell": "Sell",
+      "Currency": "EUR",
+      "HoldingCost": {"Tax": []},
+      "TotalCost": 2.61,
+      "TotalCostPct": 0.82,
+      "TradingCost": {
+        "Commissions": [{"Value": 1.0}],
+        "Spread": {"Value": 0.03},
+        "ExchangeFee": {"Value": 0}
+      }
+    }
+  },
+  "HoldingPeriodInDays": 1,
+  "Instrument": "TotalEnergies SE",
+  "Price": 56.2,
+  "Uic": 23255427
+}
