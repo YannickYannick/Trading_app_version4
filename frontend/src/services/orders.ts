@@ -132,7 +132,21 @@ export interface OrderCostEstimate {
     }
     short: {
       total_cost: number
-      trading: { commissions: number }
+      total_cost_pct?: number
+      currency?: string
+      trading: {
+        commissions: number
+        spread?: number
+        conversion_cost?: number
+        exchange_fee?: number
+        ticket?: number
+      }
+      holding?: {
+        funding_cost: number
+        carrying_cost: number
+        custody: number
+        tax: number
+      }
     }
   }
   instrument_cost_error?: string

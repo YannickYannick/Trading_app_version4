@@ -69,10 +69,17 @@ export default function PlaceOrderModal({
   const [loadingPrice, setLoadingPrice] = useState(false)
   const [priceError, setPriceError] = useState<string | null>(null)
 
-  // Estimation des coûts
+  // Estimation des coûts (auto pour Saxo)
   const [costEstimate, setCostEstimate] = useState<OrderCostEstimate | null>(null)
   const [loadingCosts, setLoadingCosts] = useState(false)
   const [costError, setCostError] = useState<string | null>(null)
+  const costEstimateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const selectedBrokerAccount = brokerAccounts.find((acc) => acc.id === brokerAccountId)
+  const selectedBrokerType = (
+    selectedBrokerAccount?.broker?.broker_type || selectedBrokerAccount?.broker_type || ''
+  ).toUpperCase()
+  const isSaxoAccount = selectedBrokerType === 'SAXO'
 
   // Charger les broker accounts
   useEffect(() => {
@@ -271,6 +278,52 @@ export default function PlaceOrderModal({
     }
   }, [allAssetId, brokerAccountId, symbol])
 
+  // Estimation auto des coûts Saxo dès que l'ordre est suffisamment renseigné
+  useEffect(() => {
+    if (costEstimateTimeoutRef.current) {
+      clearTimeout(costEstimateTimeoutRef.current)
+    }
+
+    if (!isOpen || !isSaxoAccount || !brokerAccountId || !quantity || parseFloat(quantity) <= 0) {
+      setCostEstimate(null)
+      setCostError(null)
+      setLoadingCosts(false)
+      return
+    }
+    if (!allAssetId && !symbol.trim()) {
+      setCostEstimate(null)
+      setCostError(null)
+      return
+    }
+    if (orderType === 'LIMIT' && (!price || parseFloat(price) <= 0)) {
+      return
+    }
+    if ((orderType === 'STOP' || orderType === 'STOP_LIMIT') && (!stopPrice || parseFloat(stopPrice) <= 0)) {
+      return
+    }
+
+    costEstimateTimeoutRef.current = setTimeout(() => {
+      fetchCostEstimate()
+    }, 500)
+
+    return () => {
+      if (costEstimateTimeoutRef.current) {
+        clearTimeout(costEstimateTimeoutRef.current)
+      }
+    }
+  }, [
+    isOpen,
+    isSaxoAccount,
+    brokerAccountId,
+    allAssetId,
+    symbol,
+    quantity,
+    side,
+    orderType,
+    price,
+    stopPrice,
+  ])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -305,6 +358,15 @@ export default function PlaceOrderModal({
 
     setLoading(true)
     try {
+      // Rafraîchir l'estimation juste avant le placement (Saxo)
+      if (isSaxoAccount) {
+        try {
+          await fetchCostEstimate()
+        } catch {
+          // Ne bloque pas le placement si l'estimation échoue
+        }
+      }
+
       const orderData: any = {
         broker_account_id: brokerAccountId as number,
         symbol: symbol.trim().toUpperCase(),
@@ -352,14 +414,36 @@ export default function PlaceOrderModal({
     setPriceError(null)
     setCostEstimate(null)
     setCostError(null)
+    setLoadingCosts(false)
     if (autocompleteTimeoutRef.current) {
       clearTimeout(autocompleteTimeoutRef.current)
+    }
+    if (costEstimateTimeoutRef.current) {
+      clearTimeout(costEstimateTimeoutRef.current)
     }
     onClose()
   }
 
   const requiresPrice = orderType === 'LIMIT' || orderType === 'STOP_LIMIT'
   const requiresStopPrice = orderType === 'STOP' || orderType === 'STOP_LIMIT'
+
+  const tradeCosts = side === 'BUY' ? costEstimate?.buy_costs : costEstimate?.sell_costs
+  const sideIllustration =
+    side === 'BUY' ? costEstimate?.instrument_cost?.long : costEstimate?.instrument_cost?.short
+  const tradeCommission =
+    tradeCosts?.precheck_ok && tradeCosts.commission != null
+      ? tradeCosts.commission
+      : sideIllustration?.trading?.commissions
+  const tradeConversion = costEstimate?.instrument_cost?.long?.trading?.conversion_cost ?? 0
+  const tradeTax =
+    side === 'BUY'
+      ? costEstimate?.instrument_cost?.long?.holding?.tax ?? 0
+      : 0
+  const estimatedCash =
+    side === 'BUY' && tradeCosts?.estimated_cash_required
+      ? tradeCosts.estimated_cash_required
+      : null
+  const estimatedCashCcy = tradeCosts?.estimated_cash_currency || costEstimate?.instrument_cost?.account_currency || ''
 
   if (!isOpen) return null
 
@@ -627,187 +711,122 @@ export default function PlaceOrderModal({
                 </div>
               )}
 
-              {/* Estimation des coûts */}
-              {(allAssetId || symbol) && quantity && parseFloat(quantity) > 0 && (
-                <div className="form-group">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    fullWidth
-                    onClick={fetchCostEstimate}
-                    disabled={loadingCosts || loading}
-                  >
-                    {loadingCosts ? <><Loading size="sm" /> Estimation en cours...</> : 'Estimer les coûts'}
-                  </Button>
+              {/* Estimation des coûts Saxo (auto) */}
+              {isSaxoAccount && (allAssetId || symbol) && quantity && parseFloat(quantity) > 0 && (
+                <div className="form-group cost-estimate-section">
+                  <div className="cost-estimate-header">
+                    <label>Coûts estimés (Saxo)</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={fetchCostEstimate}
+                      disabled={loadingCosts || loading}
+                    >
+                      {loadingCosts ? <><Loading size="sm" /> …</> : 'Actualiser'}
+                    </Button>
+                  </div>
 
-                  {costError && (
-                    <div className="cost-error" style={{ marginTop: '0.5rem', color: 'var(--color-danger, #ef4444)', fontSize: '0.85rem' }}>
-                      {costError}
+                  {loadingCosts && !costEstimate && (
+                    <div className="cost-estimate-loading">
+                      <Loading size="sm" /> Calcul des frais en cours…
                     </div>
                   )}
 
+                  {costError && (
+                    <div className="cost-error">{costError}</div>
+                  )}
+
                   {costEstimate && (
-                    <div className="cost-estimate-card" style={{
-                      marginTop: '0.75rem',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      background: 'var(--color-surface, #1e1e2e)',
-                      border: '1px solid var(--color-border, #333)',
-                      fontSize: '0.85rem',
-                    }}>
-                      <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem' }}>Estimation des coûts</h4>
+                    <div className="cost-estimate-card">
+                      <h4>Ce trade ({side === 'BUY' ? 'achat' : 'vente'})</h4>
 
-                      {/* Spread */}
-                      {costEstimate.spread?.bid != null && costEstimate.spread?.ask != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Spread (Bid/Ask)</span>
-                          <span>
-                            {costEstimate.spread.bid.toFixed(2)} / {costEstimate.spread.ask.toFixed(2)}
-                            {costEstimate.spread.spread != null && (
-                              <span style={{ color: 'var(--color-warning, #f59e0b)', marginLeft: '0.5rem' }}>
-                                ({costEstimate.spread.spread.toFixed(4)} = {costEstimate.spread.spread_pct?.toFixed(3)}%)
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Prix d'entrée / sortie */}
                       {costEstimate.entry_price != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Prix d'entrée estimé</span>
+                        <div className="cost-row">
+                          <span>Prix estimé</span>
                           <span>{costEstimate.entry_price.toFixed(2)}</span>
                         </div>
                       )}
-                      {costEstimate.exit_price != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Prix de sortie estimé</span>
-                          <span>{costEstimate.exit_price.toFixed(2)}</span>
-                        </div>
-                      )}
-
-                      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
-
-                      {costEstimate.instrument_cost_error && (
-                        <div style={{ marginBottom: '0.5rem', color: 'var(--color-warning, #f59e0b)' }}>
-                          Coûts Saxo : {costEstimate.instrument_cost_error}
-                        </div>
-                      )}
-
-                      {costEstimate.instrument_cost?.long && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission (illustration Saxo)</span>
-                            <span>
-                              {costEstimate.instrument_cost.long.trading.commissions.toFixed(2)} {costEstimate.instrument_cost.long.currency}
-                            </span>
-                          </div>
-                          {costEstimate.instrument_cost.long.trading.conversion_cost > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Conversion de devise</span>
-                              <span>{costEstimate.instrument_cost.long.trading.conversion_cost.toFixed(2)}</span>
-                            </div>
-                          )}
-                          {costEstimate.instrument_cost.long.holding.tax > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Taxes / holding</span>
-                              <span>{costEstimate.instrument_cost.long.holding.tax.toFixed(2)}</span>
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>
-                              Coût total illustration ({costEstimate.instrument_cost.holding_period_in_days} j)
-                            </span>
-                            <span style={{ fontWeight: 600 }}>
-                              {costEstimate.instrument_cost.long.total_cost.toFixed(2)} {costEstimate.instrument_cost.account_currency}
-                            </span>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Commissions achat */}
-                      {costEstimate.buy_costs?.precheck_ok && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission achat</span>
-                            <span>{costEstimate.buy_costs.commission?.toFixed(2)}</span>
-                          </div>
-                          {costEstimate.buy_costs.exchange_fee > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Frais de bourse (achat)</span>
-                              <span>{costEstimate.buy_costs.exchange_fee.toFixed(2)}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Commissions vente */}
-                      {costEstimate.sell_costs?.precheck_ok && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Commission vente (estimée)</span>
-                            <span>{costEstimate.sell_costs.commission?.toFixed(2)}</span>
-                          </div>
-                          {costEstimate.sell_costs.exchange_fee > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                              <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Frais de bourse (vente)</span>
-                              <span>{costEstimate.sell_costs.exchange_fee.toFixed(2)}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Coûts totaux */}
-                      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border, #333)', margin: '0.5rem 0' }} />
-                      {costEstimate.total_round_trip_cost != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Coût total aller-retour</span>
-                          <span style={{ color: 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
-                            {costEstimate.total_round_trip_cost.toFixed(2)}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Cash requis */}
-                      {costEstimate.buy_costs?.estimated_cash_required > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Cash requis</span>
-                          <span>{costEstimate.buy_costs.estimated_cash_required.toFixed(2)} {costEstimate.buy_costs.estimated_cash_currency}</span>
-                        </div>
-                      )}
-
-                      {/* Valeurs brutes */}
                       {costEstimate.gross_entry_value != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                          <span style={{ color: 'var(--color-text-secondary, #aaa)' }}>Valeur brute d'achat</span>
+                        <div className="cost-row">
+                          <span>Valeur brute</span>
                           <span>{costEstimate.gross_entry_value.toFixed(2)}</span>
                         </div>
                       )}
-
-                      {/* Estimation revente */}
-                      {costEstimate.estimated_resale_value != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', paddingTop: '0.25rem' }}>
-                          <span style={{ fontWeight: 600 }}>Estimation revente nette</span>
-                          <span style={{ fontWeight: 600, color: 'var(--color-success, #22c55e)' }}>
-                            {costEstimate.estimated_resale_value.toFixed(2)}
+                      {tradeCommission != null && (
+                        <div className="cost-row">
+                          <span>Commission</span>
+                          <span className="cost-highlight">
+                            {Number(tradeCommission).toFixed(2)}
+                            {estimatedCashCcy ? ` ${estimatedCashCcy}` : ''}
                           </span>
                         </div>
                       )}
-
-                      {/* P&L instantané */}
-                      {costEstimate.gross_entry_value != null && costEstimate.estimated_resale_value != null && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--color-border, #555)' }}>
-                          <span style={{ fontWeight: 600 }}>P&L instantané (si revente immédiate)</span>
-                          <span style={{
-                            fontWeight: 700,
-                            color: (costEstimate.estimated_resale_value - costEstimate.gross_entry_value) >= 0
-                              ? 'var(--color-success, #22c55e)'
-                              : 'var(--color-danger, #ef4444)',
-                          }}>
-                            {(costEstimate.estimated_resale_value - costEstimate.gross_entry_value).toFixed(2)}
-                          </span>
+                      {side === 'BUY' && tradeConversion > 0 && (
+                        <div className="cost-row">
+                          <span>Conversion de devise</span>
+                          <span>{tradeConversion.toFixed(2)} {estimatedCashCcy}</span>
                         </div>
                       )}
+                      {tradeTax > 0 && (
+                        <div className="cost-row">
+                          <span>Taxes</span>
+                          <span>{tradeTax.toFixed(2)} {estimatedCashCcy}</span>
+                        </div>
+                      )}
+                      {tradeCosts?.exchange_fee > 0 && (
+                        <div className="cost-row">
+                          <span>Frais de bourse</span>
+                          <span>{tradeCosts.exchange_fee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {tradeCosts?.precheck_ok && tradeCosts.total_cost != null && (
+                        <div className="cost-row cost-row-total">
+                          <span>Frais totaux (precheck)</span>
+                          <span>{Number(tradeCosts.total_cost).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {estimatedCash != null && estimatedCash > 0 && (
+                        <div className="cost-row cost-row-cash">
+                          <span>Cash estimé requis</span>
+                          <span>{estimatedCash.toFixed(2)} {estimatedCashCcy}</span>
+                        </div>
+                      )}
+
+                      {costEstimate.spread?.bid != null && costEstimate.spread?.ask != null && (
+                        <>
+                          <hr className="cost-divider" />
+                          <div className="cost-row">
+                            <span>Spread Bid/Ask</span>
+                            <span>
+                              {costEstimate.spread.bid.toFixed(2)} / {costEstimate.spread.ask.toFixed(2)}
+                              {costEstimate.spread.spread_pct != null && (
+                                <span className="cost-muted"> ({costEstimate.spread.spread_pct.toFixed(3)}%)</span>
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+
+                      {side === 'BUY' && costEstimate.total_round_trip_cost != null && (
+                        <>
+                          <hr className="cost-divider" />
+                          <div className="cost-row">
+                            <span>Aller-retour (achat+vente)</span>
+                            <span className="cost-danger">{costEstimate.total_round_trip_cost.toFixed(2)}</span>
+                          </div>
+                          {costEstimate.estimated_resale_value != null && (
+                            <div className="cost-row">
+                              <span>Revente nette estimée</span>
+                              <span className="cost-success">{costEstimate.estimated_resale_value.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {costEstimate.instrument_cost_error && (
+                        <p className="cost-warning">Illustration Saxo : {costEstimate.instrument_cost_error}</p>
+                      )}
+                      <p className="cost-footnote">Estimation indicative — le coût réel est confirmé après exécution.</p>
                     </div>
                   )}
                 </div>
@@ -833,6 +852,18 @@ export default function PlaceOrderModal({
                         <p><strong>ID Broker:</strong> {orderResult.broker_result.order_id}</p>
                       )}
                       <p><strong>Statut:</strong> {orderResult.order.status}</p>
+                      {tradeCommission != null && (
+                        <p>
+                          <strong>Commission estimée:</strong>{' '}
+                          {Number(tradeCommission).toFixed(2)}
+                          {estimatedCashCcy ? ` ${estimatedCashCcy}` : ''}
+                        </p>
+                      )}
+                      {estimatedCash != null && estimatedCash > 0 && (
+                        <p>
+                          <strong>Cash estimé:</strong> {estimatedCash.toFixed(2)} {estimatedCashCcy}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

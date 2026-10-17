@@ -12,10 +12,6 @@ import Assets from '@pages/Assets'
 import AssetDetail from '@pages/AssetDetail'
 import Orders from '@pages/Orders'
 import Strategies from '@pages/Strategies'
-import StrategiesV2 from '@pages/StrategiesV2'
-import StrategiesV3 from '@pages/StrategiesV3'
-import StrategiesV4 from '@pages/StrategiesV4'
-import StrategiesV5 from '@pages/StrategiesV5'
 import Brokers from '@pages/Brokers'
 import Settings from '@pages/Settings'
 import AIAdvisor from '@pages/AIAdvisor'
@@ -58,12 +54,12 @@ function App() {
         {/* Orders */}
         <Route path="orders" element={<Orders />} />
 
-        {/* Strategies */}
+        {/* Strategies (ex-V5) — anciennes URLs redirigées */}
         <Route path="strategies" element={<Strategies />} />
-        <Route path="strategies-v2" element={<StrategiesV2 />} />
-        <Route path="strategies-v3" element={<StrategiesV3 />} />
-        <Route path="strategies-v4" element={<StrategiesV4 />} />
-        <Route path="strategies-v5" element={<StrategiesV5 />} />
+        <Route path="strategies-v2" element={<Navigate to="/strategies" replace />} />
+        <Route path="strategies-v3" element={<Navigate to="/strategies" replace />} />
+        <Route path="strategies-v4" element={<Navigate to="/strategies" replace />} />
+        <Route path="strategies-v5" element={<Navigate to="/strategies" replace />} />
 
         {/* Brokers */}
         <Route path="brokers" element={<Brokers />} />
@@ -86,4 +82,3 @@ function App() {
 }
 
 export default App
-

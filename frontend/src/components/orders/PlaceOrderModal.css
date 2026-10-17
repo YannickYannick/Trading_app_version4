@@ -192,6 +192,97 @@
   margin-top: 0.5rem;
 }
 
+.cost-estimate-section .cost-estimate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.cost-estimate-section .cost-estimate-header label {
+  margin: 0;
+}
+
+.cost-estimate-loading,
+.cost-error {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.cost-error {
+  color: #ef4444;
+}
+
+.cost-estimate-card {
+  margin-top: 0.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  font-size: 0.85rem;
+}
+
+.cost-estimate-card h4 {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.cost-row span:first-child {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.cost-row-total,
+.cost-row-cash {
+  margin-top: 0.25rem;
+  font-weight: 600;
+}
+
+.cost-highlight {
+  font-weight: 600;
+  color: #b45309;
+}
+
+.cost-danger {
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.cost-success {
+  font-weight: 600;
+  color: #15803d;
+}
+
+.cost-muted {
+  color: var(--color-text-secondary, #64748b);
+  margin-left: 0.25rem;
+}
+
+.cost-divider {
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  margin: 0.55rem 0;
+}
+
+.cost-warning {
+  margin: 0.5rem 0 0;
+  color: #b45309;
+  font-size: 0.8rem;
+}
+
+.cost-footnote {
+  margin: 0.65rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
+}
+
 /* Autocomplétion */
 .autocomplete-dropdown {
   position: absolute;
