@@ -5,6 +5,7 @@ This module contains all service classes that encapsulate
 business logic for the trading application.
 """
 from .broker_service import BrokerService
+from .strategy_executor import StrategyExecutor
 from .sync import (
     BaseSyncService,
     AssetSyncService,
@@ -26,6 +27,7 @@ from .yahoo_validator import (
 __all__ = [
     # Broker Service
     'BrokerService',
+    'StrategyExecutor',
     # Sync Services
     'BaseSyncService',
     'AssetSyncService',
